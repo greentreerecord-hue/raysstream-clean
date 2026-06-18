@@ -15,22 +15,13 @@ export default function SubscribeButton() {
 
   return (
     <div style={{ marginBottom: "30px" }}>
-      <button
-        onClick={handleSubscribe}
-        style={{
-          background: subscribed ? "#444" : "#ff0000",
-          color: "#fff",
-          border: "none",
-          padding: "12px 24px",
-          fontSize: "18px",
-          borderRadius: "8px",
-          cursor: "pointer",
-        }}
-      >
+      <button onClick={handleSubscribe}>
         {subscribed ? "Subscribed ✓" : "Subscribe"}
       </button>
 
-      <p>{count} subscribers</p>
+      <h2 style={{ color: "white", marginTop: "12px" }}>
+        {count} subscribers
+      </h2>
     </div>
   );
 }
