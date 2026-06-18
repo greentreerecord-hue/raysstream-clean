@@ -13,21 +13,25 @@ export default function Home() {
 
       <p>Welcome to the new Ray'sStream.</p>
 
-      <button
+      <a
+        href="#subscribe"
         style={{
+          display: "inline-block",
           background: "#ff0000",
           color: "#fff",
-          border: "none",
           padding: "12px 24px",
           fontSize: "18px",
           borderRadius: "8px",
-          cursor: "pointer",
+          textDecoration: "none",
           marginBottom: "30px",
         }}
-        onClick={() => alert("Thanks for subscribing to Ray'sStream!")}
       >
         Subscribe
-      </button>
+      </a>
+
+      <div id="subscribe" style={{ marginTop: "20px", marginBottom: "40px" }}>
+        <strong>Thanks for supporting Ray'sStream!</strong>
+      </div>
 
       <div style={{ marginBottom: "40px" }}>
         <h2>It's Cool</h2>
@@ -44,4 +48,4 @@ export default function Home() {
       </div>
     </main>
   );
-}
+} 
