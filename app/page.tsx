@@ -13,29 +13,35 @@ export default function Home() {
 
       <p>Welcome to the new Ray'sStream.</p>
 
+      <button
+        style={{
+          background: "#ff0000",
+          color: "#fff",
+          border: "none",
+          padding: "12px 24px",
+          fontSize: "18px",
+          borderRadius: "8px",
+          cursor: "pointer",
+          marginBottom: "30px",
+        }}
+        onClick={() => alert("Thanks for subscribing to Ray'sStream!")}
+      >
+        Subscribe
+      </button>
+
       <div style={{ marginBottom: "40px" }}>
         <h2>It's Cool</h2>
-
-        <video
-          controls
-          width="700"
-          style={{ maxWidth: "100%" }}
-        >
+        <video controls width="700" style={{ maxWidth: "100%" }}>
           <source src="/itscool.mp4" type="video/mp4" />
         </video>
       </div>
 
       <div style={{ marginBottom: "40px" }}>
         <h2>Video 2</h2>
-
-        <video
-          controls
-          width="700"
-          style={{ maxWidth: "100%" }}
-        >
+        <video controls width="700" style={{ maxWidth: "100%" }}>
           <source src="/video2.mp4" type="video/mp4" />
         </video>
       </div>
     </main>
   );
-}
+} 
