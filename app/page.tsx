@@ -1,9 +1,16 @@
 export default function Home() {
   return (
-    <main>
+    <main style={{ padding: "20px" }}>
       <h1>Ray'sStream</h1>
-      <p>Welcome to the new Ray'sStream.</p>
-      <a href="/watch/itscool">Watch Video</a>
+
+      <video
+        width="800"
+        controls
+        autoPlay
+        muted
+      >
+        <source src="/itscool.mp4" type="video/mp4" />
+      </video>
     </main>
   );
-}
+} 
