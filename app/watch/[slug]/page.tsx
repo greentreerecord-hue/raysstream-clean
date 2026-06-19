@@ -25,26 +25,31 @@ export default async function WatchPage({
 }) {
   const { slug } = await params;
 
-  const video = videos.find((v) => v.slug === slug);
+  const video = videos.find(
+    (v) =>
+      v.slug.toLowerCase() === slug.toLowerCase()
+  );
 
   if (!video) {
     return (
       <main
         style={{
-          padding: "40px",
-          background: "#111827",
           minHeight: "100vh",
+          background: "#111827",
           color: "white",
+          padding: "40px",
         }}
       >
-        <h1 style={{ color: "#f97316" }}>Video Not Found</h1>
+        <h1 style={{ color: "orange" }}>Video Not Found</h1>
 
         <p>Available videos:</p>
 
         <ul>
           {videos.map((v) => (
             <li key={v.slug}>
-              <Link href={`/watch/${v.slug}`}>{v.title}</Link>
+              <Link href={`/watch/${v.slug}`}>
+                {v.title}
+              </Link>
             </li>
           ))}
         </ul>
@@ -59,25 +64,25 @@ export default async function WatchPage({
   return (
     <main
       style={{
-        padding: "20px",
-        background: "#111827",
         minHeight: "100vh",
+        background: "#111827",
         color: "white",
+        padding: "20px",
       }}
     >
       <h1>{video.title}</h1>
 
       <video
+        src={video.src}
         controls
         autoPlay
+        playsInline
         style={{
           width: "100%",
           maxWidth: "1000px",
           borderRadius: "12px",
         }}
-      >
-        <source src={video.src} type="video/mp4" />
-      </video>
+      />
 
       <div style={{ marginTop: "20px" }}>
         <Link href="/">← Back Home</Link>
