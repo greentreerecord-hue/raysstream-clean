@@ -5,17 +5,14 @@ import { useEffect, useRef, useState } from "react";
 
 const videos = [
   {
-    slug: "itscool",
     title: "It's Cool",
     src: "/videos/itscool.mp4",
   },
   {
-    slug: "video2",
     title: "Video 2",
     src: "/videos/video2.mp4",
   },
   {
-    slug: "spaceship",
     title: "Spaceship",
     src: "/videos/video3.mp4",
   },
@@ -23,90 +20,71 @@ const videos = [
 
 export default function WatchPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [index, setIndex] = useState(0);
 
-  const video = videos[currentIndex];
+  const video = videos[index];
 
-  function playVideo() {
+  useEffect(() => {
     const player = videoRef.current;
     if (!player) return;
 
     player.muted = true;
+    player.src = video.src;
     player.load();
 
-    setTimeout(() => {
-      player.play().catch(() => {
-        console.log("Autoplay blocked by browser");
-      });
-    }, 300);
-  }
+    const timer = setTimeout(() => {
+      player.play().catch(() => {});
+    }, 500);
 
-  useEffect(() => {
-    playVideo();
-  }, [currentIndex]);
+    return () => clearTimeout(timer);
+  }, [index, video.src]);
 
   function nextVideo() {
-    setCurrentIndex((oldIndex) =>
-      oldIndex === videos.length - 1 ? 0 : oldIndex + 1
-    );
+    setIndex((old) => (old + 1) % videos.length);
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#111827",
-        color: "white",
-        padding: "20px",
-      }}
-    >
+    <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
       <h1>{video.title}</h1>
 
       <video
         ref={videoRef}
-        key={video.src}
         controls
-        autoPlay
         muted
         playsInline
+        autoPlay
         preload="auto"
-        onCanPlay={playVideo}
         onEnded={nextVideo}
         style={{
           width: "100%",
           maxWidth: "1000px",
           background: "black",
-          borderRadius: "12px",
+          borderRadius: 12,
         }}
-      >
-        <source src={video.src} type="video/mp4" />
-        Your browser does not support video.
-      </video>
+      />
 
-      <p style={{ color: "#9ca3af" }}>
-        Auto start ON • Auto rotation ON
-      </p>
+      <br />
 
       <button
         onClick={nextVideo}
         style={{
-          marginTop: "15px",
+          marginTop: 20,
           padding: "12px 20px",
           background: "#f97316",
           color: "white",
           border: "none",
-          borderRadius: "8px",
+          borderRadius: 8,
           fontWeight: "bold",
         }}
       >
         Next Video
       </button>
 
-      <div style={{ marginTop: "20px" }}>
-        <Link href="/" style={{ color: "#93c5fd" }}>
-          ← Back Home
-        </Link>
-      </div>
+      <p>Auto start ON • Auto rotation ON</p>
+
+      <Link href="/" style={{ color: "#93c5fd" }}>
+        ← Back Home
+      </Link>
     </main>
   );
 } 
