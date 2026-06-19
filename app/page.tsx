@@ -22,8 +22,7 @@ export default function Home() {
   }, []);
 
   function handleSubscribe() {
-    const newCount = subscribers + 1;
-    setSubscribers(newCount);
+    setSubscribers(subscribers + 1);
   }
 
   return (
@@ -46,25 +45,19 @@ export default function Home() {
 
       <p>Welcome to the new Ray'sStream.</p>
 
-      <h2
-        style={{
-          color: "#00ffcc",
-        }}
-      >
-        Subscribers: {subscribers}
-      </h2>
+      <h2>Subscribers: {subscribers}</h2>
 
       <button
         onClick={handleSubscribe}
         style={{
-          background: "#ff5a4f",
+          background: "red",
           color: "white",
           border: "none",
           padding: "15px 30px",
-          borderRadius: "12px",
-          fontSize: "28px",
+          fontSize: "24px",
+          borderRadius: "10px",
           cursor: "pointer",
-          marginBottom: "30px",
+          marginBottom: "20px",
         }}
       >
         Subscribe
@@ -84,7 +77,11 @@ export default function Home() {
 
       <video
         controls
-        width="800"
+        autoPlay
+        muted
+        loop
+        playsInline
+        width={800}
         style={{
           maxWidth: "100%",
           borderRadius: "12px",
@@ -94,6 +91,7 @@ export default function Home() {
           src="/videos/itscool.mp4"
           type="video/mp4"
         />
+        Your browser does not support video playback.
       </video>
     </main>
   );
