@@ -31,24 +31,20 @@ export default async function WatchPage({
     return (
       <main
         style={{
-          background: "#111827",
           minHeight: "100vh",
+          background: "#111827",
           color: "white",
           padding: "20px",
         }}
       >
-        <h1 style={{ color: "orange" }}>Video Not Found</h1>
+        <h1>Video Not Found</h1>
 
         <ul>
-          <li>
-            <Link href="/watch/itscool">It's Cool</Link>
-          </li>
-          <li>
-            <Link href="/watch/video2">Video 2</Link>
-          </li>
-          <li>
-            <Link href="/watch/spaceship">Spaceship</Link>
-          </li>
+          {videos.map((v) => (
+            <li key={v.slug}>
+              <Link href={`/watch/${v.slug}`}>{v.title}</Link>
+            </li>
+          ))}
         </ul>
 
         <Link href="/">← Back Home</Link>
@@ -59,8 +55,8 @@ export default async function WatchPage({
   return (
     <main
       style={{
-        background: "#111827",
         minHeight: "100vh",
+        background: "#111827",
         color: "white",
         padding: "20px",
       }}
@@ -71,6 +67,7 @@ export default async function WatchPage({
         key={video.src}
         controls
         autoPlay
+        muted
         playsInline
         preload="auto"
         style={{
@@ -81,12 +78,12 @@ export default async function WatchPage({
         }}
       >
         <source src={video.src} type="video/mp4" />
+        Your browser does not support video.
       </video>
 
-      <br />
-      <br />
-
-      <Link href="/">← Back Home</Link>
+      <div style={{ marginTop: "20px" }}>
+        <Link href="/">← Back Home</Link>
+      </div>
     </main>
   );
-} 
+}
