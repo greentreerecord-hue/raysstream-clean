@@ -7,48 +7,22 @@ export default function Home() {
   const [views, setViews] = useState(0);
 
   useEffect(() => {
-    const savedViews = Number(
-      localStorage.getItem("raysstream-views") || "0"
-    );
-
+    const savedViews = Number(localStorage.getItem("raysstream-views") || "0");
     const newViews = savedViews + 1;
-
-    localStorage.setItem(
-      "raysstream-views",
-      String(newViews)
-    );
-
+    localStorage.setItem("raysstream-views", String(newViews));
     setViews(newViews);
   }, []);
 
-  function handleSubscribe() {
-    setSubscribers(subscribers + 1);
-  }
-
   return (
-    <main
-      style={{
-        background: "#111",
-        minHeight: "100vh",
-        color: "white",
-        padding: "40px",
-      }}
-    >
-      <h1
-        style={{
-          color: "orange",
-          fontSize: "48px",
-        }}
-      >
-        🔥 Ray'sStream
-      </h1>
+    <main style={{ background: "#111", minHeight: "100vh", color: "white", padding: "40px" }}>
+      <h1 style={{ color: "orange", fontSize: "48px" }}>🔥 Ray'sStream</h1>
 
       <p>Welcome to the new Ray'sStream.</p>
 
       <h2>Subscribers: {subscribers}</h2>
 
       <button
-        onClick={handleSubscribe}
+        onClick={() => setSubscribers(subscribers + 1)}
         style={{
           background: "red",
           color: "white",
@@ -65,34 +39,34 @@ export default function Home() {
 
       <h2>It's Cool</h2>
 
-      <p
-        style={{
-          color: "#00ffcc",
-          fontSize: "24px",
-          fontWeight: "bold",
-        }}
-      >
+      <p style={{ color: "#00ffcc", fontSize: "24px", fontWeight: "bold" }}>
         Views: {views}
       </p>
 
       <video
+        src="/videos/itscool.mp4"
         controls
         autoPlay
         muted
         loop
         playsInline
+        preload="auto"
         width={800}
         style={{
           maxWidth: "100%",
           borderRadius: "12px",
+          background: "black",
+          marginTop: "15px",
         }}
-      >
-        <source
-          src="/videos/itscool.mp4"
-          type="video/mp4"
-        />
-        Your browser does not support video playback.
-      </video>
+      />
+
+      <p style={{ marginTop: "20px" }}>
+        If video does not play, open this test:
+        <br />
+        <a href="/videos/itscool.mp4" style={{ color: "#00ffcc" }}>
+          /videos/itscool.mp4
+        </a>
+      </p>
     </main>
   );
-}
+} 
