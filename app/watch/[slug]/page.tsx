@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const videos = [
   {
@@ -23,54 +22,32 @@ const videos = [
 ];
 
 export default function WatchPage() {
-  const params = useParams();
-  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const slug = String(params.slug);
-  const video = videos.find((v) => v.slug === slug);
+  const video = videos[currentIndex];
 
-  useEffect(() => {
+  function playVideo() {
     const player = videoRef.current;
+    if (!player) return;
 
-    if (player) {
-      player.muted = true;
-      player.play().catch(() => {});
-    }
-  }, [slug]);
+    player.muted = true;
+    player.load();
 
-  function goToNextVideo() {
-    if (!video) return;
-
-    const currentIndex = videos.findIndex((v) => v.slug === video.slug);
-    const nextIndex = currentIndex === videos.length - 1 ? 0 : currentIndex + 1;
-    const nextVideo = videos[nextIndex];
-
-    router.push(`/watch/${nextVideo.slug}`);
+    setTimeout(() => {
+      player.play().catch(() => {
+        console.log("Autoplay blocked by browser");
+      });
+    }, 300);
   }
 
-  if (!video) {
-    return (
-      <main
-        style={{
-          minHeight: "100vh",
-          background: "#111827",
-          color: "white",
-          padding: "20px",
-        }}
-      >
-        <h1>Video Not Found</h1>
+  useEffect(() => {
+    playVideo();
+  }, [currentIndex]);
 
-        <ul>
-          {videos.map((v) => (
-            <li key={v.slug}>
-              <Link href={`/watch/${v.slug}`}>{v.title}</Link>
-            </li>
-          ))}
-        </ul>
-
-        <Link href="/">← Back Home</Link>
-      </main>
+  function nextVideo() {
+    setCurrentIndex((oldIndex) =>
+      oldIndex === videos.length - 1 ? 0 : oldIndex + 1
     );
   }
 
@@ -93,7 +70,8 @@ export default function WatchPage() {
         muted
         playsInline
         preload="auto"
-        onEnded={goToNextVideo}
+        onCanPlay={playVideo}
+        onEnded={nextVideo}
         style={{
           width: "100%",
           maxWidth: "1000px",
@@ -105,18 +83,29 @@ export default function WatchPage() {
         Your browser does not support video.
       </video>
 
-      <p style={{ marginTop: "12px", color: "#9ca3af" }}>
-        Auto start is on. Auto rotation is on.
+      <p style={{ color: "#9ca3af" }}>
+        Auto start ON • Auto rotation ON
       </p>
 
-      <div style={{ marginTop: "20px" }}>
-        <Link href="/watch/itscool">It's Cool</Link>{" | "}
-        <Link href="/watch/video2">Video 2</Link>{" | "}
-        <Link href="/watch/spaceship">Spaceship</Link>
-      </div>
+      <button
+        onClick={nextVideo}
+        style={{
+          marginTop: "15px",
+          padding: "12px 20px",
+          background: "#f97316",
+          color: "white",
+          border: "none",
+          borderRadius: "8px",
+          fontWeight: "bold",
+        }}
+      >
+        Next Video
+      </button>
 
       <div style={{ marginTop: "20px" }}>
-        <Link href="/">← Back Home</Link>
+        <Link href="/" style={{ color: "#93c5fd" }}>
+          ← Back Home
+        </Link>
       </div>
     </main>
   );
