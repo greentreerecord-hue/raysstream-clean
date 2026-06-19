@@ -1,30 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-const videos = [
-  { title: "It's Cool", slug: "itscool" },
-  { title: "Video 2", slug: "video2" },
-  { title: "Spaceship", slug: "video3" },
-];
+import { useState, useEffect } from "react";
 
 export default function HomePage() {
   const [search, setSearch] = useState("");
-  const [subscribers, setSubscribers] = useState(0);
+  const [subs, setSubs] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("raysstream_subscribers");
-    if (saved) setSubscribers(Number(saved));
+    if (saved) setSubs(Number(saved));
   }, []);
 
-  function subscribe() {
-    const next = subscribers + 1;
-    setSubscribers(next);
+  const subscribe = () => {
+    const next = subs + 1;
+    setSubs(next);
     localStorage.setItem("raysstream_subscribers", String(next));
-  }
+  };
 
-  const filteredVideos = videos.filter((video) =>
-    video.title.toLowerCase().includes(search.toLowerCase())
+  const videos = [
+    { title: "It's Cool", link: "/watch/itscool" },
+    { title: "Video 2", link: "/watch/video2" },
+    { title: "Spaceship", link: "/watch/video3" },
+  ];
+
+  const filtered = videos.filter((v) =>
+    v.title.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -37,77 +37,58 @@ export default function HomePage() {
         fontFamily: "Arial",
       }}
     >
-      <h1 style={{ textAlign: "center", fontSize: "44px" }}>
-        🔥 Ray&apos;sStream
-      </h1>
+      <h1 style={{ textAlign: "center" }}>🔥 Ray'sStream</h1>
 
-      <div style={{ textAlign: "center", marginBottom: "25px" }}>
+      <div style={{ textAlign: "center", marginBottom: "20px" }}>
         <button
           onClick={subscribe}
           style={{
             background: "red",
             color: "white",
             border: "none",
-            padding: "15px 35px",
-            borderRadius: "10px",
-            fontSize: "20px",
-            fontWeight: "bold",
+            padding: "12px 25px",
+            borderRadius: "8px",
+            fontSize: "18px",
           }}
         >
           Subscribe
         </button>
 
-        <p style={{ fontSize: "20px" }}>Subscribers: {subscribers}</p>
+        <p>Subscribers: {subs}</p>
       </div>
 
-      <div style={{ textAlign: "center", marginBottom: "30px" }}>
+      <div style={{ textAlign: "center", marginBottom: "20px" }}>
         <input
+          type="text"
           placeholder="Search videos..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
             width: "90%",
             maxWidth: "500px",
-            padding: "15px",
-            fontSize: "18px",
-            borderRadius: "10px",
-            border: "none",
+            padding: "12px",
+            borderRadius: "8px",
           }}
         />
       </div>
 
-      <h2 style={{ textAlign: "center" }}>Video Library</h2>
-
-      <div
-        style={{
-          display: "grid",
-          gap: "20px",
-          maxWidth: "700px",
-          margin: "0 auto",
-        }}
-      >
-        {filteredVideos.map((video) => (
-          <a
-            key={video.slug}
-            href={`/watch/${video.slug}`}
-            style={{
-              background: "#222",
-              color: "white",
-              padding: "25px",
-              borderRadius: "14px",
-              textDecoration: "none",
-              fontSize: "24px",
-              fontWeight: "bold",
-              display: "block",
-            }}
-          >
-            ▶ {video.title}
-            <p style={{ fontSize: "16px", fontWeight: "normal" }}>
-              Click to watch video
-            </p>
-          </a>
-        ))}
-      </div>
+      {filtered.map((video) => (
+        <a
+          key={video.link}
+          href={video.link}
+          style={{
+            display: "block",
+            background: "#222",
+            color: "white",
+            padding: "20px",
+            marginBottom: "15px",
+            borderRadius: "10px",
+            textDecoration: "none",
+          }}
+        >
+          ▶ {video.title}
+        </a>
+      ))}
     </main>
   );
 } 
