@@ -29,16 +29,8 @@ export default async function WatchPage({
 
   if (!video) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          background: "#111827",
-          color: "white",
-          padding: "20px",
-        }}
-      >
+      <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
         <h1>Video Not Found</h1>
-
         <ul>
           {videos.map((v) => (
             <li key={v.slug}>
@@ -46,24 +38,17 @@ export default async function WatchPage({
             </li>
           ))}
         </ul>
-
         <Link href="/">← Back Home</Link>
       </main>
     );
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#111827",
-        color: "white",
-        padding: "20px",
-      }}
-    >
+    <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
       <h1>{video.title}</h1>
 
       <video
+        id="mainVideo"
         key={video.src}
         controls
         autoPlay
@@ -78,12 +63,25 @@ export default async function WatchPage({
         }}
       >
         <source src={video.src} type="video/mp4" />
-        Your browser does not support video.
       </video>
+
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            setTimeout(function () {
+              var video = document.getElementById("mainVideo");
+              if (video) {
+                video.muted = true;
+                video.play().catch(function () {});
+              }
+            }, 500);
+          `,
+        }}
+      />
 
       <div style={{ marginTop: "20px" }}>
         <Link href="/">← Back Home</Link>
       </div>
     </main>
   );
-}
+} 
