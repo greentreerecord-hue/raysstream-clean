@@ -11,6 +11,10 @@ const videos = [
     title: "Video 2",
     src: "/video2.mp4",
   },
+  {
+    title: "Spaceship",
+    src: "/video3.mp4",
+  },
 ];
 
 export default function Home() {
@@ -29,6 +33,10 @@ export default function Home() {
     setLikes(savedLikes);
   }, []);
 
+  function handleSubscribe() {
+    setSubscribers(subscribers + 1);
+  }
+
   function handleLike() {
     const newLikes = likes + 1;
     localStorage.setItem("raysstream-likes", String(newLikes));
@@ -36,14 +44,26 @@ export default function Home() {
   }
 
   return (
-    <main style={{ background: "#111", minHeight: "100vh", color: "white", padding: "40px" }}>
-      <h1 style={{ color: "orange", fontSize: "48px" }}>🔥 Ray'sStream</h1>
+    <main
+      style={{
+        background: "#111",
+        minHeight: "100vh",
+        color: "white",
+        padding: "40px",
+      }}
+    >
+      <h1 style={{ color: "orange", fontSize: "48px" }}>
+        🔥 Ray'sStream
+      </h1>
+
       <p>Welcome to the new Ray'sStream.</p>
 
-      <h2 style={{ color: "#00ffcc" }}>Subscribers: {subscribers}</h2>
+      <h2 style={{ color: "#00ffcc" }}>
+        Subscribers: {subscribers}
+      </h2>
 
       <button
-        onClick={() => setSubscribers(subscribers + 1)}
+        onClick={handleSubscribe}
         style={{
           background: "#ff4d4d",
           color: "white",
@@ -57,9 +77,17 @@ export default function Home() {
         Subscribe
       </button>
 
-      <h2 style={{ marginTop: "30px" }}>{currentVideo.title}</h2>
+      <h2 style={{ marginTop: "30px" }}>
+        {currentVideo.title}
+      </h2>
 
-      <p style={{ color: "#00ffcc", fontSize: "24px", fontWeight: "bold" }}>
+      <p
+        style={{
+          color: "#00ffcc",
+          fontSize: "24px",
+          fontWeight: "bold",
+        }}
+      >
         Views: {views}
       </p>
 
@@ -74,7 +102,7 @@ export default function Home() {
           background: "#000",
         }}
       >
-        Your browser does not support video.
+        Your browser does not support video playback.
       </video>
 
       <br />
@@ -96,9 +124,17 @@ export default function Home() {
         👍 Like {likes}
       </button>
 
-      <h2 style={{ marginTop: "50px", color: "orange" }}>Video Library</h2>
+      <h2 style={{ marginTop: "50px", color: "orange" }}>
+        Video Library
+      </h2>
 
-      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "20px",
+          flexWrap: "wrap",
+        }}
+      >
         {videos.map((video) => (
           <button
             key={video.src}
@@ -117,7 +153,14 @@ export default function Home() {
           >
             🎬 {video.title}
             <br />
-            <span style={{ color: "#00ffcc", fontSize: "16px" }}>Click to play</span>
+            <span
+              style={{
+                color: "#00ffcc",
+                fontSize: "16px",
+              }}
+            >
+              Click to play
+            </span>
           </button>
         ))}
       </div>
