@@ -1,54 +1,55 @@
-"use client";
-
 import Link from "next/link";
 
-const videos: Record<string, { title: string; file: string }> = {
-  itscool: {
+const videos = [
+  {
+    slug: "itscool",
     title: "It's Cool",
-    file: "/itscool.mp4",
+    src: "/videos/itscool.mp4",
   },
-  video2: {
+  {
+    slug: "video2",
     title: "Video 2",
-    file: "/video2.mp4",
+    src: "/videos/video2.mp4",
   },
-  video3: {
+  {
+    slug: "spaceship",
     title: "Spaceship",
-    file: "/video3.mp4",
+    src: "/videos/video3.mp4",
   },
-};
+];
 
-export default function WatchPage({
+export default async function WatchPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const video = videos[params.slug];
+  const { slug } = await params;
+
+  const video = videos.find((v) => v.slug === slug);
 
   if (!video) {
     return (
       <main
         style={{
+          padding: "40px",
+          background: "#111827",
           minHeight: "100vh",
-          backgroundColor: "#111",
           color: "white",
-          padding: "20px",
-          fontFamily: "Arial, sans-serif",
         }}
       >
-        <h1>Video Not Found</h1>
+        <h1 style={{ color: "#f97316" }}>Video Not Found</h1>
+
         <p>Available videos:</p>
 
         <ul>
-          <li>
-            <Link href="/watch/itscool">It's Cool</Link>
-          </li>
-          <li>
-            <Link href="/watch/video2">Video 2</Link>
-          </li>
-          <li>
-            <Link href="/watch/video3">Spaceship</Link>
-          </li>
+          {videos.map((v) => (
+            <li key={v.slug}>
+              <Link href={`/watch/${v.slug}`}>{v.title}</Link>
+            </li>
+          ))}
         </ul>
+
+        <br />
 
         <Link href="/">← Back Home</Link>
       </main>
@@ -58,31 +59,29 @@ export default function WatchPage({
   return (
     <main
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#111",
-        color: "white",
         padding: "20px",
-        fontFamily: "Arial, sans-serif",
+        background: "#111827",
+        minHeight: "100vh",
+        color: "white",
       }}
     >
-      <Link href="/">← Back Home</Link>
-
-      <h1 style={{ marginTop: "20px" }}>{video.title}</h1>
+      <h1>{video.title}</h1>
 
       <video
         controls
         autoPlay
-        playsInline
         style={{
           width: "100%",
-          maxWidth: "900px",
+          maxWidth: "1000px",
           borderRadius: "12px",
-          backgroundColor: "black",
         }}
       >
-        <source src={video.file} type="video/mp4" />
-        Your browser does not support video playback.
+        <source src={video.src} type="video/mp4" />
       </video>
+
+      <div style={{ marginTop: "20px" }}>
+        <Link href="/">← Back Home</Link>
+      </div>
     </main>
   );
 } 
