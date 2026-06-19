@@ -25,36 +25,31 @@ export default async function WatchPage({
 }) {
   const { slug } = await params;
 
-  const video = videos.find(
-    (v) =>
-      v.slug.toLowerCase() === slug.toLowerCase()
-  );
+  const video = videos.find((v) => v.slug === slug);
 
   if (!video) {
     return (
       <main
         style={{
-          minHeight: "100vh",
           background: "#111827",
+          minHeight: "100vh",
           color: "white",
-          padding: "40px",
+          padding: "20px",
         }}
       >
         <h1 style={{ color: "orange" }}>Video Not Found</h1>
 
-        <p>Available videos:</p>
-
         <ul>
-          {videos.map((v) => (
-            <li key={v.slug}>
-              <Link href={`/watch/${v.slug}`}>
-                {v.title}
-              </Link>
-            </li>
-          ))}
+          <li>
+            <Link href="/watch/itscool">It's Cool</Link>
+          </li>
+          <li>
+            <Link href="/watch/video2">Video 2</Link>
+          </li>
+          <li>
+            <Link href="/watch/spaceship">Spaceship</Link>
+          </li>
         </ul>
-
-        <br />
 
         <Link href="/">← Back Home</Link>
       </main>
@@ -64,8 +59,8 @@ export default async function WatchPage({
   return (
     <main
       style={{
-        minHeight: "100vh",
         background: "#111827",
+        minHeight: "100vh",
         color: "white",
         padding: "20px",
       }}
@@ -73,20 +68,25 @@ export default async function WatchPage({
       <h1>{video.title}</h1>
 
       <video
-        src={video.src}
+        key={video.src}
         controls
         autoPlay
         playsInline
+        preload="auto"
         style={{
           width: "100%",
           maxWidth: "1000px",
+          background: "black",
           borderRadius: "12px",
         }}
-      />
+      >
+        <source src={video.src} type="video/mp4" />
+      </video>
 
-      <div style={{ marginTop: "20px" }}>
-        <Link href="/">← Back Home</Link>
-      </div>
+      <br />
+      <br />
+
+      <Link href="/">← Back Home</Link>
     </main>
   );
 } 
