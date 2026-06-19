@@ -2,10 +2,22 @@
 
 import { useEffect, useState } from "react";
 
+const videos = [
+  {
+    title: "It's Cool",
+    src: "/itscool.mp4",
+  },
+  {
+    title: "Video 2",
+    src: "/video2.mp4",
+  },
+];
+
 export default function Home() {
   const [subscribers, setSubscribers] = useState(1);
   const [views, setViews] = useState(0);
   const [likes, setLikes] = useState(0);
+  const [currentVideo, setCurrentVideo] = useState(videos[0]);
 
   useEffect(() => {
     const savedViews = Number(localStorage.getItem("raysstream-views") || "0");
@@ -17,10 +29,6 @@ export default function Home() {
     setLikes(savedLikes);
   }, []);
 
-  function handleSubscribe() {
-    setSubscribers(subscribers + 1);
-  }
-
   function handleLike() {
     const newLikes = likes + 1;
     localStorage.setItem("raysstream-likes", String(newLikes));
@@ -30,13 +38,12 @@ export default function Home() {
   return (
     <main style={{ background: "#111", minHeight: "100vh", color: "white", padding: "40px" }}>
       <h1 style={{ color: "orange", fontSize: "48px" }}>🔥 Ray'sStream</h1>
-
       <p>Welcome to the new Ray'sStream.</p>
 
       <h2 style={{ color: "#00ffcc" }}>Subscribers: {subscribers}</h2>
 
       <button
-        onClick={handleSubscribe}
+        onClick={() => setSubscribers(subscribers + 1)}
         style={{
           background: "#ff4d4d",
           color: "white",
@@ -50,14 +57,15 @@ export default function Home() {
         Subscribe
       </button>
 
-      <h2 style={{ marginTop: "30px" }}>It's Cool</h2>
+      <h2 style={{ marginTop: "30px" }}>{currentVideo.title}</h2>
 
       <p style={{ color: "#00ffcc", fontSize: "24px", fontWeight: "bold" }}>
         Views: {views}
       </p>
 
       <video
-        src="/itscool.mp4"
+        key={currentVideo.src}
+        src={currentVideo.src}
         controls
         width={800}
         style={{
@@ -87,6 +95,32 @@ export default function Home() {
       >
         👍 Like {likes}
       </button>
+
+      <h2 style={{ marginTop: "50px", color: "orange" }}>Video Library</h2>
+
+      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+        {videos.map((video) => (
+          <button
+            key={video.src}
+            onClick={() => setCurrentVideo(video)}
+            style={{
+              background: "#222",
+              color: "white",
+              border: "2px solid #00ffcc",
+              borderRadius: "12px",
+              padding: "20px",
+              fontSize: "22px",
+              cursor: "pointer",
+              width: "220px",
+              textAlign: "left",
+            }}
+          >
+            🎬 {video.title}
+            <br />
+            <span style={{ color: "#00ffcc", fontSize: "16px" }}>Click to play</span>
+          </button>
+        ))}
+      </div>
     </main>
   );
 }
