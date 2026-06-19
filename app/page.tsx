@@ -3,21 +3,9 @@
 import { useEffect, useState } from "react";
 
 const videos = [
-  {
-    title: "It's Cool",
-    slug: "itscool",
-    file: "/videos/itscool.mp4",
-  },
-  {
-    title: "Video 2",
-    slug: "video2",
-    file: "/videos/video2.mp4",
-  },
-  {
-    title: "Spaceship",
-    slug: "video3",
-    file: "/videos/video3.mp4",
-  },
+  { title: "It's Cool", slug: "itscool" },
+  { title: "Video 2", slug: "video2" },
+  { title: "Spaceship", slug: "video3" },
 ];
 
 export default function HomePage() {
@@ -25,14 +13,14 @@ export default function HomePage() {
   const [subscribers, setSubscribers] = useState(0);
 
   useEffect(() => {
-    const savedSubs = localStorage.getItem("raysstream_subscribers");
-    if (savedSubs) setSubscribers(Number(savedSubs));
+    const saved = localStorage.getItem("raysstream_subscribers");
+    if (saved) setSubscribers(Number(saved));
   }, []);
 
   function subscribe() {
-    const newCount = subscribers + 1;
-    setSubscribers(newCount);
-    localStorage.setItem("raysstream_subscribers", String(newCount));
+    const next = subscribers + 1;
+    setSubscribers(next);
+    localStorage.setItem("raysstream_subscribers", String(next));
   }
 
   const filteredVideos = videos.filter((video) =>
@@ -46,10 +34,10 @@ export default function HomePage() {
         background: "#111",
         color: "white",
         padding: "20px",
-        fontFamily: "Arial, sans-serif",
+        fontFamily: "Arial",
       }}
     >
-      <h1 style={{ textAlign: "center", fontSize: "42px" }}>
+      <h1 style={{ textAlign: "center", fontSize: "44px" }}>
         🔥 Ray&apos;sStream
       </h1>
 
@@ -63,21 +51,17 @@ export default function HomePage() {
             padding: "15px 35px",
             borderRadius: "10px",
             fontSize: "20px",
-            cursor: "pointer",
             fontWeight: "bold",
           }}
         >
           Subscribe
         </button>
 
-        <p style={{ fontSize: "20px", marginTop: "10px" }}>
-          Subscribers: {subscribers}
-        </p>
+        <p style={{ fontSize: "20px" }}>Subscribers: {subscribers}</p>
       </div>
 
       <div style={{ textAlign: "center", marginBottom: "30px" }}>
         <input
-          type="text"
           placeholder="Search videos..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -97,8 +81,8 @@ export default function HomePage() {
       <div
         style={{
           display: "grid",
-          gap: "25px",
-          maxWidth: "800px",
+          gap: "20px",
+          maxWidth: "700px",
           margin: "0 auto",
         }}
       >
@@ -107,31 +91,23 @@ export default function HomePage() {
             key={video.slug}
             href={`/watch/${video.slug}`}
             style={{
-              textDecoration: "none",
-              color: "white",
               background: "#222",
-              padding: "15px",
-              borderRadius: "12px",
+              color: "white",
+              padding: "25px",
+              borderRadius: "14px",
+              textDecoration: "none",
+              fontSize: "24px",
+              fontWeight: "bold",
               display: "block",
             }}
           >
-            <video
-              src={video.file}
-              muted
-              playsInline
-              preload="metadata"
-              style={{
-                width: "100%",
-                borderRadius: "10px",
-                background: "black",
-              }}
-            />
-
-            <h2>{video.title}</h2>
-            <p>Views: open video to count view</p>
+            ▶ {video.title}
+            <p style={{ fontSize: "16px", fontWeight: "normal" }}>
+              Click to watch video
+            </p>
           </a>
         ))}
       </div>
     </main>
   );
-}
+} 
