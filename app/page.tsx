@@ -16,6 +16,8 @@ export default function WatchPage() {
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
   const [views, setViews] = useState(0);
+  const [subscribers, setSubscribers] = useState(0);
+  const [subscribed, setSubscribed] = useState(false);
 
   const video = videos[index];
 
@@ -24,10 +26,14 @@ export default function WatchPage() {
     const savedLikes = localStorage.getItem(`likes-${video.title}`);
     const savedLiked = localStorage.getItem(`liked-${video.title}`);
     const savedViews = localStorage.getItem(`views-${video.title}`);
+    const savedSubscribers = localStorage.getItem("raysstream-subscribers");
+    const savedSubscribed = localStorage.getItem("raysstream-subscribed");
 
     setComments(savedComments ? JSON.parse(savedComments) : []);
     setLikes(savedLikes ? Number(savedLikes) : 0);
     setLiked(savedLiked === "true");
+    setSubscribers(savedSubscribers ? Number(savedSubscribers) : 0);
+    setSubscribed(savedSubscribed === "true");
 
     const newViews = savedViews ? Number(savedViews) + 1 : 1;
     setViews(newViews);
@@ -58,6 +64,19 @@ export default function WatchPage() {
     localStorage.setItem(`likes-${video.title}`, String(newLikes));
   }
 
+  function toggleSubscribe() {
+    const newSubscribed = !subscribed;
+    const newCount = newSubscribed
+      ? subscribers + 1
+      : Math.max(0, subscribers - 1);
+
+    setSubscribed(newSubscribed);
+    setSubscribers(newCount);
+
+    localStorage.setItem("raysstream-subscribed", String(newSubscribed));
+    localStorage.setItem("raysstream-subscribers", String(newCount));
+  }
+
   return (
     <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
       <h1>{video.title}</h1>
@@ -79,7 +98,7 @@ export default function WatchPage() {
         }}
       />
 
-      <div style={{ display: "flex", gap: 10, marginTop: 15 }}>
+      <div style={{ display: "flex", gap: 10, marginTop: 15, flexWrap: "wrap" }}>
         <button
           onClick={toggleLike}
           style={{
@@ -92,6 +111,20 @@ export default function WatchPage() {
           }}
         >
           👍 {liked ? "Liked" : "Like"} ({likes})
+        </button>
+
+        <button
+          onClick={toggleSubscribe}
+          style={{
+            padding: "12px 20px",
+            background: subscribed ? "#16a34a" : "#dc2626",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: "bold",
+          }}
+        >
+          {subscribed ? "Subscribed" : "Subscribe"} ({subscribers})
         </button>
 
         <button
