@@ -1,37 +1,24 @@
-"use client";
-
-import { useParams } from "next/navigation";
-
-const videos: Record<string, { title: string; file: string }> = {
-  itscool: { title: "It's Cool", file: "/videos/itscool.mp4" },
-  video2: { title: "Video 2", file: "/videos/video2.mp4" },
-  video3: { title: "Spaceship Video", file: "/videos/video3.mp4" },
-};
-
-export default function WatchPage() {
-  const params = useParams();
-  const slug = String(params.slug || "itscool");
-  const video = videos[slug] || videos.itscool;
-
+export default function Home() {
   return (
     <main style={{ padding: 20, background: "#111", color: "white", minHeight: "100vh" }}>
-      <a href="/" style={{ color: "red" }}>← Home</a>
+      <h1>🔥 Ray'sStream</h1>
+      <p>Watch videos on Ray'sStream.</p>
 
-      <h1>{video.title}</h1>
-
-      <video
-        key={video.file}
-        controls
-        playsInline
-        preload="auto"
-        style={{ width: "100%", maxWidth: 900, background: "black" }}
-      >
-        <source src={video.file} type="video/mp4" />
-        Video not supported.
-      </video>
-
-      <p>Video file path: {video.file}</p>
+      <a href="/watch/itscool" style={card}>▶ It's Cool</a>
+      <a href="/watch/video2" style={card}>▶ Video 2</a>
+      <a href="/watch/video3" style={card}>▶ Spaceship Video</a>
     </main>
   );
-} 
+}
+
+const card = {
+  display: "block",
+  background: "#222",
+  color: "white",
+  padding: 18,
+  marginTop: 14,
+  borderRadius: 12,
+  textDecoration: "none",
+  fontSize: 20,
+}; 
 
