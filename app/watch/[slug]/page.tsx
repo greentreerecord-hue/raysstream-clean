@@ -1,28 +1,66 @@
-export default function WatchPage() {
+import Link from "next/link";
+
+export default function HomePage() {
+  const videos = [
+    {
+      title: "It's Cool",
+      slug: "itscool",
+    },
+    {
+      title: "Video 2",
+      slug: "video2",
+    },
+    {
+      title: "Spaceship",
+      slug: "video3",
+    },
+  ];
+
   return (
-    <main style={{ background: "#000", color: "white", minHeight: "100vh", padding: 20 }}>
-      <h1>Ray'sStream</h1>
+    <main
+      style={{
+        background: "#111",
+        color: "white",
+        minHeight: "100vh",
+        padding: "20px",
+      }}
+    >
+      <h1>🔥 Ray'sStream</h1>
 
-      <video
-        controls
-        autoPlay
-        loop
-        playsInline
-        style={{ width: "100%", maxWidth: 900, borderRadius: 12 }}
+      <h2>Video Library</h2>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))",
+          gap: "20px",
+          marginTop: "20px",
+        }}
       >
-        <source src="/videos/itscool.mp4" type="video/mp4" />
-      </video>
-
-      <h2>It's Cool</h2>
-
-      <button style={{ background: "red", color: "white", padding: "12px 20px", borderRadius: 8 }}>
-        Subscribe
-      </button>
-
-      <p>Views: 1</p>
-
-      <h3>Comments</h3>
-      <input placeholder="Write a comment..." style={{ padding: 10, width: "100%", maxWidth: 500 }} />
+        {videos.map((video) => (
+          <Link
+            key={video.slug}
+            href={`/watch/${video.slug}`}
+            style={{
+              textDecoration: "none",
+              color: "white",
+            }}
+          >
+            <div
+              style={{
+                background: "#222",
+                padding: "20px",
+                borderRadius: "12px",
+                cursor: "pointer",
+              }}
+            >
+              <h3>{video.title}</h3>
+              <p>▶ Watch Video</p>
+            </div>
+          </Link>
+        ))}
+      </div>
     </main>
   );
 } 
+
