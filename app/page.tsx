@@ -1,55 +1,65 @@
 import Link from "next/link";
 
-const videos = [
-  {
-    title: "It's Cool",
-    description: "Ray'sStream music video",
-    href: "/watch",
-  },
-  {
-    title: "Video 2",
-    description: "Second Ray'sStream video",
-    href: "/watch",
-  },
-  {
-    title: "Spaceship",
-    description: "Spaceship video",
-    href: "/watch",
-  },
-];
-
 export default function HomePage() {
   return (
-    <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
-      <h1 style={{ color: "#f97316" }}>Ray&apos;sStream</h1>
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#111827",
+        color: "white",
+        padding: "40px",
+        textAlign: "center",
+      }}
+    >
+      <h1
+        style={{
+          color: "#f97316",
+          fontSize: "48px",
+          marginBottom: "20px",
+        }}
+      >
+        Ray'sStream
+      </h1>
 
-      <p style={{ color: "#9ca3af" }}>
-        Video library
+      <p
+        style={{
+          color: "#9ca3af",
+          fontSize: "20px",
+          marginBottom: "40px",
+        }}
+      >
+        Videos • Likes • Views • Comments • Subscribe
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
-        {videos.map((video) => (
-          <Link
-            key={video.title}
-            href={video.href}
-            style={{
-              background: "#1f2937",
-              padding: 20,
-              borderRadius: 12,
-              color: "white",
-              textDecoration: "none",
-            }}
-          >
-            <div style={{ background: "black", height: 140, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              ▶ Play
-            </div>
+      <Link
+        href="/watch"
+        style={{
+          display: "inline-block",
+          padding: "16px 32px",
+          background: "#dc2626",
+          color: "white",
+          textDecoration: "none",
+          borderRadius: "10px",
+          fontWeight: "bold",
+          fontSize: "20px",
+        }}
+      >
+        Watch Videos
+      </Link>
 
-            <h2>{video.title}</h2>
-            <p style={{ color: "#9ca3af" }}>{video.description}</p>
-          </Link>
-        ))}
+      <div
+        style={{
+          marginTop: "50px",
+          padding: "20px",
+          background: "#1f2937",
+          borderRadius: "12px",
+        }}
+      >
+        <h2>TEST CHANGE 123</h2>
+        <p>If you can see this text, the homepage is deploying correctly.</p>
       </div>
     </main>
   );
 } 
+
  
