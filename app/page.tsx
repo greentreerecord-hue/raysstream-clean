@@ -1,143 +1,131 @@
-"use client";
+""use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const videos = [
-  {
+const videos = {
+  "its-cool": {
     title: "It's Cool",
-    slug: "its-cool",
     src: "/videos/itscool.mp4",
   },
-  {
+  itscool: {
+    title: "It's Cool",
+    src: "/videos/itscool.mp4",
+  },
+  video2: {
     title: "Video 2",
-    slug: "video2",
     src: "/videos/video2.mp4",
   },
-  {
+  video3: {
     title: "Spaceship",
-    slug: "video3",
     src: "/videos/video3.mp4",
   },
-];
+};
 
-export default function HomePage() {
-  const [search, setSearch] = useState("");
-  const [views, setViews] = useState<Record<string, number>>({});
-  const [likes, setLikes] = useState<Record<string, number>>({});
-  const [comments, setComments] = useState<Record<string, string[]>>({});
-  const [commentText, setCommentText] = useState<Record<string, string>>({});
+export default function WatchPage({ params }: { params: { slug: string } }) {
+  const video = videos[params.slug as keyof typeof videos];
+
+  const [views, setViews] = useState(0);
+  const [likes, setLikes] = useState(0);
+  const [comment, setComment] = useState("");
+  const [comments, setComments] = useState<string[]>([]);
 
   useEffect(() => {
-    const loadedViews: Record<string, number> = {};
-    const loadedLikes: Record<string, number> = {};
-    const loadedComments: Record<string, string[]> = {};
+    if (!video) return;
 
-    videos.forEach((video) => {
-      loadedViews[video.slug] = Number(localStorage.getItem(`views-${video.slug}`) || "0");
-      loadedLikes[video.slug] = Number(localStorage.getItem(`likes-${video.slug}`) || "0");
-      loadedComments[video.slug] = JSON.parse(localStorage.getItem(`comments-${video.slug}`) || "[]");
-    });
+    const viewKey = `views-${params.slug}`;
+    const likeKey = `likes-${params.slug}`;
+    const commentKey = `comments-${params.slug}`;
 
-    setViews(loadedViews);
-    setLikes(loadedLikes);
-    setComments(loadedComments);
-  }, []);
+    const newViews = Number(localStorage.getItem(viewKey) || "0") + 1;
+    const savedLikes = Number(localStorage.getItem(likeKey) || "0");
+    const savedComments = JSON.parse(localStorage.getItem(commentKey) || "[]");
 
-  function addView(slug: string) {
-    const newViews = (views[slug] || 0) + 1;
-    setViews({ ...views, [slug]: newViews });
-    localStorage.setItem(`views-${slug}`, String(newViews));
+    localStorage.setItem(viewKey, String(newViews));
+
+    setViews(newViews);
+    setLikes(savedLikes);
+    setComments(savedComments);
+  }, [params.slug, video]);
+
+  if (!video) {
+    return (
+      <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
+        <h1 style={{ color: "#ff6a00" }}>Video not found</h1>
+        <p>Slug: {params.slug}</p>
+        <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
+      </main>
+    );
   }
 
-  function addLike(slug: string) {
-    const newLikes = (likes[slug] || 0) + 1;
-    setLikes({ ...likes, [slug]: newLikes });
-    localStorage.setItem(`likes-${slug}`, String(newLikes));
+  function handleLike() {
+    const newLikes = likes + 1;
+    setLikes(newLikes);
+    localStorage.setItem(`likes-${params.slug}`, String(newLikes));
   }
 
-  function addComment(slug: string) {
-    const text = commentText[slug];
-    if (!text || !text.trim()) return;
+  function addComment() {
+    if (!comment.trim()) return;
 
-    const newComments = [text, ...(comments[slug] || [])];
-
-    setComments({ ...comments, [slug]: newComments });
-    setCommentText({ ...commentText, [slug]: "" });
-
-    localStorage.setItem(`comments-${slug}`, JSON.stringify(newComments));
+    const updatedComments = [comment, ...comments];
+    setComments(updatedComments);
+    localStorage.setItem(`comments-${params.slug}`, JSON.stringify(updatedComments));
+    setComment("");
   }
-
-  const filteredVideos = videos.filter((video) =>
-    video.title.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
-      <h1 style={{ color: "#ff6a00", fontSize: 44 }}>🔥 Ray'sStream</h1>
-      <p style={{ color: "#aaa" }}>Home Video Library</p>
+      <h1 style={{ color: "#ff6a00", fontSize: 36 }}>🔥 Ray'sStream</h1>
 
-      <input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search videos..."
+      <h2>{video.title}</h2>
+
+      <video
+        src={video.src}
+        controls
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
         style={{
           width: "100%",
-          maxWidth: 500,
-          padding: 12,
-          fontSize: 16,
-          marginBottom: 24,
+          maxWidth: 1000,
+          background: "black",
+          borderRadius: 12,
         }}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
-        {filteredVideos.map((video) => (
-          <div key={video.slug} style={{ background: "#151515", padding: 16, borderRadius: 14 }}>
-            <Link href={`/watch/${video.slug}`} onClick={() => addView(video.slug)}>
-              <video
-                src={video.src}
-                muted
-                playsInline
-                preload="metadata"
-                style={{ width: "100%", height: 180, objectFit: "cover", background: "black", borderRadius: 10 }}
-              />
-            </Link>
+      <p style={{ color: "#aaa" }}>{views} views</p>
 
-            <h2>{video.title}</h2>
+      <button onClick={handleLike} style={{ padding: "10px 16px", marginRight: 10 }}>
+        👍 Like {likes}
+      </button>
 
-            <p style={{ color: "#aaa" }}>{views[video.slug] || 0} views</p>
+      <section style={{ marginTop: 30, maxWidth: 700 }}>
+        <h3>Comments</h3>
 
-            <button onClick={() => addLike(video.slug)} style={{ padding: "8px 14px", marginRight: 8 }}>
-              👍 Like {likes[video.slug] || 0}
-            </button>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Add a comment..."
+          style={{ width: "100%", height: 90, padding: 10 }}
+        />
 
-            <Link href={`/watch/${video.slug}`} style={{ color: "#00ffff" }} onClick={() => addView(video.slug)}>
-              Watch Video
-            </Link>
+        <br />
 
-            <div style={{ marginTop: 16 }}>
-              <textarea
-                value={commentText[video.slug] || ""}
-                onChange={(e) =>
-                  setCommentText({ ...commentText, [video.slug]: e.target.value })
-                }
-                placeholder="Add a comment..."
-                style={{ width: "100%", height: 70, padding: 8 }}
-              />
+        <button onClick={addComment} style={{ marginTop: 10, padding: "10px 16px" }}>
+          Post Comment
+        </button>
 
-              <button onClick={() => addComment(video.slug)} style={{ marginTop: 8, padding: "8px 14px" }}>
-                Post Comment
-              </button>
-
-              {(comments[video.slug] || []).map((comment, index) => (
-                <p key={index} style={{ background: "#222", padding: 10, borderRadius: 8 }}>
-                  {comment}
-                </p>
-              ))}
-            </div>
-          </div>
+        {comments.map((c, i) => (
+          <p key={i} style={{ background: "#151515", padding: 12, borderRadius: 8 }}>
+            {c}
+          </p>
         ))}
-      </div>
+      </section>
+
+      <br />
+
+      <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
     </main>
   );
 } 
