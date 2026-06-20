@@ -3,19 +3,19 @@ import Link from "next/link";
 const videos: Record<string, { title: string; src: string }> = {
   itscool: {
     title: "It's Cool",
-    src: "/videos/itscool.mp4",
+    src: "/itscool.mp4",
   },
   "its-cool": {
     title: "It's Cool",
-    src: "/videos/itscool.mp4",
+    src: "/itscool.mp4",
   },
   video2: {
     title: "Video 2",
-    src: "/videos/video2.mp4",
+    src: "/video2.mp4",
   },
   video3: {
     title: "Spaceship",
-    src: "/videos/video3.mp4",
+    src: "/video3.mp4",
   },
 };
 
@@ -41,6 +41,7 @@ export default function WatchPage({ params }: { params: { slug: string } }) {
       <video
         src={video.src}
         controls
+        autoPlay
         playsInline
         preload="auto"
         style={{
@@ -52,13 +53,6 @@ export default function WatchPage({ params }: { params: { slug: string } }) {
       />
 
       <p style={{ color: "#aaa" }}>File: {video.src}</p>
-
-      <a href={video.src} target="_blank" style={{ color: "#00ffff" }}>
-        Open raw video file
-      </a>
-
-      <br />
-      <br />
 
       <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
     </main>
