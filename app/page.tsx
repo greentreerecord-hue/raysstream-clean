@@ -2,9 +2,7 @@ export default function Home() {
   return (
     <main style={{ padding: 20, background: "#111", color: "white", minHeight: "100vh" }}>
       <h1>🔥 Ray'sStream</h1>
-      <p>Streaming service built for videos.</p>
-
-      <h2>Videos</h2>
+      <p>Watch videos on Ray'sStream.</p>
 
       <a href="/watch/itscool" style={card}>▶ It's Cool</a>
       <a href="/watch/video2" style={card}>▶ Video 2</a>
