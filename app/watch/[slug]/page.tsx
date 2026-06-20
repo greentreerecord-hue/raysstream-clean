@@ -1,46 +1,28 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
 
-const videos = [
-  { title: "It's Cool", slug: "its-cool" },
-  { title: "Video 2", slug: "video2" },
-  { title: "Spaceship", slug: "video3" },
-];
+const videos = {
+  "its-cool": {
+    title: "It's Cool",
+    src: "/videos/itscool.mp4",
+  },
+  video2: {
+    title: "Video 2",
+    src: "/videos/video2.mp4",
+  },
+  video3: {
+    title: "Spaceship",
+    src: "/videos/video3.mp4",
+  },
+};
 
-export default function HomePage() {
-  const [search, setSearch] = useState("");
+export default function WatchPage({ params }: { params: { slug: string } }) {
+  const video = videos[params.slug as keyof typeof videos];
 
-  const filteredVideos = videos.filter((video) =>
-    video.title.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <main style={{ padding: 24 }}>
-      <h1>🔥 Ray'sStream</h1>
-
-      <input
-        type="text"
-        placeholder="Search videos..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{
-          width: "100%",
-          maxWidth: 500,
-          padding: 12,
-          marginBottom: 20,
-          fontSize: 16,
-        }}
-      />
-
-      {filteredVideos.map((video) => (
-        <div key={video.slug} style={{ marginBottom: 16 }}>
-          <Link href={`/watch/${video.slug}`}>
-            {video.title}
-          </Link>
-        </div>
-      ))}
-    </main>
-  );
-} 
+  if (!video) {
+    return (
+      <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
+        <h1>Video not found</h1>
+        <Link href="/">Back Home</Link>
+      </main>
+    );
+  }
