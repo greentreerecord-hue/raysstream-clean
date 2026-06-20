@@ -8,6 +8,10 @@ const videos = {
     title: "It's Cool",
     src: "/videos/itscool.mp4",
   },
+  itscool: {
+    title: "It's Cool",
+    src: "/videos/itscool.mp4",
+  },
   video2: {
     title: "Video 2",
     src: "/videos/video2.mp4",
@@ -18,18 +22,13 @@ const videos = {
   },
 };
 
-export default function WatchPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const video =
-    videos[params.slug as keyof typeof videos];
+export default function WatchPage({ params }: { params: { slug: string } }) {
+  const video = videos[params.slug as keyof typeof videos];
 
   const [views, setViews] = useState(0);
   const [likes, setLikes] = useState(0);
-  const [comments, setComments] = useState<string[]>([]);
   const [comment, setComment] = useState("");
+  const [comments, setComments] = useState<string[]>([]);
 
   useEffect(() => {
     if (!video) return;
@@ -38,96 +37,53 @@ export default function WatchPage({
     const likeKey = `likes-${params.slug}`;
     const commentKey = `comments-${params.slug}`;
 
-    const savedViews =
-      Number(localStorage.getItem(viewKey) || "0") + 1;
+    const newViews = Number(localStorage.getItem(viewKey) || "0") + 1;
+    const savedLikes = Number(localStorage.getItem(likeKey) || "0");
+    const savedComments = JSON.parse(localStorage.getItem(commentKey) || "[]");
 
-    localStorage.setItem(
-      viewKey,
-      String(savedViews)
-    );
+    localStorage.setItem(viewKey, String(newViews));
 
-    setViews(savedViews);
-    setLikes(
-      Number(localStorage.getItem(likeKey) || "0")
-    );
-
-    setComments(
-      JSON.parse(
-        localStorage.getItem(commentKey) || "[]"
-      )
-    );
+    setViews(newViews);
+    setLikes(savedLikes);
+    setComments(savedComments);
   }, [params.slug, video]);
 
   if (!video) {
     return (
-      <main
-        style={{
-          background: "#050505",
-          color: "white",
-          minHeight: "100vh",
-          padding: 24,
-        }}
-      >
-        <h1>Video not found</h1>
-
-        <Link
-          href="/"
-          style={{ color: "#00ffff" }}
-        >
-          ← Back Home
-        </Link>
+      <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
+        <h1 style={{ color: "#ff6a00" }}>Video not found</h1>
+        <p>Slug: {params.slug}</p>
+        <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
       </main>
     );
   }
 
   function handleLike() {
     const newLikes = likes + 1;
-
     setLikes(newLikes);
-
-    localStorage.setItem(
-      `likes-${params.slug}`,
-      String(newLikes)
-    );
+    localStorage.setItem(`likes-${params.slug}`, String(newLikes));
   }
 
   function addComment() {
     if (!comment.trim()) return;
 
-    const updated = [comment, ...comments];
-
-    setComments(updated);
-
-    localStorage.setItem(
-      `comments-${params.slug}`,
-      JSON.stringify(updated)
-    );
-
+    const updatedComments = [comment, ...comments];
+    setComments(updatedComments);
+    localStorage.setItem(`comments-${params.slug}`, JSON.stringify(updatedComments));
     setComment("");
   }
 
   return (
-    <main
-      style={{
-        background: "#050505",
-        color: "white",
-        minHeight: "100vh",
-        padding: 24,
-      }}
-    >
-      <h1
-        style={{
-          color: "#ff6a00",
-          fontSize: 36,
-        }}
-      >
-        🔥 Ray'sStream
-      </h1>
+    <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
+      <h1 style={{ color: "#ff6a00", fontSize: 36 }}>🔥 Ray'sStream</h1>
+
+      <h2>{video.title}</h2>
 
       <video
         src={video.src}
         controls
         autoPlay
+        muted
         playsInline
         preload="auto"
         style={{
@@ -138,75 +94,38 @@ export default function WatchPage({
         }}
       />
 
-      <h2>{video.title}</h2>
+      <p style={{ color: "#aaa" }}>{views} views</p>
 
-      <p>{views} views</p>
-
-      <button
-        onClick={handleLike}
-        style={{
-          padding: "10px 16px",
-          marginRight: 10,
-        }}
-      >
-        👍 Like ({likes})
+      <button onClick={handleLike} style={{ padding: "10px 16px", marginRight: 10 }}>
+        👍 Like {likes}
       </button>
 
-      <h3 style={{ marginTop: 30 }}>
-        Comments
-      </h3>
+      <section style={{ marginTop: 30, maxWidth: 700 }}>
+        <h3>Comments</h3>
 
-      <textarea
-        value={comment}
-        onChange={(e) =>
-          setComment(e.target.value)
-        }
-        placeholder="Add a comment..."
-        style={{
-          width: "100%",
-          maxWidth: 700,
-          height: 100,
-          padding: 10,
-        }}
-      />
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Add a comment..."
+          style={{ width: "100%", height: 90, padding: 10 }}
+        />
 
-      <br />
+        <br />
 
-      <button
-        onClick={addComment}
-        style={{
-          marginTop: 10,
-          padding: "10px 16px",
-        }}
-      >
-        Post Comment
-      </button>
+        <button onClick={addComment} style={{ marginTop: 10, padding: "10px 16px" }}>
+          Post Comment
+        </button>
 
-      <div style={{ marginTop: 20 }}>
         {comments.map((c, i) => (
-          <div
-            key={i}
-            style={{
-              background: "#151515",
-              padding: 12,
-              borderRadius: 8,
-              marginBottom: 10,
-            }}
-          >
+          <p key={i} style={{ background: "#151515", padding: 12, borderRadius: 8 }}>
             {c}
-          </div>
+          </p>
         ))}
-      </div>
+      </section>
 
       <br />
 
-      <Link
-        href="/"
-        style={{ color: "#00ffff" }}
-      >
-        ← Back Home
-      </Link>
+      <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
     </main>
   );
-} 
-
+}
