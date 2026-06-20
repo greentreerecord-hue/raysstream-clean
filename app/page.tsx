@@ -1,58 +1,56 @@
 import Link from "next/link";
 
-const videos = [
-  {
+const videos: Record<string, { title: string; file: string }> = {
+  "its-cool": {
     title: "It's Cool",
-    slug: "its-cool",
     file: "/videos/itscool.mp4",
   },
-  {
+  video2: {
     title: "Video 2",
-    slug: "video2",
     file: "/videos/video2.mp4",
   },
-  {
+  video3: {
     title: "Spaceship",
-    slug: "video3",
     file: "/videos/video3.mp4",
   },
-];
+};
 
-export default function HomePage() {
+export default function WatchPage({ params }: { params: { slug: string } }) {
+  const video = videos[params.slug];
+
+  if (!video) {
+    return (
+      <main style={{ background: "#050505", minHeight: "100vh", color: "white", padding: "24px" }}>
+        <h1>Video not found</h1>
+        <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
+      </main>
+    );
+  }
+
   return (
     <main style={{ background: "#050505", minHeight: "100vh", color: "white", padding: "24px" }}>
-      <h1 style={{ fontSize: "42px", marginBottom: "10px" }}>🔥 Ray'sStream</h1>
-      <p style={{ color: "#aaa", marginBottom: "30px" }}>Home Video Library</p>
+      <h1 style={{ color: "#ff6a00", fontSize: "36px" }}>🔥 Ray'sStream</h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "24px" }}>
-        {videos.map((video) => (
-          <Link
-            key={video.slug}
-            href={`/watch/${video.slug}`}
-            style={{
-              textDecoration: "none",
-              color: "white",
-              background: "#151515",
-              borderRadius: "14px",
-              overflow: "hidden",
-              border: "1px solid #333",
-            }}
-          >
-            <video
-              src={video.file}
-              muted
-              preload="metadata"
-              style={{ width: "100%", height: "170px", objectFit: "cover", background: "black" }}
-            />
+      <video
+        key={video.file}
+        controls
+        autoPlay
+        playsInline
+        preload="auto"
+        style={{
+          width: "100%",
+          maxWidth: "1000px",
+          background: "black",
+          borderRadius: "12px",
+        }}
+      >
+        <source src={video.file} type="video/mp4" />
+        Your browser does not support this video.
+      </video>
 
-            <div style={{ padding: "14px" }}>
-              <h2 style={{ fontSize: "20px", margin: "0 0 8px" }}>{video.title}</h2>
-              <p style={{ color: "#aaa", margin: 0 }}>Click to watch</p>
-            </div>
-          </Link>
-        ))}
-      </div>
+      <h2 style={{ marginTop: "18px" }}>{video.title}</h2>
+
+      <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
     </main>
   );
 } 
-
