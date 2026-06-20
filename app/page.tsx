@@ -1,22 +1,37 @@
-import Link from "next/link";
+i"use client";
 
-export default function HomePage() {
+import { useState } from "react";
+
+export default function LikeButton() {
+  const [likes, setLikes] = useState(0);
+  const [liked, setLiked] = useState(false);
+
+  const handleLike = () => {
+    if (liked) {
+      setLikes(likes - 1);
+      setLiked(false);
+    } else {
+      setLikes(likes + 1);
+      setLiked(true);
+    }
+  };
+
   return (
-    <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
-      <h1 style={{ color: "#ff6a00", fontSize: 48 }}>🔥 Ray'sStream</h1>
-      <p>Home Video Library</p>
-
-      <Link href="/watch/itscool" style={{ display: "block", color: "white", fontSize: 32, marginTop: 30 }}>
-        It's Cool
-      </Link>
-
-      <Link href="/watch/video2" style={{ display: "block", color: "white", fontSize: 32, marginTop: 20 }}>
-        Video 2
-      </Link>
-
-      <Link href="/watch/video3" style={{ display: "block", color: "white", fontSize: 32, marginTop: 20 }}>
-        Spaceship
-      </Link>
-    </main>
+    <div style={{ marginTop: "20px" }}>
+      <button
+        onClick={handleLike}
+        style={{
+          background: liked ? "#ff0000" : "#333",
+          color: "#fff",
+          border: "none",
+          padding: "10px 20px",
+          borderRadius: "8px",
+          cursor: "pointer",
+          fontSize: "16px",
+        }}
+      >
+        👍 Like ({likes})
+      </button>
+    </div>
   );
-} 
+}
