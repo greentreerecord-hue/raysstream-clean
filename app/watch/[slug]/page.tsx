@@ -1,24 +1,50 @@
-export default function Home() {
+"use client";
+
+import { useParams } from "next/navigation";
+import { useState } from "react";
+
+const videos: Record<string, { title: string; file: string }> = {
+  itscool: { title: "It's Cool", file: "/videos/itscool.mp4" },
+  video2: { title: "Video 2", file: "/videos/video2.mp4" },
+  video3: { title: "Spaceship Video", file: "/videos/video3.mp4" },
+};
+
+export default function WatchPage() {
+  const params = useParams();
+  const slug = String(params.slug || "itscool");
+  const video = videos[slug] || videos.itscool;
+
+  const [likes, setLikes] = useState(0);
+
   return (
     <main style={{ padding: 20, background: "#111", color: "white", minHeight: "100vh" }}>
-      <h1>🔥 Ray'sStream</h1>
-      <p>Watch videos on Ray'sStream.</p>
+      <a href="/" style={{ color: "red" }}>← Home</a>
 
-      <a href="/watch/itscool" style={card}>▶ It's Cool</a>
-      <a href="/watch/video2" style={card}>▶ Video 2</a>
-      <a href="/watch/video3" style={card}>▶ Spaceship Video</a>
+      <h1>{video.title}</h1>
+
+      <video
+        key={video.file}
+        controls
+        playsInline
+        preload="auto"
+        style={{ width: "100%", maxWidth: 900, background: "black" }}
+      >
+        <source src={video.file} type="video/mp4" />
+      </video>
+
+      <p>👁 Views: 1</p>
+
+      <button onClick={() => setLikes(likes + 1)}>
+        👍 Like ({likes})
+      </button>
+
+      <br /><br />
+
+      <button>🔔 Subscribe</button>
+
+      <h2>Comments</h2>
+      <input placeholder="Write a comment" />
+      <button>Post</button>
     </main>
   );
-}
-
-const card = {
-  display: "block",
-  background: "#222",
-  color: "white",
-  padding: 18,
-  marginTop: 14,
-  borderRadius: 12,
-  textDecoration: "none",
-  fontSize: 20,
-}; 
-
+} 
