@@ -1,4 +1,4 @@
-import Link from "next/link";
+iimport Link from "next/link";
 
 const videos: Record<string, { src: string }> = {
   itscool: { src: "/itscool.mp4" },
