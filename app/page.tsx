@@ -1,82 +1,60 @@
+"use client";
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const videos = [
-  {
-    title: "It's Cool",
-    description: "Working video page",
-    href: "/watch/itscool",
-  },
-  {
-    title: "Video 2",
-    description: "Second video page",
-    href: "/watch/video2",
-  },
-  {
-    title: "Spaceship",
-    description: "Spaceship video page",
-    href: "/watch/spaceship",
-  },
+  { slug: "itscool", title: "It's Cool", src: "/videos/itscool.mp4" },
+  { slug: "video2", title: "Video 2", src: "/videos/video2.mp4" },
+  { slug: "spaceship", title: "Spaceship", src: "/videos/video3.mp4" },
 ];
 
-export default function HomePage() {
+export default function WatchPage() {
+  const params = useParams<{ slug: string }>();
+  const slug = params?.slug || "itscool";
+  const video = videos.find((v) => v.slug === slug);
+
+  if (!video) {
+    return (
+      <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
+        <h1>Video Not Found</h1>
+        <Link href="/">← Back Home</Link>
+      </main>
+    );
+  }
+
+  const [views, setViews] = useState(0);
+
+  useEffect(() => {
+    const savedViews = localStorage.getItem(`views-${video.slug}`);
+    const newViews = savedViews ? Number(savedViews) + 1 : 1;
+    setViews(newViews);
+    localStorage.setItem(`views-${video.slug}`, String(newViews));
+  }, [video.slug]);
+
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#111827",
-        color: "white",
-        padding: 20,
-      }}
-    >
-      <h1 style={{ color: "#f97316" }}>Ray&apos;sStream</h1>
+    <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
+      <h1>{video.title}</h1>
 
-      <p style={{ color: "#9ca3af" }}>
-        Videos • Likes • Views • Comments • Subscribe
-      </p>
+      <p style={{ color: "#9ca3af" }}>👀 {views} views</p>
 
-      <h2 style={{ marginTop: 30 }}>Video Library</h2>
-
-      <div
+      <video
+        key={video.src}
+        src={video.src}
+        controls
+        playsInline
+        preload="auto"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 20,
-          marginTop: 20,
+          width: "100%",
+          maxWidth: "1000px",
+          background: "black",
+          borderRadius: 12,
         }}
-      >
-        {videos.map((video) => (
-          <Link
-            key={video.title}
-            href={video.href}
-            style={{
-              background: "#1f2937",
-              padding: 20,
-              borderRadius: 12,
-              color: "white",
-              textDecoration: "none",
-              display: "block",
-            }}
-          >
-            <div
-              style={{
-                height: 140,
-                background: "black",
-                borderRadius: 10,
-                marginBottom: 12,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#9ca3af",
-                fontSize: 22,
-              }}
-            >
-              ▶ Open
-            </div>
+      />
 
-            <h3>{video.title}</h3>
-            <p style={{ color: "#9ca3af" }}>{video.description}</p>
-          </Link>
-        ))}
+      <div style={{ marginTop: 20 }}>
+        <Link href="/">← Back Home</Link>
       </div>
     </main>
   );
