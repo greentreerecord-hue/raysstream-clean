@@ -1,90 +1,55 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 
 const videos = [
   {
     title: "It's Cool",
-    src: "/videos/itscool.mp4",
+    description: "Ray'sStream music video",
+    href: "/watch",
   },
   {
     title: "Video 2",
-    src: "/videos/video2.mp4",
+    description: "Second Ray'sStream video",
+    href: "/watch",
   },
   {
     title: "Spaceship",
-    src: "/videos/video3.mp4",
+    description: "Spaceship video",
+    href: "/watch",
   },
 ];
 
-export default function WatchPage() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [index, setIndex] = useState(0);
-
-  const video = videos[index];
-
-  useEffect(() => {
-    const player = videoRef.current;
-    if (!player) return;
-
-    player.muted = true;
-    player.src = video.src;
-    player.load();
-
-    const timer = setTimeout(() => {
-      player.play().catch(() => {});
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [index, video.src]);
-
-  function nextVideo() {
-    setIndex((old) => (old + 1) % videos.length);
-  }
-
+export default function HomePage() {
   return (
     <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
-      <h1>{video.title}</h1>
+      <h1 style={{ color: "#f97316" }}>Ray&apos;sStream</h1>
 
-      <video
-        ref={videoRef}
-        controls
-        muted
-        playsInline
-        autoPlay
-        preload="auto"
-        onEnded={nextVideo}
-        style={{
-          width: "100%",
-          maxWidth: "1000px",
-          background: "black",
-          borderRadius: 12,
-        }}
-      />
+      <p style={{ color: "#9ca3af" }}>
+        Video library
+      </p>
 
-      <br />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+        {videos.map((video) => (
+          <Link
+            key={video.title}
+            href={video.href}
+            style={{
+              background: "#1f2937",
+              padding: 20,
+              borderRadius: 12,
+              color: "white",
+              textDecoration: "none",
+            }}
+          >
+            <div style={{ background: "black", height: 140, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              ▶ Play
+            </div>
 
-      <button
-        onClick={nextVideo}
-        style={{
-          marginTop: 20,
-          padding: "12px 20px",
-          background: "#f97316",
-          color: "white",
-          border: "none",
-          borderRadius: 8,
-          fontWeight: "bold",
-        }}
-      >
-        Next Video
-      </button>
-
-      <p>Auto start ON • Auto rotation ON</p>
-
-      <Link href="/" style={{ color: "#93c5fd" }}>
-        ← Back Home
-      </Link>
+            <h2>{video.title}</h2>
+            <p style={{ color: "#9ca3af" }}>{video.description}</p>
+          </Link>
+        ))}
+      </div>
     </main>
   );
 } 
+
