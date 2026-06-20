@@ -13,16 +13,29 @@ const videos = [
 export default function WatchPage() {
   const params = useParams<{ slug: string }>();
   const slug = params?.slug || "itscool";
+
   const video = videos.find((v) => v.slug === slug) || videos[0];
 
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
+
+  const [subscribers, setSubscribers] = useState(0);
+  const [subscribed, setSubscribed] = useState(false);
+
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<string[]>([]);
 
   useEffect(() => {
     setLikes(Number(localStorage.getItem(`likes-${video.title}`) || 0));
     setLiked(localStorage.getItem(`liked-${video.title}`) === "true");
+
+    setSubscribers(
+      Number(localStorage.getItem("raysstream-subscribers") || 0)
+    );
+
+    setSubscribed(
+      localStorage.getItem("raysstream-subscribed") === "true"
+    );
 
     const savedComments = localStorage.getItem(`comments-${video.title}`);
     setComments(savedComments ? JSON.parse(savedComments) : []);
@@ -39,12 +52,39 @@ export default function WatchPage() {
     localStorage.setItem(`likes-${video.title}`, String(newLikes));
   }
 
+  function toggleSubscribe() {
+    const newSubscribed = !subscribed;
+
+    const newSubscribers = newSubscribed
+      ? subscribers + 1
+      : Math.max(0, subscribers - 1);
+
+    setSubscribed(newSubscribed);
+    setSubscribers(newSubscribers);
+
+    localStorage.setItem(
+      "raysstream-subscribed",
+      String(newSubscribed)
+    );
+
+    localStorage.setItem(
+      "raysstream-subscribers",
+      String(newSubscribers)
+    );
+  }
+
   function addComment() {
     if (!comment.trim()) return;
 
     const updated = [comment, ...comments];
+
     setComments(updated);
-    localStorage.setItem(`comments-${video.title}`, JSON.stringify(updated));
+
+    localStorage.setItem(
+      `comments-${video.title}`,
+      JSON.stringify(updated)
+    );
+
     setComment("");
   }
 
@@ -72,7 +112,14 @@ export default function WatchPage() {
         }}
       />
 
-      <div style={{ marginTop: 15 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginTop: 15,
+          flexWrap: "wrap",
+        }}
+      >
         <button
           onClick={toggleLike}
           style={{
@@ -85,6 +132,20 @@ export default function WatchPage() {
           }}
         >
           👍 {liked ? "Liked" : "Like"} ({likes})
+        </button>
+
+        <button
+          onClick={toggleSubscribe}
+          style={{
+            padding: "12px 20px",
+            background: subscribed ? "#16a34a" : "#dc2626",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: "bold",
+          }}
+        >
+          {subscribed ? "Subscribed" : "Subscribe"} ({subscribers})
         </button>
       </div>
 
@@ -110,8 +171,6 @@ export default function WatchPage() {
           }}
         />
 
-        <br />
-
         <button
           onClick={addComment}
           style={{
@@ -128,23 +187,19 @@ export default function WatchPage() {
         </button>
 
         <div style={{ marginTop: 20 }}>
-          {comments.length === 0 ? (
-            <p>No comments yet.</p>
-          ) : (
-            comments.map((c, i) => (
-              <div
-                key={i}
-                style={{
-                  background: "#111827",
-                  padding: 12,
-                  borderRadius: 8,
-                  marginBottom: 10,
-                }}
-              >
-                {c}
-              </div>
-            ))
-          )}
+          {comments.map((c, i) => (
+            <div
+              key={i}
+              style={{
+                background: "#111827",
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 10,
+              }}
+            >
+              {c}
+            </div>
+          ))}
         </div>
       </section>
 
