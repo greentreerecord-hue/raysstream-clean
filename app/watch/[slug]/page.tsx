@@ -34,15 +34,25 @@ export default function WatchPage({ params }: { params: { slug: string } }) {
       <h2>{video.title}</h2>
 
       <video
+        src={video.src}
         controls
         playsInline
-        preload="auto"
-        style={{ width: "100%", maxWidth: 1000, background: "black", borderRadius: 12 }}
-      >
-        <source src={video.src} type="video/mp4" />
-      </video>
+        preload="metadata"
+        style={{
+          width: "100%",
+          maxWidth: 1000,
+          background: "black",
+          borderRadius: 12,
+        }}
+      />
 
-      <p style={{ color: "#aaa" }}>Now playing: {video.src}</p>
+      <p style={{ color: "#aaa" }}>Testing file: {video.src}</p>
+
+      <p>
+        <a href={video.src} target="_blank" style={{ color: "#00ffff" }}>
+          Open raw video file
+        </a>
+      </p>
 
       <Link href="/" style={{ color: "#00ffff" }}>Back Home</Link>
     </main>
