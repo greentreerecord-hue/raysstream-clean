@@ -25,8 +25,7 @@ export default function WatchPage() {
   const params = useParams();
   const slug = String(params?.slug || "itscool");
 
-  const video =
-    videos.find((v) => v.slug === slug) || videos[0];
+  const video = videos.find((v) => v.slug === slug) || videos[0];
 
   return (
     <main
@@ -42,6 +41,8 @@ export default function WatchPage() {
       <video
         src={video.src}
         controls
+        playsInline
+        preload="auto"
         style={{
           width: "100%",
           maxWidth: "1000px",
@@ -55,4 +56,6 @@ export default function WatchPage() {
       </div>
     </main>
   );
+} 
+
 } 
