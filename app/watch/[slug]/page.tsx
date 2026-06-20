@@ -37,7 +37,7 @@ export default async function WatchPage({
       <br />
 
       <button style={{ padding: "10px 18px", fontSize: 18, borderRadius: 8 }}>
-        👍 Like
+        👍 Like 0
       </button>
 
       <br />
