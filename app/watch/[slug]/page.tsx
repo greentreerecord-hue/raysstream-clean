@@ -25,8 +25,7 @@ export default function WatchPage({ params }: { params: { slug: string } }) {
   if (!video) {
     return (
       <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
-        <h1 style={{ color: "#ff6a00" }}>Video not found</h1>
-        <p>Slug: {params.slug}</p>
+        <h1>Video not found</h1>
         <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
       </main>
     );
@@ -34,25 +33,16 @@ export default function WatchPage({ params }: { params: { slug: string } }) {
 
   return (
     <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
-      <h1 style={{ color: "#ff6a00", fontSize: 36 }}>🔥 Ray'sStream</h1>
-
-      <h2>{video.title}</h2>
-
       <video
         src={video.src}
         controls
         autoPlay
         playsInline
-        preload="auto"
-        style={{
-          width: "100%",
-          maxWidth: 1000,
-          background: "black",
-          borderRadius: 12,
-        }}
+        style={{ width: "100%", maxWidth: 1000, background: "black" }}
       />
 
-      <p style={{ color: "#aaa" }}>File: {video.src}</p>
+      <br />
+      <br />
 
       <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
     </main>
