@@ -20,36 +20,31 @@ export default function WatchPage({ params }: { params: { slug: string } }) {
 
   if (!video) {
     return (
-      <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: "24px" }}>
+      <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
         <h1>Video not found</h1>
         <p>Slug: {params.slug}</p>
-        <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
+        <Link href="/" style={{ color: "#00ffff" }}>Back Home</Link>
       </main>
     );
   }
 
   return (
-    <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: "24px" }}>
-      <h1 style={{ color: "#ff6a00", fontSize: "36px" }}>🔥 Ray'sStream</h1>
-
+    <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: 24 }}>
+      <h1 style={{ color: "#ff6a00" }}>🔥 Ray'sStream</h1>
       <h2>{video.title}</h2>
 
       <video
-        src={video.src}
         controls
         playsInline
         preload="auto"
-        style={{
-          width: "100%",
-          maxWidth: "1000px",
-          background: "black",
-          borderRadius: "12px",
-        }}
-      />
+        style={{ width: "100%", maxWidth: 1000, background: "black", borderRadius: 12 }}
+      >
+        <source src={video.src} type="video/mp4" />
+      </video>
 
-      <p style={{ color: "#aaa" }}>Video file: {video.src}</p>
+      <p style={{ color: "#aaa" }}>Now playing: {video.src}</p>
 
-      <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
+      <Link href="/" style={{ color: "#00ffff" }}>Back Home</Link>
     </main>
   );
 } 
