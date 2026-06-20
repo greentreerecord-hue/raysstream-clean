@@ -1,4 +1,4 @@
-export default function Home() {
+eexport default function Home() {
   return (
     <main style={{ padding: 20, background: "#111", color: "white", minHeight: "100vh" }}>
       <h1>🔥 Ray'sStream</h1>
