@@ -1,65 +1,56 @@
 import Link from "next/link";
 
-export default function HomePage() {
-  const videos = [
-    {
-      title: "It's Cool",
-      slug: "itscool",
-    },
-    {
-      title: "Video 2",
-      slug: "video2",
-    },
-    {
-      title: "Spaceship",
-      slug: "video3",
-    },
-  ];
+const videos: Record<string, { title: string; file: string }> = {
+  "its-cool": {
+    title: "It's Cool",
+    file: "/videos/itscool.mp4",
+  },
+  video2: {
+    title: "Video 2",
+    file: "/videos/video2.mp4",
+  },
+  video3: {
+    title: "Spaceship",
+    file: "/videos/video3.mp4",
+  },
+};
+
+export default function WatchPage({ params }: { params: { slug: string } }) {
+  const video = videos[params.slug];
+
+  if (!video) {
+    return (
+      <main style={{ background: "#050505", minHeight: "100vh", color: "white", padding: "24px" }}>
+        <h1>Video not found</h1>
+        <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
+      </main>
+    );
+  }
 
   return (
-    <main
-      style={{
-        background: "#111",
-        color: "white",
-        minHeight: "100vh",
-        padding: "20px",
-      }}
-    >
-      <h1>🔥 Ray'sStream</h1>
+    <main style={{ background: "#050505", minHeight: "100vh", color: "white", padding: "24px" }}>
+      <h1 style={{ color: "#ff6a00", fontSize: "36px" }}>🔥 Ray'sStream</h1>
 
-      <h2>Video Library</h2>
-
-      <div
+      <video
+        key={video.file}
+        controls
+        autoPlay
+        playsInline
+        preload="auto"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))",
-          gap: "20px",
-          marginTop: "20px",
+          width: "100%",
+          maxWidth: "1000px",
+          background: "black",
+          borderRadius: "12px",
         }}
       >
-        {videos.map((video) => (
-          <Link
-            key={video.slug}
-            href={`/watch/${video.slug}`}
-            style={{
-              textDecoration: "none",
-              color: "white",
-            }}
-          >
-            <div
-              style={{
-                background: "#222",
-                padding: "20px",
-                borderRadius: "12px",
-                cursor: "pointer",
-              }}
-            >
-              <h3>{video.title}</h3>
-              <p>▶ Watch Video</p>
-            </div>
-          </Link>
-        ))}
-      </div>
+        <source src={video.file} type="video/mp4" />
+        Your browser does not support this video.
+      </video>
+
+      <h2 style={{ marginTop: "18px" }}>{video.title}</h2>
+
+      <Link href="/" style={{ color: "#00ffff" }}>← Back Home</Link>
     </main>
   );
 } 
