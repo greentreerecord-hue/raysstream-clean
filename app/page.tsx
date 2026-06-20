@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 const videos = [
   { title: "It's Cool", src: "/videos/itscool.mp4" },
@@ -10,20 +10,26 @@ const videos = [
 ];
 
 export default function WatchPage() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [index, setIndex] = useState(0);
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<string[]>([]);
+  const [likes, setLikes] = useState(0);
+  const [liked, setLiked] = useState(false);
 
   const video = videos[index];
 
   useEffect(() => {
-    const saved = localStorage.getItem(`comments-${video.title}`);
-    setComments(saved ? JSON.parse(saved) : []);
+    const savedComments = localStorage.getItem(`comments-${video.title}`);
+    const savedLikes = localStorage.getItem(`likes-${video.title}`);
+    const savedLiked = localStorage.getItem(`liked-${video.title}`);
+
+    setComments(savedComments ? JSON.parse(savedComments) : []);
+    setLikes(savedLikes ? Number(savedLikes) : 0);
+    setLiked(savedLiked === "true");
   }, [video.title]);
 
   function nextVideo() {
-    setIndex((old) => (old + 1) % videos.length);
+    setIndex((old) => (old === videos.length - 1 ? 0 : old + 1));
   }
 
   function addComment() {
@@ -35,24 +41,26 @@ export default function WatchPage() {
     setComment("");
   }
 
+  function toggleLike() {
+    const newLiked = !liked;
+    const newLikes = newLiked ? likes + 1 : Math.max(0, likes - 1);
+
+    setLiked(newLiked);
+    setLikes(newLikes);
+
+    localStorage.setItem(`liked-${video.title}`, String(newLiked));
+    localStorage.setItem(`likes-${video.title}`, String(newLikes));
+  }
+
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#111827",
-        color: "white",
-        padding: 20,
-      }}
-    >
+    <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
       <h1>{video.title}</h1>
 
       <video
-        ref={videoRef}
         src={video.src}
         controls
         playsInline
         preload="auto"
-        onEnded={nextVideo}
         style={{
           width: "100%",
           maxWidth: "1000px",
@@ -61,30 +69,43 @@ export default function WatchPage() {
         }}
       />
 
-      <br />
+      <div style={{ display: "flex", gap: 10, marginTop: 15 }}>
+        <button
+          onClick={toggleLike}
+          style={{
+            padding: "12px 20px",
+            background: liked ? "#ef4444" : "#374151",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: "bold",
+          }}
+        >
+          👍 {liked ? "Liked" : "Like"} ({likes})
+        </button>
 
-      <button
-        onClick={nextVideo}
-        style={{
-          marginTop: 20,
-          padding: "12px 20px",
-          background: "#f97316",
-          color: "white",
-          border: "none",
-          borderRadius: 8,
-          fontWeight: "bold",
-        }}
-      >
-        Next Video
-      </button>
+        <button
+          onClick={nextVideo}
+          style={{
+            padding: "12px 20px",
+            background: "#f97316",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: "bold",
+          }}
+        >
+          Next Video
+        </button>
+      </div>
 
       <section
         style={{
           marginTop: 30,
-          maxWidth: "1000px",
           background: "#1f2937",
           padding: 20,
           borderRadius: 12,
+          maxWidth: "1000px",
         }}
       >
         <h2>Comments</h2>
@@ -95,11 +116,9 @@ export default function WatchPage() {
           placeholder="Add a comment..."
           style={{
             width: "100%",
-            minHeight: 90,
+            minHeight: 100,
             padding: 12,
             borderRadius: 8,
-            border: "none",
-            resize: "vertical",
           }}
         />
 
@@ -120,7 +139,7 @@ export default function WatchPage() {
 
         <div style={{ marginTop: 20 }}>
           {comments.length === 0 ? (
-            <p style={{ color: "#9ca3af" }}>No comments yet.</p>
+            <p>No comments yet.</p>
           ) : (
             comments.map((c, i) => (
               <div
@@ -140,9 +159,7 @@ export default function WatchPage() {
       </section>
 
       <div style={{ marginTop: 20 }}>
-        <Link href="/" style={{ color: "#93c5fd" }}>
-          ← Back Home
-        </Link>
+        <Link href="/">← Back Home</Link>
       </div>
     </main>
   );
