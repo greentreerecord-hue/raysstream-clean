@@ -15,6 +15,7 @@ export default function WatchPage() {
   const [comments, setComments] = useState<string[]>([]);
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
+  const [views, setViews] = useState(0);
 
   const video = videos[index];
 
@@ -22,10 +23,15 @@ export default function WatchPage() {
     const savedComments = localStorage.getItem(`comments-${video.title}`);
     const savedLikes = localStorage.getItem(`likes-${video.title}`);
     const savedLiked = localStorage.getItem(`liked-${video.title}`);
+    const savedViews = localStorage.getItem(`views-${video.title}`);
 
     setComments(savedComments ? JSON.parse(savedComments) : []);
     setLikes(savedLikes ? Number(savedLikes) : 0);
     setLiked(savedLiked === "true");
+
+    const newViews = savedViews ? Number(savedViews) + 1 : 1;
+    setViews(newViews);
+    localStorage.setItem(`views-${video.title}`, String(newViews));
   }, [video.title]);
 
   function nextVideo() {
@@ -55,6 +61,10 @@ export default function WatchPage() {
   return (
     <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
       <h1>{video.title}</h1>
+
+      <p style={{ color: "#9ca3af", marginBottom: 15 }}>
+        👀 {views} views
+      </p>
 
       <video
         src={video.src}
