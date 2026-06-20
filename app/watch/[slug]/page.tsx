@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 const videos: Record<string, { src: string }> = {
   itscool: { src: "/itscool.mp4" },
@@ -9,24 +6,13 @@ const videos: Record<string, { src: string }> = {
   video3: { src: "/video3.mp4" },
 };
 
-export default function WatchPage({
+export default async function WatchPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const video = videos[params.slug];
-  const [likes, setLikes] = useState(0);
-
-  useEffect(() => {
-    if (!video) return;
-    setLikes(Number(localStorage.getItem(`likes-${params.slug}`) || "0"));
-  }, [params.slug, video]);
-
-  function handleLike() {
-    const newLikes = likes + 1;
-    setLikes(newLikes);
-    localStorage.setItem(`likes-${params.slug}`, String(newLikes));
-  }
+  const { slug } = await params;
+  const video = videos[slug];
 
   if (!video) {
     return (
@@ -50,17 +36,8 @@ export default function WatchPage({
       <br />
       <br />
 
-      <button
-        onClick={handleLike}
-        style={{
-          padding: "10px 18px",
-          fontSize: 18,
-          borderRadius: 8,
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        👍 Like {likes}
+      <button style={{ padding: "10px 18px", fontSize: 18, borderRadius: 8 }}>
+        👍 Like
       </button>
 
       <br />
