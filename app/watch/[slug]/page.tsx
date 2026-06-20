@@ -42,34 +42,52 @@ export default function WatchPage() {
   function toggleLike() {
     const newLiked = !liked;
     const newLikes = newLiked ? likes + 1 : Math.max(0, likes - 1);
+
     setLiked(newLiked);
     setLikes(newLikes);
+
     localStorage.setItem(`liked-${video.slug}`, String(newLiked));
     localStorage.setItem(`likes-${video.slug}`, String(newLikes));
   }
 
   function toggleSubscribe() {
     const newSubscribed = !subscribed;
-    const newSubscribers = newSubscribed ? subscribers + 1 : Math.max(0, subscribers - 1);
+    const newSubscribers = newSubscribed
+      ? subscribers + 1
+      : Math.max(0, subscribers - 1);
+
     setSubscribed(newSubscribed);
     setSubscribers(newSubscribers);
+
     localStorage.setItem("raysstream-subscribed", String(newSubscribed));
     localStorage.setItem("raysstream-subscribers", String(newSubscribers));
   }
 
   function addComment() {
     if (!comment.trim()) return;
+
     const updated = [comment, ...comments];
+
     setComments(updated);
     localStorage.setItem(`comments-${video.slug}`, JSON.stringify(updated));
+
     setComment("");
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#111827", color: "white", padding: 20 }}>
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#111827",
+        color: "white",
+        padding: 20,
+      }}
+    >
       <h1>{video.title}</h1>
 
-      <p style={{ color: "#9ca3af" }}>👀 {views} views</p>
+      <p style={{ color: "#9ca3af", fontSize: 18 }}>
+        👀 {views} views
+      </p>
 
       <video
         key={video.src}
@@ -85,27 +103,79 @@ export default function WatchPage() {
         }}
       />
 
-      <div style={{ display: "flex", gap: 10, marginTop: 15, flexWrap: "wrap" }}>
-        <button onClick={toggleLike} style={{ padding: "12px 20px", background: liked ? "#ef4444" : "#374151", color: "white", border: "none", borderRadius: 8, fontWeight: "bold" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginTop: 15,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          onClick={toggleLike}
+          style={{
+            padding: "12px 20px",
+            background: liked ? "#ef4444" : "#374151",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: "bold",
+          }}
+        >
           👍 {liked ? "Liked" : "Like"} ({likes})
         </button>
 
-        <button onClick={toggleSubscribe} style={{ padding: "12px 20px", background: subscribed ? "#16a34a" : "#dc2626", color: "white", border: "none", borderRadius: 8, fontWeight: "bold" }}>
+        <button
+          onClick={toggleSubscribe}
+          style={{
+            padding: "12px 20px",
+            background: subscribed ? "#16a34a" : "#dc2626",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: "bold",
+          }}
+        >
           {subscribed ? "Subscribed" : "Subscribe"} ({subscribers})
         </button>
       </div>
 
-      <section style={{ marginTop: 30, background: "#1f2937", padding: 20, borderRadius: 12 }}>
+      <section
+        style={{
+          marginTop: 30,
+          background: "#1f2937",
+          padding: 20,
+          borderRadius: 12,
+        }}
+      >
         <h2>Comments</h2>
 
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Add a comment..."
-          style={{ width: "100%", minHeight: 100, padding: 12, borderRadius: 8 }}
+          style={{
+            width: "100%",
+            minHeight: 100,
+            padding: 12,
+            borderRadius: 8,
+          }}
         />
 
-        <button onClick={addComment} style={{ marginTop: 10, padding: "10px 18px", background: "#ef4444", color: "white", border: "none", borderRadius: 8, fontWeight: "bold" }}>
+        <br />
+
+        <button
+          onClick={addComment}
+          style={{
+            marginTop: 10,
+            padding: "10px 18px",
+            background: "#ef4444",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: "bold",
+          }}
+        >
           Post Comment
         </button>
 
@@ -114,7 +184,15 @@ export default function WatchPage() {
             <p>No comments yet.</p>
           ) : (
             comments.map((c, i) => (
-              <div key={i} style={{ background: "#111827", padding: 12, borderRadius: 8, marginBottom: 10 }}>
+              <div
+                key={i}
+                style={{
+                  background: "#111827",
+                  padding: 12,
+                  borderRadius: 8,
+                  marginBottom: 10,
+                }}
+              >
                 {c}
               </div>
             ))
