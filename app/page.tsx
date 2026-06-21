@@ -16,6 +16,10 @@ export default function Home() {
     setComments(JSON.parse(localStorage.getItem("comments") || "[]"));
   }, []);
 
+  function save(key: string, value: any) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
   function subscribe() {
     const next = subs + 1;
     setSubs(next);
@@ -34,19 +38,19 @@ export default function Home() {
     localStorage.setItem("views", String(next));
   }
 
-  function addComment() {
+  function postComment() {
     if (!comment.trim()) return;
     const next = [comment, ...comments];
     setComments(next);
-    localStorage.setItem("comments", JSON.stringify(next));
+    save("comments", next);
     setComment("");
   }
 
   return (
-    <main style={{ background: "#111", color: "white", minHeight: "100vh", padding: 24 }}>
-      <h1 style={{ color: "orangered", fontSize: 48 }}>Ray'sStream</h1>
+    <main style={{ background: "#080808", color: "white", minHeight: "100vh", padding: 24 }}>
+      <h1 style={{ color: "red", fontSize: 44 }}>Ray'sStream</h1>
 
-      <button onClick={subscribe} style={{ padding: 15, background: "orangered", color: "white", border: 0, borderRadius: 8 }}>
+      <button onClick={subscribe} style={{ padding: 14, background: "red", color: "white" }}>
         Subscribe
       </button>
 
@@ -54,22 +58,22 @@ export default function Home() {
       <h3>Views: {views}</h3>
       <h3>Likes: {likes}</h3>
 
-      <button onClick={like} style={{ padding: 12, marginBottom: 25 }}>
+      <button onClick={like} style={{ padding: 12 }}>
         👍 Like
       </button>
 
       <h2>Video 1</h2>
-      <video controls width="100%" onPlay={addView} style={{ background: "black" }}>
+      <video controls playsInline width="100%" onPlay={addView} style={{ background: "black" }}>
         <source src="/videos/video1.mp4" type="video/mp4" />
       </video>
 
       <h2>Video 2</h2>
-      <video controls width="100%" onPlay={addView} style={{ background: "black" }}>
+      <video controls playsInline width="100%" onPlay={addView} style={{ background: "black" }}>
         <source src="/videos/video2.mp4" type="video/mp4" />
       </video>
 
       <h2>Video 3</h2>
-      <video controls width="100%" onPlay={addView} style={{ background: "black" }}>
+      <video controls playsInline width="100%" onPlay={addView} style={{ background: "black" }}>
         <source src="/videos/video3.mp4" type="video/mp4" />
       </video>
 
@@ -78,14 +82,16 @@ export default function Home() {
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         placeholder="Write a comment"
-        style={{ padding: 12, width: "80%" }}
+        style={{ padding: 12, width: "70%" }}
       />
-      <button onClick={addComment} style={{ padding: 12, marginLeft: 8 }}>
+      <button onClick={postComment} style={{ padding: 12, marginLeft: 8 }}>
         Post
       </button>
 
       {comments.map((c, i) => (
-        <p key={i} style={{ background: "#222", padding: 10 }}>{c}</p>
+        <p key={i} style={{ background: "#222", padding: 12 }}>
+          {c}
+        </p>
       ))}
     </main>
   );
