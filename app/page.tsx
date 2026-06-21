@@ -1,21 +1,27 @@
-import Link from "next/link";
+"use client";
 
-export default function Home() {
+const videos: Record<string, { title: string; file: string }> = {
+  itscool: { title: "It's Cool", file: "/video1.mp4" },
+  video1: { title: "It's Cool", file: "/video1.mp4" },
+  video2: { title: "Video 2", file: "/video2.mp4" },
+  video3: { title: "Spaceship", file: "/video3.mp4" },
+};
+
+export default function WatchPage({ params }: { params: { slug: string } }) {
+  const video = videos[params.slug];
+
+  if (!video) return <main style={{ padding: 20 }}>Video not found</main>;
+
   return (
     <main style={{ padding: 20 }}>
-      <h1>Ray'sStream</h1>
+      <h1>{video.title}</h1>
 
-      <p>
-        <Link href="/watch/itscool">It's Cool</Link>
-      </p>
-
-      <p>
-        <Link href="/watch/video2">Video 2</Link>
-      </p>
-
-      <p>
-        <Link href="/watch/video3">Spaceship</Link>
-      </p>
+      <video
+        src={video.file}
+        controls
+        playsInline
+        style={{ width: "100%", maxWidth: 900, background: "black" }}
+      />
     </main>
   );
 } 
