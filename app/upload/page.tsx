@@ -17,8 +17,10 @@ export default function UploadPage() {
       return;
     }
 
+    const previewUrl = URL.createObjectURL(file);
+
     setFileName(file.name);
-    setVideoUrl(URL.createObjectURL(file));
+    setVideoUrl(previewUrl);
   }
 
   function handleUpload() {
@@ -27,7 +29,7 @@ export default function UploadPage() {
       return;
     }
 
-    alert("Creator upload preview works.");
+    alert("Video preview works. Real storage comes next.");
   }
 
   return (
@@ -96,34 +98,31 @@ export default function UploadPage() {
         <section style={{ marginTop: "30px" }}>
           <h2>{title || "Video Preview"}</h2>
 
-          <p
-            style={{
-              color: "#22c55e",
-              fontWeight: "bold",
-            }}
-          >
+          <p style={{ color: "#22c55e", fontWeight: "bold" }}>
             Preview ready — press play
           </p>
 
           <video
-            src={videoUrl}
+            key={videoUrl}
             controls
-            autoPlay
             muted
-            loop
             playsInline
-            preload="auto"
+            preload="metadata"
             style={{
               width: "100%",
               maxWidth: "800px",
               minHeight: "300px",
-              background: "black",
+              backgroundColor: "#000",
               border: "3px solid red",
               borderRadius: "12px",
             }}
-          />
+          >
+            <source src={videoUrl} type="video/mp4" />
+            Your browser does not support video playback.
+          </video>
         </section>
       )}
     </main>
   );
 } 
+
