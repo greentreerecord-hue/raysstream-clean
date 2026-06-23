@@ -2,177 +2,255 @@
 
 import { useEffect, useState } from "react";
 
+const STRIPE_LINK =
+  "https://buy.stripe.com/fZu6oH08q6VV3Zw5TP2Nq02";
+
 const videos = [
-  { title: "It's Cool", src: "/videos/video1.mp4" },
-  { title: "Video 2", src: "/videos/video2.mp4" },
-  { title: "Spaceship", src: "/videos/video3.mp4" },
+  {
+    title: "It's Cool",
+    file: "/videos/video1.mp4",
+  },
+  {
+    title: "Video 2",
+    file: "/videos/video2.mp4",
+  },
+  {
+    title: "Video 3",
+    file: "/videos/video3.mp4",
+  },
 ];
 
 export default function Home() {
-  const [currentVideo, setCurrentVideo] = useState(videos[0]);
   const [likes, setLikes] = useState(0);
-  const [subscribers, setSubscribers] = useState(0);
   const [views, setViews] = useState(0);
+  const [subscribers, setSubscribers] = useState(0);
+  const [subscribed, setSubscribed] = useState(false);
+  const [comment, setComment] = useState("");
   const [comments, setComments] = useState<string[]>([]);
-  const [commentText, setCommentText] = useState("");
 
   useEffect(() => {
-    setLikes(Number(localStorage.getItem("likes") || "0"));
-    setSubscribers(Number(localStorage.getItem("subscribers") || "0"));
+    const savedLikes = localStorage.getItem("raysstream_likes");
+    const savedViews = localStorage.getItem("raysstream_views");
+    const savedSubs = localStorage.getItem("raysstream_subscribers");
+    const savedSubscribed = localStorage.getItem("raysstream_subscribed");
+    const savedComments = localStorage.getItem("raysstream_comments");
 
-    const savedViews = Number(localStorage.getItem("views") || "0") + 1;
-    setViews(savedViews);
-    localStorage.setItem("views", String(savedViews));
+    if (savedLikes) setLikes(Number(savedLikes));
+    if (savedViews) setViews(Number(savedViews));
+    if (savedSubs) setSubscribers(Number(savedSubs));
+    if (savedSubscribed === "true") setSubscribed(true);
+    if (savedComments) setComments(JSON.parse(savedComments));
 
-    setComments(JSON.parse(localStorage.getItem("comments") || "[]"));
+    const newViews = savedViews ? Number(savedViews) + 1 : 1;
+    setViews(newViews);
+    localStorage.setItem("raysstream_views", String(newViews));
   }, []);
 
-  function likeVideo() {
+  function handleLike() {
     const newLikes = likes + 1;
     setLikes(newLikes);
-    localStorage.setItem("likes", String(newLikes));
+    localStorage.setItem("raysstream_likes", String(newLikes));
   }
 
-  function subscribe() {
-    const newSubscribers = subscribers + 1;
-    setSubscribers(newSubscribers);
-    localStorage.setItem("subscribers", String(newSubscribers));
+  function handleSubscribe() {
+    if (subscribed) return;
+
+    const newSubs = subscribers + 1;
+    setSubscribers(newSubs);
+    setSubscribed(true);
+
+    localStorage.setItem("raysstream_subscribers", String(newSubs));
+    localStorage.setItem("raysstream_subscribed", "true");
   }
 
-  function shareVideo() {
-    navigator.clipboard.writeText(window.location.href);
-    alert("Ray'sStream link copied!");
-  }
+  function handleComment() {
+    if (!comment.trim()) return;
 
-  function addComment() {
-    if (!commentText.trim()) return;
-
-    const newComments = [commentText, ...comments];
+    const newComments = [comment, ...comments];
     setComments(newComments);
-    localStorage.setItem("comments", JSON.stringify(newComments));
-    setCommentText("");
+    setComment("");
+
+    localStorage.setItem(
+      "raysstream_comments",
+      JSON.stringify(newComments)
+    );
+  }
+
+  function handleShare() {
+    navigator.clipboard.writeText(window.location.href);
+    alert("Ray'sStream link copied");
   }
 
   return (
     <main
       style={{
-        minHeight: "100vh",
         background: "#050505",
         color: "white",
+        minHeight: "100vh",
         padding: "20px",
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h1 style={{ color: "#ff0033", fontSize: "38px" }}>
-        🔥 Ray&apos;sStream
+      <h1 style={{ color: "red", fontSize: "42px" }}>
+        Ray&apos;sStream
       </h1>
 
-      <h2>{currentVideo.title}</h2>
+      <p style={{ fontSize: "18px" }}>
+        Watch videos, like, comment, subscribe, and support Ray&apos;sStream.
+      </p>
 
-      <video
-        key={currentVideo.src}
-        src={currentVideo.src}
-        controls
-        autoPlay
-        loop
-        playsInline
+      <a
+        href={STRIPE_LINK}
+        target="_blank"
+        rel="noopener noreferrer"
         style={{
-          width: "100%",
-          maxWidth: "900px",
-          borderRadius: "12px",
-          background: "black",
-        }}
-      />
-
-      <div
-        style={{
-          marginTop: "16px",
-          display: "flex",
-          gap: "10px",
-          flexWrap: "wrap",
+          display: "inline-block",
+          background: "#16a34a",
+          color: "white",
+          padding: "14px 24px",
+          borderRadius: "10px",
+          fontWeight: "bold",
+          textDecoration: "none",
+          marginTop: "15px",
+          marginBottom: "20px",
         }}
       >
-        <button onClick={likeVideo}>👍 Like {likes}</button>
-        <button onClick={subscribe}>🔔 Subscribe {subscribers}</button>
-        <button onClick={shareVideo}>🔗 Share</button>
+        Pay Subscription
+      </a>
 
-        <a
-          href="https://buy.stripe.com/fZu6oH08q6VV3Zw5TP2Nq02"
-          target="_blank"
-          rel="noopener noreferrer"
+      <div>
+        <button
+          onClick={handleSubscribe}
           style={{
-            padding: "10px 16px",
-            background: "#22c55e",
+            background: subscribed ? "#444" : "red",
             color: "white",
+            padding: "12px 24px",
+            border: "none",
             borderRadius: "8px",
-            textDecoration: "none",
+            fontSize: "18px",
+            cursor: "pointer",
             fontWeight: "bold",
           }}
         >
-          💳 Payment Subscription
-        </a>
+          {subscribed ? "Subscribed" : "Subscribe"}
+        </button>
+
+        <p style={{ fontSize: "20px", fontWeight: "bold" }}>
+          Subscribers: {subscribers}
+        </p>
       </div>
 
-      <p style={{ marginTop: "12px", fontSize: "18px" }}>
-        👀 Views: {views}
-      </p>
+      <p style={{ fontSize: "18px" }}>Views: {views}</p>
+
+      <button
+        onClick={handleLike}
+        style={{
+          background: "#2563eb",
+          color: "white",
+          padding: "10px 20px",
+          border: "none",
+          borderRadius: "8px",
+          fontSize: "16px",
+          cursor: "pointer",
+          marginRight: "10px",
+        }}
+      >
+        Like: {likes}
+      </button>
+
+      <button
+        onClick={handleShare}
+        style={{
+          background: "#9333ea",
+          color: "white",
+          padding: "10px 20px",
+          border: "none",
+          borderRadius: "8px",
+          fontSize: "16px",
+          cursor: "pointer",
+        }}
+      >
+        Share
+      </button>
 
       <h2 style={{ marginTop: "30px" }}>Video Library</h2>
 
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        {videos.map((video) => (
-          <button
-            key={video.src}
-            onClick={() => setCurrentVideo(video)}
+      {videos.map((video) => (
+        <section
+          key={video.file}
+          style={{
+            marginTop: "25px",
+            background: "#111",
+            padding: "15px",
+            borderRadius: "12px",
+          }}
+        >
+          <h3>{video.title}</h3>
+
+          <video
+            src={video.file}
+            controls
+            loop
+            playsInline
             style={{
-              padding: "12px",
-              borderRadius: "8px",
-              background: currentVideo.src === video.src ? "#ff0033" : "#222",
-              color: "white",
-              border: "1px solid #444",
+              width: "100%",
+              maxWidth: "800px",
+              borderRadius: "12px",
+              background: "black",
             }}
-          >
-            ▶ {video.title}
-          </button>
-        ))}
-      </div>
+          />
+        </section>
+      ))}
 
-      <h2 style={{ marginTop: "30px" }}>Comments</h2>
+      <section style={{ marginTop: "35px" }}>
+        <h2>Comments</h2>
 
-      <textarea
-        value={commentText}
-        onChange={(e) => setCommentText(e.target.value)}
-        placeholder="Write a comment..."
-        style={{
-          width: "100%",
-          maxWidth: "700px",
-          height: "80px",
-          borderRadius: "8px",
-          padding: "10px",
-        }}
-      />
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Write a comment..."
+          style={{
+            width: "100%",
+            maxWidth: "800px",
+            height: "90px",
+            padding: "10px",
+            borderRadius: "8px",
+            fontSize: "16px",
+          }}
+        />
 
-      <br />
+        <br />
 
-      <button onClick={addComment} style={{ marginTop: "10px" }}>
-        Post Comment
-      </button>
+        <button
+          onClick={handleComment}
+          style={{
+            marginTop: "10px",
+            background: "red",
+            color: "white",
+            padding: "10px 20px",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+          }}
+        >
+          Post Comment
+        </button>
 
-      <div style={{ marginTop: "20px" }}>
-        {comments.map((comment, index) => (
+        {comments.map((item, index) => (
           <p
             key={index}
             style={{
-              background: "#1a1a1a",
-              padding: "10px",
+              background: "#222",
+              padding: "12px",
               borderRadius: "8px",
-              maxWidth: "700px",
+              maxWidth: "800px",
             }}
           >
-            {comment}
+            {item}
           </p>
         ))}
-      </div>
+      </section>
     </main>
   );
 } 
+
