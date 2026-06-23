@@ -17,8 +17,6 @@ export default function Home() {
   const [subscribed, setSubscribed] = useState(false);
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<string[]>([]);
-  const [uploadTitle, setUploadTitle] = useState("");
-  const [uploadFile, setUploadFile] = useState("");
 
   useEffect(() => {
     const savedLikes = localStorage.getItem("raysstream_likes");
@@ -31,7 +29,14 @@ export default function Home() {
     if (savedViews) setViews(Number(savedViews));
     if (savedSubs) setSubscribers(Number(savedSubs));
     if (savedSubscribed === "true") setSubscribed(true);
-    if (savedComments) setComments(JSON.parse(savedComments));
+
+    if (savedComments) {
+      try {
+        setComments(JSON.parse(savedComments));
+      } catch {
+        setComments([]);
+      }
+    }
 
     const newViews = savedViews ? Number(savedViews) + 1 : 1;
     setViews(newViews);
@@ -46,28 +51,23 @@ export default function Home() {
 
   function handleSubscribe() {
     if (subscribed) return;
+
     const newSubs = subscribers + 1;
     setSubscribers(newSubs);
     setSubscribed(true);
+
     localStorage.setItem("raysstream_subscribers", String(newSubs));
     localStorage.setItem("raysstream_subscribed", "true");
   }
 
   function handleComment() {
     if (!comment.trim()) return;
+
     const newComments = [comment.trim(), ...comments];
     setComments(newComments);
     setComment("");
+
     localStorage.setItem("raysstream_comments", JSON.stringify(newComments));
-  }
-
-  function handleUpload() {
-    if (!uploadTitle || !uploadFile) {
-      alert("Add a title and choose an MP4 video.");
-      return;
-    }
-
-    alert("Upload page works. Real storage comes next.");
   }
 
   function copyLink(message: string) {
@@ -77,93 +77,154 @@ export default function Home() {
 
   function shareFacebook() {
     window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`,
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+        window.location.href
+      )}`,
       "_blank"
     );
   }
 
   return (
-    <main style={{ background: "#050505", color: "white", minHeight: "100vh", padding: "20px", fontFamily: "Arial" }}>
+    <main
+      style={{
+        background: "#050505",
+        color: "white",
+        minHeight: "100vh",
+        padding: "20px",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
       <h1 style={{ color: "red", fontSize: "42px" }}>Ray&apos;sStream</h1>
 
-      <h2>Creator Upload</h2>
-
-      <input
-        value={uploadTitle}
-        onChange={(e) => setUploadTitle(e.target.value)}
-        placeholder="Video title"
-        style={{ padding: "12px", width: "100%", maxWidth: "500px" }}
-      />
-
-      <br /><br />
-
-      <input
-        type="file"
-        accept="video/mp4"
-        onChange={(e) => setUploadFile(e.target.files?.[0]?.name || "")}
-      />
-
-      {uploadFile && <p>Selected file: {uploadFile}</p>}
-
-      <button onClick={handleUpload}>Upload Video</button>
-
-      <hr style={{ margin: "30px 0" }} />
-
-      <a href={STRIPE_LINK} target="_blank" rel="noopener noreferrer">
-        <button>Pay Subscription</button>
+      <a
+        href="/upload"
+        style={{
+          display: "inline-block",
+          background: "red",
+          color: "white",
+          padding: "12px 24px",
+          borderRadius: "8px",
+          textDecoration: "none",
+          fontWeight: "bold",
+          marginBottom: "20px",
+        }}
+      >
+        Creator Upload
       </a>
 
-      <br /><br />
+      <p>Videos, likes, comments, views, subscriptions, payments, and sharing.</p>
+
+      <a
+        href={STRIPE_LINK}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "inline-block",
+          background: "#16a34a",
+          color: "white",
+          padding: "14px 24px",
+          borderRadius: "10px",
+          fontWeight: "bold",
+          textDecoration: "none",
+          marginTop: "15px",
+          marginBottom: "20px",
+        }}
+      >
+        Pay Subscription
+      </a>
+
+      <br />
 
       <button onClick={handleSubscribe}>
         {subscribed ? "Subscribed" : "Subscribe"}
       </button>
 
-      <p>Subscribers: {subscribers}</p>
-      <p>Views: {views}</p>
+      <p style={{ fontSize: "20px", fontWeight: "bold" }}>
+        Subscribers: {subscribers}
+      </p>
+
+      <p style={{ fontSize: "18px" }}>Views: {views}</p>
 
       <button onClick={handleLike}>Like: {likes}</button>
 
       <div style={{ marginTop: "15px" }}>
         <button onClick={shareFacebook}>Facebook</button>{" "}
-        <button onClick={() => copyLink("Ray'sStream link copied. Open TikTok and paste it.")}>
+        <button
+          onClick={() =>
+            copyLink("Ray'sStream link copied. Open TikTok and paste it.")
+          }
+        >
           Copy for TikTok
         </button>{" "}
-        <button onClick={() => copyLink("Ray'sStream link copied. Open Instagram and paste it.")}>
+        <button
+          onClick={() =>
+            copyLink("Ray'sStream link copied. Open Instagram and paste it.")
+          }
+        >
           Copy for Instagram
         </button>{" "}
-        <button onClick={() => copyLink("Ray'sStream link copied.")}>Copy Link</button>
+        <button onClick={() => copyLink("Ray'sStream link copied.")}>
+          Copy Link
+        </button>
       </div>
 
-      <h2>Video Library</h2>
+      <h2 style={{ marginTop: "30px" }}>Video Library</h2>
 
       {videos.map((video) => (
-        <section key={video.file}>
+        <section key={video.file} style={{ marginTop: "25px" }}>
           <h3>{video.title}</h3>
-          <video src={video.file} controls loop playsInline style={{ width: "100%", maxWidth: "800px" }} />
+
+          <video
+            src={video.file}
+            controls
+            loop
+            playsInline
+            style={{
+              width: "100%",
+              maxWidth: "800px",
+              borderRadius: "12px",
+              background: "black",
+            }}
+          />
         </section>
       ))}
 
-      <h2>Comments</h2>
+      <section style={{ marginTop: "35px" }}>
+        <h2>Comments</h2>
+        <p style={{ color: "#aaa" }}>Comments save on this device.</p>
 
-      <textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="Write a comment..."
-        style={{ width: "100%", maxWidth: "800px", height: "90px" }}
-      />
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Write a comment..."
+          style={{
+            width: "100%",
+            maxWidth: "800px",
+            height: "90px",
+            padding: "10px",
+            borderRadius: "8px",
+            fontSize: "16px",
+          }}
+        />
 
-      <br />
+        <br />
 
-      <button onClick={handleComment}>Post Comment</button>
+        <button onClick={handleComment}>Post Comment</button>
 
-      {comments.map((item, index) => (
-        <p key={index} style={{ background: "#222", padding: "12px" }}>
-          {item}
-        </p>
-      ))}
+        {comments.map((item, index) => (
+          <p
+            key={index}
+            style={{
+              background: "#222",
+              padding: "12px",
+              borderRadius: "8px",
+              maxWidth: "800px",
+            }}
+          >
+            {item}
+          </p>
+        ))}
+      </section>
     </main>
   );
-} 
-
 } 
