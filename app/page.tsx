@@ -66,7 +66,6 @@ export default function Home() {
     const newComments = [comment.trim(), ...comments];
     setComments(newComments);
     setComment("");
-
     localStorage.setItem("raysstream_comments", JSON.stringify(newComments));
   }
 
@@ -107,7 +106,6 @@ export default function Home() {
           textDecoration: "none",
           fontWeight: "bold",
           marginBottom: "20px",
-          marginRight: "10px",
         }}
       >
         Creator Upload
@@ -229,4 +227,3 @@ export default function Home() {
     </main>
   );
 } 
-
