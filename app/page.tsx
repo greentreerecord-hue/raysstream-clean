@@ -96,6 +96,23 @@ export default function Home() {
     >
       <h1 style={{ color: "red", fontSize: "42px" }}>Ray&apos;sStream</h1>
 
+      <a
+        href="/upload"
+        style={{
+          display: "inline-block",
+          background: "red",
+          color: "white",
+          padding: "12px 24px",
+          borderRadius: "8px",
+          textDecoration: "none",
+          fontWeight: "bold",
+          marginBottom: "20px",
+          marginRight: "10px",
+        }}
+      >
+        Creator Upload
+      </a>
+
       <p>Videos, likes, comments, views, subscriptions, payments, and sharing.</p>
 
       <a
@@ -119,19 +136,7 @@ export default function Home() {
 
       <br />
 
-      <button
-        onClick={handleSubscribe}
-        style={{
-          background: subscribed ? "#444" : "red",
-          color: "white",
-          padding: "12px 24px",
-          border: "none",
-          borderRadius: "8px",
-          fontSize: "18px",
-          cursor: "pointer",
-          fontWeight: "bold",
-        }}
-      >
+      <button onClick={handleSubscribe}>
         {subscribed ? "Subscribed" : "Subscribe"}
       </button>
 
@@ -147,17 +152,17 @@ export default function Home() {
         <button onClick={shareFacebook}>Facebook</button>{" "}
         <button
           onClick={() =>
-            copyLink("Ray'sStream link copied. Paste it into TikTok.")
+            copyLink("Ray'sStream link copied. Open TikTok and paste it.")
           }
         >
-          TikTok
+          Copy for TikTok
         </button>{" "}
         <button
           onClick={() =>
-            copyLink("Ray'sStream link copied. Paste it into Instagram.")
+            copyLink("Ray'sStream link copied. Open Instagram and paste it.")
           }
         >
-          Instagram
+          Copy for Instagram
         </button>{" "}
         <button onClick={() => copyLink("Ray'sStream link copied.")}>
           Copy Link
@@ -205,20 +210,7 @@ export default function Home() {
 
         <br />
 
-        <button
-          onClick={handleComment}
-          style={{
-            marginTop: "10px",
-            background: "red",
-            color: "white",
-            padding: "10px 20px",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-          }}
-        >
-          Post Comment
-        </button>
+        <button onClick={handleComment}>Post Comment</button>
 
         {comments.map((item, index) => (
           <p
