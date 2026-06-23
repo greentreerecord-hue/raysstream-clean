@@ -64,19 +64,24 @@ export default function Home() {
     if (!comment.trim()) return;
 
     const newComments = [comment.trim(), ...comments];
-
     setComments(newComments);
     setComment("");
 
-    localStorage.setItem(
-      "raysstream_comments",
-      JSON.stringify(newComments)
-    );
+    localStorage.setItem("raysstream_comments", JSON.stringify(newComments));
   }
 
-  function handleShare() {
+  function copyLink(message: string) {
     navigator.clipboard.writeText(window.location.href);
-    alert("Ray'sStream link copied");
+    alert(message);
+  }
+
+  function shareFacebook() {
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+        window.location.href
+      )}`,
+      "_blank"
+    );
   }
 
   return (
@@ -89,11 +94,9 @@ export default function Home() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h1 style={{ color: "red", fontSize: "42px" }}>
-        Ray&apos;sStream
-      </h1>
+      <h1 style={{ color: "red", fontSize: "42px" }}>Ray&apos;sStream</h1>
 
-      <p>Watch videos, like, comment, subscribe, and support Ray&apos;sStream.</p>
+      <p>Videos, likes, comments, views, subscriptions, payments, and sharing.</p>
 
       <a
         href={STRIPE_LINK}
@@ -114,32 +117,52 @@ export default function Home() {
         Pay Subscription
       </a>
 
-      <div>
-        <button
-          onClick={handleSubscribe}
-          style={{
-            background: subscribed ? "#444" : "red",
-            color: "white",
-            padding: "12px 24px",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "18px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          {subscribed ? "Subscribed" : "Subscribe"}
-        </button>
+      <br />
 
-        <p style={{ fontSize: "20px", fontWeight: "bold" }}>
-          Subscribers: {subscribers}
-        </p>
-      </div>
+      <button
+        onClick={handleSubscribe}
+        style={{
+          background: subscribed ? "#444" : "red",
+          color: "white",
+          padding: "12px 24px",
+          border: "none",
+          borderRadius: "8px",
+          fontSize: "18px",
+          cursor: "pointer",
+          fontWeight: "bold",
+        }}
+      >
+        {subscribed ? "Subscribed" : "Subscribe"}
+      </button>
+
+      <p style={{ fontSize: "20px", fontWeight: "bold" }}>
+        Subscribers: {subscribers}
+      </p>
 
       <p style={{ fontSize: "18px" }}>Views: {views}</p>
 
-      <button onClick={handleLike}>Like: {likes}</button>{" "}
-      <button onClick={handleShare}>Share</button>
+      <button onClick={handleLike}>Like: {likes}</button>
+
+      <div style={{ marginTop: "15px" }}>
+        <button onClick={shareFacebook}>Facebook</button>{" "}
+        <button
+          onClick={() =>
+            copyLink("Ray'sStream link copied. Paste it into TikTok.")
+          }
+        >
+          TikTok
+        </button>{" "}
+        <button
+          onClick={() =>
+            copyLink("Ray'sStream link copied. Paste it into Instagram.")
+          }
+        >
+          Instagram
+        </button>{" "}
+        <button onClick={() => copyLink("Ray'sStream link copied.")}>
+          Copy Link
+        </button>
+      </div>
 
       <h2 style={{ marginTop: "30px" }}>Video Library</h2>
 
@@ -164,10 +187,7 @@ export default function Home() {
 
       <section style={{ marginTop: "35px" }}>
         <h2>Comments</h2>
-
-        <p style={{ color: "#aaa" }}>
-          Comments save on this device.
-        </p>
+        <p style={{ color: "#aaa" }}>Comments save on this device.</p>
 
         <textarea
           value={comment}
@@ -217,3 +237,4 @@ export default function Home() {
     </main>
   );
 } 
+
