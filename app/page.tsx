@@ -3,117 +3,176 @@
 import { useEffect, useState } from "react";
 
 const videos = [
-  { title: "Video 1", src: "/videos/video1.mp4" },
-  { title: "Video 2", src: "/videos/video2.mp4" },
-  { title: "Video 3", src: "/videos/video3.mp4" },
+  {
+    title: "It's Cool",
+    src: "/videos/video1.mp4",
+  },
+  {
+    title: "Video 2",
+    src: "/videos/video2.mp4",
+  },
+  {
+    title: "Spaceship",
+    src: "/videos/video3.mp4",
+  },
 ];
 
 export default function Home() {
-  const [current, setCurrent] = useState(0);
+  const [currentVideo, setCurrentVideo] = useState(videos[0]);
   const [likes, setLikes] = useState(0);
+  const [subscribers, setSubscribers] = useState(0);
   const [views, setViews] = useState(0);
-  const [shares, setShares] = useState(0);
-  const [subs, setSubs] = useState(0);
   const [comments, setComments] = useState<string[]>([]);
-  const [comment, setComment] = useState("");
-
-  const video = videos[current];
+  const [commentText, setCommentText] = useState("");
 
   useEffect(() => {
-    const saved = localStorage.getItem("raysstream-data");
-    if (saved) {
-      const data = JSON.parse(saved);
-      setLikes(data.likes || 0);
-      setViews(data.views || 0);
-      setShares(data.shares || 0);
-      setSubs(data.subs || 0);
-      setComments(data.comments || []);
-    }
+    const savedLikes = Number(localStorage.getItem("likes") || "0");
+    const savedSubs = Number(localStorage.getItem("subscribers") || "0");
+    const savedViews = Number(localStorage.getItem("views") || "0");
+    const savedComments = JSON.parse(localStorage.getItem("comments") || "[]");
+
+    setLikes(savedLikes);
+    setSubscribers(savedSubs);
+    setViews(savedViews + 1);
+    setComments(savedComments);
+
+    localStorage.setItem("views", String(savedViews + 1));
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(
-      "raysstream-data",
-      JSON.stringify({ likes, views, shares, subs, comments })
-    );
-  }, [likes, views, shares, subs, comments]);
+  function likeVideo() {
+    const newLikes = likes + 1;
+    setLikes(newLikes);
+    localStorage.setItem("likes", String(newLikes));
+  }
 
-  function addView() {
-    setViews((v) => v + 1);
+  function subscribe() {
+    const newSubs = subscribers + 1;
+    setSubscribers(newSubs);
+    localStorage.setItem("subscribers", String(newSubs));
   }
 
   function addComment() {
-    if (!comment.trim()) return;
-    setComments([comment, ...comments]);
-    setComment("");
+    if (!commentText.trim()) return;
+
+    const newComments = [commentText, ...comments];
+    setComments(newComments);
+    localStorage.setItem("comments", JSON.stringify(newComments));
+    setCommentText("");
   }
 
   function shareVideo() {
-    setShares((s) => s + 1);
     navigator.clipboard.writeText(window.location.href);
-    alert("Video link copied!");
+    alert("Ray'sStream link copied!");
   }
 
   return (
-    <main style={{ background: "#111", color: "white", minHeight: "100vh", padding: 20 }}>
-      <h1>🔥 Ray&apos;sStream</h1>
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#050505",
+        color: "white",
+        padding: "20px",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <h1 style={{ color: "#ff0033", fontSize: "36px" }}>🔥 Ray&apos;sStream</h1>
 
-      <h2>{video.title}</h2>
+      <h2>{currentVideo.title}</h2>
 
       <video
-        key={video.src}
-        width="100%"
+        src={currentVideo.src}
         controls
+        autoPlay
         loop
         playsInline
-        onPlay={addView}
-        style={{ maxWidth: 900, background: "black" }}
-      >
-        <source src={video.src} type="video/mp4" />
-        Your browser does not support video.
-      </video>
+        style={{
+          width: "100%",
+          maxWidth: "900px",
+          borderRadius: "12px",
+          background: "black",
+        }}
+      />
 
-      <p>👁 Views: {views}</p>
+      <div style={{ marginTop: "16px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <button onClick={likeVideo}>👍 Like {likes}</button>
+        <button onClick={subscribe}>🔔 Subscribe {subscribers}</button>
+        <button onClick={shareVideo}>🔗 Share</button>
 
-      <button onClick={() => setLikes(likes + 1)}>👍 Like {likes}</button>
-
-      <button onClick={() => setSubs(subs + 1)} style={{ marginLeft: 10 }}>
-        🔔 Subscribe {subs}
-      </button>
-
-      <button onClick={shareVideo} style={{ marginLeft: 10 }}>
-        🔗 Share {shares}
-      </button>
-
-      <h3>Video Library</h3>
-      {videos.map((v, index) => (
-        <button
-          key={v.src}
-          onClick={() => setCurrent(index)}
-          style={{ display: "block", marginTop: 10 }}
+        <a
+          href="https://buy.stripe.com/YOUR_PAYMENT_LINK"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            padding: "10px 16px",
+            background: "#22c55e",
+            color: "white",
+            borderRadius: "8px",
+            textDecoration: "none",
+            fontWeight: "bold",
+          }}
         >
-          ▶ {v.title}
-        </button>
-      ))}
+          💳 Payment Subscription
+        </a>
+      </div>
 
-      <h3>Comments</h3>
+      <p style={{ marginTop: "12px" }}>👀 Views: {views}</p>
+
+      <h2 style={{ marginTop: "30px" }}>Video Library</h2>
+
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        {videos.map((video) => (
+          <button
+            key={video.src}
+            onClick={() => setCurrentVideo(video)}
+            style={{
+              padding: "12px",
+              borderRadius: "8px",
+              background: currentVideo.src === video.src ? "#ff0033" : "#222",
+              color: "white",
+              border: "1px solid #444",
+            }}
+          >
+            ▶ {video.title}
+          </button>
+        ))}
+      </div>
+
+      <h2 style={{ marginTop: "30px" }}>Comments</h2>
 
       <textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="Leave a comment..."
-        style={{ width: "100%", maxWidth: 600, height: 80 }}
+        value={commentText}
+        onChange={(e) => setCommentText(e.target.value)}
+        placeholder="Write a comment..."
+        style={{
+          width: "100%",
+          maxWidth: "700px",
+          height: "80px",
+          borderRadius: "8px",
+          padding: "10px",
+        }}
       />
 
       <br />
 
-      <button onClick={addComment}>Post Comment</button>
+      <button onClick={addComment} style={{ marginTop: "10px" }}>
+        Post Comment
+      </button>
 
-      {comments.map((c, i) => (
-        <p key={i} style={{ background: "#222", padding: 10 }}>
-          {c}
-        </p>
-      ))}
+      <div style={{ marginTop: "20px" }}>
+        {comments.map((comment, index) => (
+          <p
+            key={index}
+            style={{
+              background: "#1a1a1a",
+              padding: "10px",
+              borderRadius: "8px",
+              maxWidth: "700px",
+            }}
+          >
+            {comment}
+          </p>
+        ))}
+      </div>
     </main>
   );
 } 
