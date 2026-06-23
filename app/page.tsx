@@ -2,22 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-const STRIPE_LINK =
-  "https://buy.stripe.com/fZu6oH08q6VV3Zw5TP2Nq02";
+const STRIPE_LINK = "https://buy.stripe.com/fZu6oH08q6VV3Zw5TP2Nq02";
 
 const videos = [
-  {
-    title: "It's Cool",
-    file: "/videos/video1.mp4",
-  },
-  {
-    title: "Video 2",
-    file: "/videos/video2.mp4",
-  },
-  {
-    title: "Video 3",
-    file: "/videos/video3.mp4",
-  },
+  { title: "It's Cool", file: "/videos/video1.mp4" },
+  { title: "Video 2", file: "/videos/video2.mp4" },
+  { title: "Video 3", file: "/videos/video3.mp4" },
 ];
 
 export default function Home() {
@@ -39,7 +29,14 @@ export default function Home() {
     if (savedViews) setViews(Number(savedViews));
     if (savedSubs) setSubscribers(Number(savedSubs));
     if (savedSubscribed === "true") setSubscribed(true);
-    if (savedComments) setComments(JSON.parse(savedComments));
+
+    if (savedComments) {
+      try {
+        setComments(JSON.parse(savedComments));
+      } catch {
+        setComments([]);
+      }
+    }
 
     const newViews = savedViews ? Number(savedViews) + 1 : 1;
     setViews(newViews);
@@ -66,7 +63,8 @@ export default function Home() {
   function handleComment() {
     if (!comment.trim()) return;
 
-    const newComments = [comment, ...comments];
+    const newComments = [comment.trim(), ...comments];
+
     setComments(newComments);
     setComment("");
 
@@ -95,9 +93,7 @@ export default function Home() {
         Ray&apos;sStream
       </h1>
 
-      <p style={{ fontSize: "18px" }}>
-        Watch videos, like, comment, subscribe, and support Ray&apos;sStream.
-      </p>
+      <p>Watch videos, like, comment, subscribe, and support Ray&apos;sStream.</p>
 
       <a
         href={STRIPE_LINK}
@@ -142,49 +138,13 @@ export default function Home() {
 
       <p style={{ fontSize: "18px" }}>Views: {views}</p>
 
-      <button
-        onClick={handleLike}
-        style={{
-          background: "#2563eb",
-          color: "white",
-          padding: "10px 20px",
-          border: "none",
-          borderRadius: "8px",
-          fontSize: "16px",
-          cursor: "pointer",
-          marginRight: "10px",
-        }}
-      >
-        Like: {likes}
-      </button>
-
-      <button
-        onClick={handleShare}
-        style={{
-          background: "#9333ea",
-          color: "white",
-          padding: "10px 20px",
-          border: "none",
-          borderRadius: "8px",
-          fontSize: "16px",
-          cursor: "pointer",
-        }}
-      >
-        Share
-      </button>
+      <button onClick={handleLike}>Like: {likes}</button>{" "}
+      <button onClick={handleShare}>Share</button>
 
       <h2 style={{ marginTop: "30px" }}>Video Library</h2>
 
       {videos.map((video) => (
-        <section
-          key={video.file}
-          style={{
-            marginTop: "25px",
-            background: "#111",
-            padding: "15px",
-            borderRadius: "12px",
-          }}
-        >
+        <section key={video.file} style={{ marginTop: "25px" }}>
           <h3>{video.title}</h3>
 
           <video
@@ -204,6 +164,10 @@ export default function Home() {
 
       <section style={{ marginTop: "35px" }}>
         <h2>Comments</h2>
+
+        <p style={{ color: "#aaa" }}>
+          Comments save on this device.
+        </p>
 
         <textarea
           value={comment}
@@ -253,4 +217,3 @@ export default function Home() {
     </main>
   );
 } 
-
