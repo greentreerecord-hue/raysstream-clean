@@ -4,15 +4,30 @@ import { useState } from "react";
 
 export default function UploadPage() {
   const [title, setTitle] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [fileName, setFileName] = useState("");
 
-  function handleUpload() {
-    if (!title.trim() || !fileName) {
-      alert("Add a video title and choose an MP4 file.");
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    if (file.type !== "video/mp4") {
+      alert("Please choose an MP4 video.");
       return;
     }
 
-    alert("Upload page works. Next step will be real video storage.");
+    setFileName(file.name);
+    setVideoUrl(URL.createObjectURL(file));
+  }
+
+  function handleUpload() {
+    if (!title.trim() || !videoUrl) {
+      alert("Add a title and choose an MP4 video.");
+      return;
+    }
+
+    alert("Creator upload works. Video preview is ready.");
   }
 
   return (
@@ -29,41 +44,33 @@ export default function UploadPage() {
         Ray&apos;sStream Creator Upload
       </h1>
 
-      <p>Upload your next Ray&apos;sStream video.</p>
+      <a href="/" style={{ color: "white" }}>
+        Back to Ray&apos;sStream
+      </a>
 
-      <div style={{ marginTop: "25px" }}>
-        <label>Video Title</label>
-        <br />
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Enter video title"
-          style={{
-            width: "100%",
-            maxWidth: "500px",
-            padding: "12px",
-            marginTop: "8px",
-            borderRadius: "8px",
-            fontSize: "16px",
-          }}
-        />
-      </div>
+      <p>Upload and preview your Ray&apos;sStream video.</p>
 
-      <div style={{ marginTop: "25px" }}>
-        <label>Choose MP4 Video</label>
-        <br />
-        <input
-          type="file"
-          accept="video/mp4"
-          onChange={(e) =>
-            setFileName(e.target.files?.[0]?.name || "")
-          }
-          style={{ marginTop: "8px" }}
-        />
-      </div>
+      <h3>Video Title</h3>
+
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Enter video title"
+        style={{
+          width: "100%",
+          maxWidth: "600px",
+          padding: "12px",
+          borderRadius: "8px",
+          fontSize: "18px",
+        }}
+      />
+
+      <h3 style={{ marginTop: "25px" }}>Choose MP4 Video</h3>
+
+      <input type="file" accept="video/mp4" onChange={handleFile} />
 
       {fileName && (
-        <p style={{ marginTop: "15px" }}>
+        <p>
           Selected file: <strong>{fileName}</strong>
         </p>
       )}
@@ -71,23 +78,38 @@ export default function UploadPage() {
       <button
         onClick={handleUpload}
         style={{
-          marginTop: "25px",
+          marginTop: "20px",
           background: "red",
           color: "white",
           padding: "12px 24px",
           border: "none",
           borderRadius: "8px",
           fontSize: "18px",
-          cursor: "pointer",
           fontWeight: "bold",
+          cursor: "pointer",
         }}
       >
         Upload Video
       </button>
 
-      <p style={{ marginTop: "25px", color: "#aaa" }}>
-        Safe version: this page does not change your working homepage.
-      </p>
+      {videoUrl && (
+        <section style={{ marginTop: "30px" }}>
+          <h2>{title || "Video Preview"}</h2>
+
+          <video
+            src={videoUrl}
+            controls
+            loop
+            playsInline
+            style={{
+              width: "100%",
+              maxWidth: "800px",
+              borderRadius: "12px",
+              background: "black",
+            }}
+          />
+        </section>
+      )}
     </main>
   );
 } 
