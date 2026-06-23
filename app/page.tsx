@@ -3,18 +3,9 @@
 import { useEffect, useState } from "react";
 
 const videos = [
-  {
-    title: "It's Cool",
-    src: "/videos/video1.mp4",
-  },
-  {
-    title: "Video 2",
-    src: "/videos/video2.mp4",
-  },
-  {
-    title: "Spaceship",
-    src: "/videos/video3.mp4",
-  },
+  { title: "It's Cool", src: "/videos/video1.mp4" },
+  { title: "Video 2", src: "/videos/video2.mp4" },
+  { title: "Spaceship", src: "/videos/video3.mp4" },
 ];
 
 export default function Home() {
@@ -65,6 +56,10 @@ export default function Home() {
     alert("Ray'sStream link copied!");
   }
 
+  function paymentComingSoon() {
+    alert("Payment link coming soon!");
+  }
+
   return (
     <main
       style={{
@@ -97,22 +92,19 @@ export default function Home() {
         <button onClick={likeVideo}>👍 Like {likes}</button>
         <button onClick={subscribe}>🔔 Subscribe {subscribers}</button>
         <button onClick={shareVideo}>🔗 Share</button>
-
-        <a
-          href="https://buy.stripe.com/YOUR_PAYMENT_LINK"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={paymentComingSoon}
           style={{
             padding: "10px 16px",
             background: "#22c55e",
             color: "white",
             borderRadius: "8px",
-            textDecoration: "none",
+            border: "none",
             fontWeight: "bold",
           }}
         >
           💳 Payment Subscription
-        </a>
+        </button>
       </div>
 
       <p style={{ marginTop: "12px" }}>👀 Views: {views}</p>
