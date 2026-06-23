@@ -17,17 +17,14 @@ export default function Home() {
   const [commentText, setCommentText] = useState("");
 
   useEffect(() => {
-    const savedLikes = Number(localStorage.getItem("likes") || "0");
-    const savedSubs = Number(localStorage.getItem("subscribers") || "0");
-    const savedViews = Number(localStorage.getItem("views") || "0");
-    const savedComments = JSON.parse(localStorage.getItem("comments") || "[]");
+    setLikes(Number(localStorage.getItem("likes") || "0"));
+    setSubscribers(Number(localStorage.getItem("subscribers") || "0"));
 
-    setLikes(savedLikes);
-    setSubscribers(savedSubs);
-    setViews(savedViews + 1);
-    setComments(savedComments);
+    const savedViews = Number(localStorage.getItem("views") || "0") + 1;
+    setViews(savedViews);
+    localStorage.setItem("views", String(savedViews));
 
-    localStorage.setItem("views", String(savedViews + 1));
+    setComments(JSON.parse(localStorage.getItem("comments") || "[]"));
   }, []);
 
   function likeVideo() {
@@ -37,9 +34,14 @@ export default function Home() {
   }
 
   function subscribe() {
-    const newSubs = subscribers + 1;
-    setSubscribers(newSubs);
-    localStorage.setItem("subscribers", String(newSubs));
+    const newSubscribers = subscribers + 1;
+    setSubscribers(newSubscribers);
+    localStorage.setItem("subscribers", String(newSubscribers));
+  }
+
+  function shareVideo() {
+    navigator.clipboard.writeText(window.location.href);
+    alert("Ray'sStream link copied!");
   }
 
   function addComment() {
@@ -49,15 +51,6 @@ export default function Home() {
     setComments(newComments);
     localStorage.setItem("comments", JSON.stringify(newComments));
     setCommentText("");
-  }
-
-  function shareVideo() {
-    navigator.clipboard.writeText(window.location.href);
-    alert("Ray'sStream link copied!");
-  }
-
-  function paymentComingSoon() {
-    alert("Payment link coming soon!");
   }
 
   return (
@@ -70,11 +63,14 @@ export default function Home() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h1 style={{ color: "#ff0033", fontSize: "36px" }}>🔥 Ray&apos;sStream</h1>
+      <h1 style={{ color: "#ff0033", fontSize: "38px" }}>
+        🔥 Ray&apos;sStream
+      </h1>
 
       <h2>{currentVideo.title}</h2>
 
       <video
+        key={currentVideo.src}
         src={currentVideo.src}
         controls
         autoPlay
@@ -88,26 +84,38 @@ export default function Home() {
         }}
       />
 
-      <div style={{ marginTop: "16px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+      <div
+        style={{
+          marginTop: "16px",
+          display: "flex",
+          gap: "10px",
+          flexWrap: "wrap",
+        }}
+      >
         <button onClick={likeVideo}>👍 Like {likes}</button>
         <button onClick={subscribe}>🔔 Subscribe {subscribers}</button>
         <button onClick={shareVideo}>🔗 Share</button>
-        <button
-          onClick={paymentComingSoon}
+
+        <a
+          href="https://buy.stripe.com/fZu6oH08q6VV3Zw5TP2Nq02"
+          target="_blank"
+          rel="noopener noreferrer"
           style={{
             padding: "10px 16px",
             background: "#22c55e",
             color: "white",
             borderRadius: "8px",
-            border: "none",
+            textDecoration: "none",
             fontWeight: "bold",
           }}
         >
           💳 Payment Subscription
-        </button>
+        </a>
       </div>
 
-      <p style={{ marginTop: "12px" }}>👀 Views: {views}</p>
+      <p style={{ marginTop: "12px", fontSize: "18px" }}>
+        👀 Views: {views}
+      </p>
 
       <h2 style={{ marginTop: "30px" }}>Video Library</h2>
 
