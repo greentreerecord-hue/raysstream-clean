@@ -1,47 +1,73 @@
+"use client";
+
+import { useState } from "react";
+
 export default function UploadPage() {
+  const [file, setFile] = useState<File | null>(null);
+  const [message, setMessage] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+
+  async function uploadVideo() {
+    if (!file) {
+      setMessage("Please choose a video first.");
+      return;
+    }
+
+    setMessage("Uploading...");
+
+    const formData = new FormData();
+    formData.append("video", file);
+
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setMessage(data.error || "Upload failed.");
+      return;
+    }
+
+    setVideoUrl(data.url);
+    setMessage("Upload complete!");
+  }
+
   return (
     <main style={{ minHeight: "100vh", background: "#050505", color: "white", padding: 24 }}>
-      <h1 style={{ fontSize: 36, marginBottom: 10 }}>Ray&apos;sStream Upload</h1>
+      <h1>Ray&apos;sStream Upload</h1>
 
-      <p style={{ fontSize: 18, color: "#ccc" }}>
-        Real uploads are done through GitHub for now.
-      </p>
+      <input
+        type="file"
+        accept="video/mp4,video/webm,video/quicktime"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+      />
 
-      <section style={{ marginTop: 24, padding: 20, background: "#111", borderRadius: 12 }}>
-        <h2>Upload video files here:</h2>
+      <br /><br />
 
-        <pre style={{ background: "#000", padding: 16, borderRadius: 8 }}>
-public/videos
-        </pre>
-
-        <h2>Video file names:</h2>
-
-        <pre style={{ background: "#000", padding: 16, borderRadius: 8 }}>
-video1.mp4
-video2.mp4
-video3.mp4
-        </pre>
-
-        <p>
-          After uploading to <b>public/videos</b>, commit the changes and redeploy on Vercel.
-        </p>
-      </section>
-
-      <a
-        href="/"
+      <button
+        onClick={uploadVideo}
         style={{
-          display: "inline-block",
-          marginTop: 24,
-          padding: "12px 18px",
+          padding: "12px 20px",
           background: "red",
           color: "white",
+          border: "none",
           borderRadius: 8,
-          textDecoration: "none",
           fontWeight: "bold",
         }}
       >
-        Back to Home
-      </a>
+        Upload Video
+      </button>
+
+      <p>{message}</p>
+
+      {videoUrl && (
+        <>
+          <p>Video link: {videoUrl}</p>
+          <video src={videoUrl} controls width="100%" style={{ maxWidth: 700 }} />
+        </>
+      )}
     </main>
   );
 } 
