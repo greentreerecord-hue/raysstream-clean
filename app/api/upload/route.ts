@@ -1,48 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 export const runtime = "nodejs";
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const formData = await req.formData();
-    const file = formData.get("video");
+    const data = await request.formData();
+    const file = data.get("video") as File | null;
 
-    if (!file || !(file instanceof File)) {
-      return NextResponse.json(
-        { success: false, error: "No video file uploaded" },
-        { status: 400 }
-      );
+    if (!file) {
+      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const uploadDir = path.join(process.cwd(), "public", "videos");
-    await mkdir(uploadDir, { recursive: true });
+    const folderPath = path.join(process.cwd(), "public", "videos");
+    await mkdir(folderPath, { recursive: true });
 
-    const safeName = file.name
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9.-]/g, "")
-      .toLowerCase();
-
-    const filePath = path.join(uploadDir, safeName);
+    const fileName = file.name.replaceAll(" ", "-").toLowerCase();
+    const filePath = path.join(folderPath, fileName);
 
     await writeFile(filePath, buffer);
 
     return NextResponse.json({
       success: true,
-      fileName: safeName,
-      url: `/videos/${safeName}`,
+      url: `/videos/${fileName}`,
+      fileName,
     });
   } catch (error) {
-    console.error("Upload error:", error);
-
     return NextResponse.json(
-      { success: false, error: "Upload failed" },
+      { error: "Upload failed" },
       { status: 500 }
     );
   }
 } 
-
