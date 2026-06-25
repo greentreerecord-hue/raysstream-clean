@@ -8,29 +8,31 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const video = formData.get("video");
 
-    if (!video || !(video instanceof File)) {
+    if (!(video instanceof File)) {
       return NextResponse.json(
         { error: "No video uploaded" },
         { status: 400 }
       );
     }
 
-    const blob = await put(video.name, video, {
-      access: "public",
+    const safeName = video.name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9.-]/g, "");
+
+    const blob = await put(`videos/${Date.now()}-${safeName}`, video, {
+      access: "public"
     });
 
     return NextResponse.json({
       success: true,
-      url: blob.url,
-      fileName: video.name,
+      url: blob.url
     });
   } catch (error) {
-    console.error("Upload error:", error);
-
+    console.error(error);
     return NextResponse.json(
       { error: "Upload failed" },
       { status: 500 }
     );
   }
 } 
-
