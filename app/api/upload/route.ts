@@ -1,8 +1,8 @@
-import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
@@ -13,35 +13,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No video uploaded" }, { status: 400 });
     }
 
-    if (video.size > 50 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "Video too large. Try under 50MB." },
-        { status: 400 }
-      );
-    }
+    const bytes = await video.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    const uploadsDir = path.join(process.cwd(), "public", "uploads");
+    await mkdir(uploadsDir, { recursive: true });
 
     const safeName = video.name
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9.-]/g, "");
 
-    const blob = await put(`videos/${Date.now()}-${safeName}`, video, {
-      access: "public",
-      addRandomSuffix: true,
-    });
+    const fileName = `${Date.now()}-${safeName}`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    await writeFile(filePath, buffer);
 
     return NextResponse.json({
       success: true,
-      url: blob.url,
-      name: safeName,
-      size: video.size,
+      url: `/uploads/${fileName}`,
     });
   } catch (error) {
     console.error("UPLOAD ERROR:", error);
-
-    return NextResponse.json(
-      { error: "Upload failed. Check Vercel Blob Storage connection." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 } 
