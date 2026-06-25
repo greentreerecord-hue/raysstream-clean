@@ -1,22 +1,33 @@
-import { NextResponse } from "next/server";
+const videos = [
+  { title: "It&apos;s Cool", src: "/videos/itscool.mp4" },
+  { title: "Video 2", src: "/videos/video2.mp4" },
+  { title: "Spaceship", src: "/videos/video3.mp4" },
+];
 
-export const runtime = "nodejs";
+export default function Home() {
+  return (
+    <main style={{ padding: 30, background: "#111", color: "white", minHeight: "100vh" }}>
+      <h1>🔥 Ray&apos;sStream</h1>
+      <p>3 videos playing.</p>
 
-export async function POST(request: Request) {
-  try {
-    const formData = await request.formData();
-    const video = formData.get("video");
+      {videos.map((video) => (
+        <section key={video.src} style={{ marginBottom: 40 }}>
+          <h2>{video.title}</h2>
+          <video
+            src={video.src}
+            controls
+            autoPlay
+            muted
+            loop
+            playsInline
+            style={{ width: "100%", maxWidth: 800 }}
+          />
+        </section>
+      ))}
 
-    if (!(video instanceof File)) {
-      return NextResponse.json({ error: "No video uploaded" }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      url: "/videos/itscool.mp4",
-      name: video.name
-    });
-  } catch {
-    return NextResponse.json({ error: "Server upload error" }, { status: 500 });
-  }
+      <a href="/upload" style={{ color: "red", fontWeight: "bold" }}>
+        Creator Upload
+      </a>
+    </main>
+  );
 } 
