@@ -1,64 +1,22 @@
-"use client";
+import { NextResponse } from "next/server";
 
-import { useState } from "react";
+export const runtime = "nodejs";
 
-export default function UploadPage() {
-  const [file, setFile] = useState<File | null>(null);
-  const [status, setStatus] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
+export async function POST(request: Request) {
+  try {
+    const formData = await request.formData();
+    const video = formData.get("video");
 
-  async function handleUpload() {
-    if (!file) {
-      setStatus("Choose a video first.");
-      return;
+    if (!(video instanceof File)) {
+      return NextResponse.json({ error: "No video uploaded" }, { status: 400 });
     }
 
-    setStatus("Uploading...");
-    setVideoUrl("");
-
-    const formData = new FormData();
-    formData.append("video", file);
-
-    try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setStatus(data.error || "Upload failed.");
-        return;
-      }
-
-      setStatus("Upload success!");
-      setVideoUrl(data.url);
-    } catch {
-      setStatus("Upload failed. API did not respond.");
-    }
+    return NextResponse.json({
+      success: true,
+      url: "/videos/itscool.mp4",
+      name: video.name
+    });
+  } catch {
+    return NextResponse.json({ error: "Server upload error" }, { status: 500 });
   }
-
-  return (
-    <main style={{ padding: 30, background: "#111", color: "white", minHeight: "100vh" }}>
-      <h1>Ray&apos;sStream Upload</h1>
-
-      <input
-        type="file"
-        accept="video/mp4"
-        onChange={(e) => setFile(e.target.files?.[0] || null)}
-      />
-
-      <br /><br />
-
-      <button onClick={handleUpload}>Upload Video</button>
-
-      <h2>{status}</h2>
-
-      {videoUrl && (
-        <video src={videoUrl} controls style={{ width: "100%", maxWidth: 700 }} />
-      )}
-    </main>
-  );
 } 
-
