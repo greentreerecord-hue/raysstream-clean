@@ -1,230 +1,84 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-const STRIPE_LINK = "https://buy.stripe.com/fZu6oH08q6VV3Zw5TP2Nq02";
+export default function UploadPage() {
+  const [file, setFile] = useState<File | null>(null);
+  const [status, setStatus] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
 
-const videos = [
-  { title: "It's Cool", file: "/videos/video1.mp4" },
-  { title: "Video 2", file: "/videos/video2.mp4" },
-  { title: "Video 3", file: "/videos/video3.mp4" },
-];
-
-export default function Home() {
-  const [likes, setLikes] = useState(0);
-  const [views, setViews] = useState(0);
-  const [subscribers, setSubscribers] = useState(0);
-  const [subscribed, setSubscribed] = useState(false);
-  const [comment, setComment] = useState("");
-  const [comments, setComments] = useState<string[]>([]);
-
-  useEffect(() => {
-    const savedLikes = localStorage.getItem("raysstream_likes");
-    const savedViews = localStorage.getItem("raysstream_views");
-    const savedSubs = localStorage.getItem("raysstream_subscribers");
-    const savedSubscribed = localStorage.getItem("raysstream_subscribed");
-    const savedComments = localStorage.getItem("raysstream_comments");
-
-    if (savedLikes) setLikes(Number(savedLikes));
-    if (savedViews) setViews(Number(savedViews));
-    if (savedSubs) setSubscribers(Number(savedSubs));
-    if (savedSubscribed === "true") setSubscribed(true);
-
-    if (savedComments) {
-      try {
-        setComments(JSON.parse(savedComments));
-      } catch {
-        setComments([]);
-      }
+  async function handleUpload() {
+    if (!file) {
+      setStatus("Choose a video first.");
+      return;
     }
 
-    const newViews = savedViews ? Number(savedViews) + 1 : 1;
-    setViews(newViews);
-    localStorage.setItem("raysstream_views", String(newViews));
-  }, []);
+    setStatus("Uploading...");
+    setVideoUrl("");
 
-  function handleLike() {
-    const newLikes = likes + 1;
-    setLikes(newLikes);
-    localStorage.setItem("raysstream_likes", String(newLikes));
-  }
+    const formData = new FormData();
+    formData.append("video", file);
 
-  function handleSubscribe() {
-    if (subscribed) return;
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    const newSubs = subscribers + 1;
-    setSubscribers(newSubs);
-    setSubscribed(true);
+      const data = await response.json();
 
-    localStorage.setItem("raysstream_subscribers", String(newSubs));
-    localStorage.setItem("raysstream_subscribed", "true");
-  }
+      if (!response.ok) {
+        setStatus(data.error || "Upload failed.");
+        return;
+      }
 
-  function handleComment() {
-    if (!comment.trim()) return;
-
-    const newComments = [comment.trim(), ...comments];
-    setComments(newComments);
-    setComment("");
-
-    localStorage.setItem("raysstream_comments", JSON.stringify(newComments));
-  }
-
-  function copyLink(message: string) {
-    navigator.clipboard.writeText(window.location.href);
-    alert(message);
-  }
-
-  function shareFacebook() {
-    window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-        window.location.href
-      )}`,
-      "_blank"
-    );
+      setStatus("Upload success!");
+      setVideoUrl(data.url);
+    } catch (error) {
+      setStatus("Upload failed. API did not respond.");
+    }
   }
 
   return (
-    <main
-      style={{
-        background: "#050505",
-        color: "white",
-        minHeight: "100vh",
-        padding: "20px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1 style={{ color: "red", fontSize: "42px" }}>Ray&apos;sStream</h1>
+    <main style={{ padding: 30, color: "white", background: "#111", minHeight: "100vh" }}>
+      <h1>Ray&apos;sStream Upload Test</h1>
 
-      <a
-        href="/upload"
-        style={{
-          display: "inline-block",
-          background: "red",
-          color: "white",
-          padding: "12px 24px",
-          borderRadius: "8px",
-          textDecoration: "none",
-          fontWeight: "bold",
-          marginBottom: "20px",
-        }}
-      >
-        Creator Upload
-      </a>
-
-      <p>Videos, likes, comments, views, subscriptions, payments, and sharing.</p>
-
-      <a
-        href={STRIPE_LINK}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: "inline-block",
-          background: "#16a34a",
-          color: "white",
-          padding: "14px 24px",
-          borderRadius: "10px",
-          fontWeight: "bold",
-          textDecoration: "none",
-          marginTop: "15px",
-          marginBottom: "20px",
-        }}
-      >
-        Pay Subscription
-      </a>
+      <input
+        type="file"
+        accept="video/mp4,video/webm,video/quicktime"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+      />
 
       <br />
+      <br />
 
-      <button onClick={handleSubscribe}>
-        {subscribed ? "Subscribed" : "Subscribe"}
+      <button
+        onClick={handleUpload}
+        style={{
+          padding: "12px 20px",
+          background: "red",
+          color: "white",
+          border: "none",
+          borderRadius: 8,
+          fontWeight: "bold",
+        }}
+      >
+        Upload Video
       </button>
 
-      <p style={{ fontSize: "20px", fontWeight: "bold" }}>
-        Subscribers: {subscribers}
-      </p>
+      <p>{status}</p>
 
-      <p style={{ fontSize: "18px" }}>Views: {views}</p>
-
-      <button onClick={handleLike}>Like: {likes}</button>
-
-      <div style={{ marginTop: "15px" }}>
-        <button onClick={shareFacebook}>Facebook</button>{" "}
-        <button
-          onClick={() =>
-            copyLink("Ray'sStream link copied. Open TikTok and paste it.")
-          }
-        >
-          Copy for TikTok
-        </button>{" "}
-        <button
-          onClick={() =>
-            copyLink("Ray'sStream link copied. Open Instagram and paste it.")
-          }
-        >
-          Copy for Instagram
-        </button>{" "}
-        <button onClick={() => copyLink("Ray'sStream link copied.")}>
-          Copy Link
-        </button>
-      </div>
-
-      <h2 style={{ marginTop: "30px" }}>Video Library</h2>
-
-      {videos.map((video) => (
-        <section key={video.file} style={{ marginTop: "25px" }}>
-          <h3>{video.title}</h3>
-
+      {videoUrl && (
+        <>
+          <p>Video URL: {videoUrl}</p>
           <video
-            src={video.file}
+            src={videoUrl}
             controls
-            loop
-            playsInline
-            style={{
-              width: "100%",
-              maxWidth: "800px",
-              borderRadius: "12px",
-              background: "black",
-            }}
+            style={{ width: "100%", maxWidth: 700, marginTop: 20 }}
           />
-        </section>
-      ))}
-
-      <section style={{ marginTop: "35px" }}>
-        <h2>Comments</h2>
-        <p style={{ color: "#aaa" }}>Comments save on this device.</p>
-
-        <textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="Write a comment..."
-          style={{
-            width: "100%",
-            maxWidth: "800px",
-            height: "90px",
-            padding: "10px",
-            borderRadius: "8px",
-            fontSize: "16px",
-          }}
-        />
-
-        <br />
-
-        <button onClick={handleComment}>Post Comment</button>
-
-        {comments.map((item, index) => (
-          <p
-            key={index}
-            style={{
-              background: "#222",
-              padding: "12px",
-              borderRadius: "8px",
-              maxWidth: "800px",
-            }}
-          >
-            {item}
-          </p>
-        ))}
-      </section>
+        </>
+      )}
     </main>
   );
 } 
+
