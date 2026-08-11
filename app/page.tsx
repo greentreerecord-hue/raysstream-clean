@@ -11,7 +11,7 @@ type Video = {
 const videos: Video[] = [
   {
     id: 1,
-    title: "It's Cool",
+    title: "video 1",
     src: "/videos/its-cool.mp4",
   },
   {
