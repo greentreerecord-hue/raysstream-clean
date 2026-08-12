@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { upload } from "@vercel/blob/client";
 
 export default function UploadPage() {
   const [title, setTitle] = useState("");
@@ -20,23 +21,16 @@ export default function UploadPage() {
       setUploading(true);
       setMessage("Uploading video...");
 
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("video", video);
+      const blob = await upload(
+        `videos/${video.name}`,
+        video,
+        {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+        }
+      );
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage(data.error || "Upload failed.");
-        return;
-      }
-
-      setMessage(`Upload successful! ${data.videoUrl}`);
+      setMessage(`Upload successful! ${blob.url}`);
       setTitle("");
       setVideo(null);
     } catch (error) {
@@ -150,7 +144,13 @@ export default function UploadPage() {
           </button>
 
           {message && (
-            <p style={{ marginTop: "20px", textAlign: "center" }}>
+            <p
+              style={{
+                marginTop: "20px",
+                textAlign: "center",
+                wordBreak: "break-word",
+              }}
+            >
               {message}
             </p>
           )}

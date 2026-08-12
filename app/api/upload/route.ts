@@ -1,39 +1,41 @@
+import {
+  handleUpload,
+  type HandleUploadBody,
+} from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
+  const body = (await request.json()) as HandleUploadBody;
+
   try {
-    const formData = await request.formData();
-    const video = formData.get("video");
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      token: process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
 
-    if (!(video instanceof File)) {
-      return NextResponse.json(
-        { error: "No video was selected." },
-        { status: 400 }
-      );
-    }
+      onBeforeGenerateToken: async (pathname) => {
+        return {
+          allowedContentTypes: [
+            "video/mp4",
+            "video/webm",
+            "video/quicktime",
+          ],
+          addRandomSuffix: true,
+        };
+      },
 
-    const blob = await put(
-      `videos/${video.name}`,
-      video,
-      {
-        access: "public",
-        addRandomSuffix: true,
-        token: process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
-      }
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: "Video uploaded to Vercel Blob!",
-      videoUrl: blob.url,
+      onUploadCompleted: async ({ blob }) => {
+        console.log("Ray'sStream upload completed:", blob.url);
+      },
     });
+
+    return NextResponse.json(jsonResponse);
   } catch (error) {
-    console.error("Blob upload error:", error);
+    console.error("Client upload error:", error);
 
     return NextResponse.json(
-      { error: "Video upload failed." },
-      { status: 500 }
+      { error: "Unable to authorize video upload." },
+      { status: 400 }
     );
   }
 } 
