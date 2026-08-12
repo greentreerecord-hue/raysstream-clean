@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-
-export const runtime = "nodejs";
+import { put } from "@vercel/blob";
 
 export async function POST(request: Request) {
   try {
@@ -10,31 +7,33 @@ export async function POST(request: Request) {
     const video = formData.get("video");
 
     if (!(video instanceof File)) {
-      return NextResponse.json({ error: "No video uploaded" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No video was selected." },
+        { status: 400 }
+      );
     }
 
-    const bytes = await video.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadsDir, { recursive: true });
-
-    const safeName = video.name
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9.-]/g, "");
-
-    const fileName = `${Date.now()}-${safeName}`;
-    const filePath = path.join(uploadsDir, fileName);
-
-    await writeFile(filePath, buffer);
+    const blob = await put(
+      `videos/${video.name}`,
+      video,
+      {
+        access: "public",
+        addRandomSuffix: true,
+        token: process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
+      }
+    );
 
     return NextResponse.json({
       success: true,
-      url: `/uploads/${fileName}`,
+      message: "Video uploaded to Vercel Blob!",
+      videoUrl: blob.url,
     });
   } catch (error) {
-    console.error("UPLOAD ERROR:", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    console.error("Blob upload error:", error);
+
+    return NextResponse.json(
+      { error: "Video upload failed." },
+      { status: 500 }
+    );
   }
 } 

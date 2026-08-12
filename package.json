@@ -5,7 +5,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@vercel/blob": "latest",
+    "@vercel/blob": "^2.8.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
@@ -16,4 +16,4 @@
     "@types/react-dom": "latest",
     "typescript": "latest"
   }
-} 
+}

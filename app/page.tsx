@@ -47,12 +47,15 @@ export default function Home() {
   useEffect(() => {
     const savedLikes = localStorage.getItem("raysstream-likes");
     const savedViews = localStorage.getItem("raysstream-views");
+
     const savedSubscribers = localStorage.getItem(
       "raysstream-subscribers"
     );
+
     const savedSubscribed = localStorage.getItem(
       "raysstream-subscribed"
     );
+
     const savedComments = localStorage.getItem(
       "raysstream-comments"
     );
@@ -81,6 +84,7 @@ export default function Home() {
   function addView(index: number) {
     setViews((oldViews) => {
       const next = [...oldViews];
+
       next[index] = (next[index] || 0) + 1;
 
       localStorage.setItem(
@@ -95,6 +99,7 @@ export default function Home() {
   function likeVideo(index: number) {
     setLikes((oldLikes) => {
       const next = [...oldLikes];
+
       next[index] = (next[index] || 0) + 1;
 
       localStorage.setItem(
@@ -130,7 +135,8 @@ export default function Home() {
 
       setSubscribers(newCount);
 
-      localStorage.setItem(
+      localStorage 
+  localStorage.setItem(
         "raysstream-subscribers",
         String(newCount)
       );
@@ -196,7 +202,6 @@ export default function Home() {
     }
 
     await navigator.clipboard.writeText(url);
-
     alert("Ray'sStream link copied!");
   }
 
@@ -211,6 +216,7 @@ export default function Home() {
 
   function shareX(video: Video) {
     const url = encodeURIComponent(window.location.href);
+
     const text = encodeURIComponent(
       `Watch ${video.title} on Ray'sStream`
     );
@@ -240,8 +246,6 @@ export default function Home() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      {/* HEADER */}
-
       <header
         style={{
           position: "sticky",
@@ -257,12 +261,7 @@ export default function Home() {
           flexWrap: "wrap",
         }}
       >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "30px",
-          }}
-        >
+        <h1 style={{ margin: 0, fontSize: "30px" }}>
           🔥 Ray&apos;sStream
         </h1>
 
@@ -274,6 +273,14 @@ export default function Home() {
             flexWrap: "wrap",
           }}
         >
+          <a href="/upload" style={linkStyle}>
+            ⬆ Upload
+          </a>
+
+          <a href="/uploads" style={linkStyle}>
+            🎬 Creator Videos
+          </a>
+
           <strong>
             {subscribers.toLocaleString()} subscribers
           </strong>
@@ -311,20 +318,13 @@ export default function Home() {
         </div>
       </header>
 
-      {/* TITLE */}
-
       <section
         style={{
           textAlign: "center",
           padding: "30px 20px 10px",
         }}
       >
-        <h2
-          style={{
-            fontSize: "34px",
-            marginBottom: "8px",
-          }}
-        >
+        <h2 style={{ fontSize: "34px", marginBottom: "8px" }}>
           Welcome to Ray&apos;sStream
         </h2>
 
@@ -332,8 +332,6 @@ export default function Home() {
           Watch • Like • Comment • Subscribe • Share
         </p>
       </section>
-
-      {/* VIDEOS */}
 
       <section
         style={{
@@ -350,10 +348,9 @@ export default function Home() {
               marginTop: "28px",
               borderRadius: "18px",
               padding: "18px",
-              boxShadow: "0 4px 20px rgba(0,0,0,.4)",
             }}
           >
-            <h2 style={{ marginTop: 0 }}>{video.title}</h2>
+            <h2>{video.title}</h2>
 
             <video
               src={video.src}
@@ -370,38 +367,17 @@ export default function Home() {
               }}
             />
 
-            {/* STATS */}
-
-            <div
-              style={{
-                display: "flex",
-                gap: "16px",
-                flexWrap: "wrap",
-                marginTop: "14px",
-                color: "#ccc",
-              }}
-            >
-              <span>
-                👁 {views[index]?.toLocaleString() || 0} views
-              </span>
-
-              <span>
-                👍 {likes[index]?.toLocaleString() || 0} likes
-              </span>
-
-              <span>
-                💬 {comments[index]?.length || 0} comments
-              </span>
-            </div>
-
-            {/* BUTTONS */}
+            <p>
+              👁 {views[index] || 0} views &nbsp;
+              👍 {likes[index] || 0} likes &nbsp;
+              💬 {comments[index]?.length || 0} comments
+            </p>
 
             <div
               style={{
                 display: "flex",
                 flexWrap: "wrap",
                 gap: "9px",
-                marginTop: "16px",
               }}
             >
               <button
@@ -418,10 +394,7 @@ export default function Home() {
                 📤 Share
               </button>
 
-              <button
-                onClick={shareFacebook}
-                style={buttonStyle}
-              >
+              <button onClick={shareFacebook} style={buttonStyle}>
                 Facebook
               </button>
 
@@ -447,30 +420,15 @@ export default function Home() {
               </button>
             </div>
 
-            {/* COMMENTS */}
-
             <div style={{ marginTop: "24px" }}>
               <h3>Comments</h3>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                }}
-              >
+              <div style={{ display: "flex", gap: "8px" }}>
                 <input
                   value={commentInputs[index] || ""}
                   onChange={(event) =>
-                    updateComment(
-                      index,
-                      event.target.value
-                    )
+                    updateComment(index, event.target.value)
                   }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      postComment(index);
-                    }
-                  }}
                   placeholder="Add a comment..."
                   style={{
                     flex: 1,
@@ -490,41 +448,48 @@ export default function Home() {
                 </button>
               </div>
 
-              <div style={{ marginTop: "15px" }}>
-                {comments[index]?.length === 0 ? (
-                  <p style={{ color: "#777" }}>
-                    No comments yet.
-                  </p>
-                ) : (
-                  comments[index]?.map(
-                    (comment, commentIndex) => (
-                      <div
-                        key={commentIndex}
-                        style={{
-                          background: "#1b1b1b",
-                          marginBottom: "8px",
-                          padding: "12px",
-                          borderRadius: "10px",
-                        }}
-                      >
-                        <strong>Ray&apos;sStream User</strong>
-
-                        <div
-                          style={{
-                            marginTop: "5px",
-                            color: "#ddd",
-                          }}
-                        >
-                          {comment}
-                        </div>
-                      </div>
-                    )
-                  )
-                )}
-              </div>
+              {comments[index]?.map((comment, commentIndex) => (
+                <div
+                  key={commentIndex}
+                  style={{
+                    background: "#1b1b1b",
+                    marginTop: "8px",
+                    padding: "12px",
+                    borderRadius: "10px",
+                  }}
+                >
+                  <strong>Ray&apos;sStream User</strong>
+                  <div>{comment}</div>
+                </div>
+              ))}
             </div>
           </article>
         ))}
+      </section>
+
+      <section
+        style={{
+          width: "min(1000px, 94%)",
+          margin: "0 auto 50px",
+          padding: "30px",
+          textAlign: "center",
+          background: "#121212",
+          borderRadius: "18px",
+        }}
+      >
+        <h2>🎬 Creator Uploads</h2>
+
+        <p style={{ color: "#bbb" }}>
+          Upload your own videos and watch creator uploads.
+        </p>
+
+        <a href="/upload" style={creatorButton}>
+          ⬆ Upload Video
+        </a>
+
+        <a href="/uploads" style={creatorButton}>
+          ▶ View Uploaded Videos
+        </a>
       </section>
 
       <footer
@@ -548,5 +513,25 @@ const buttonStyle = {
   padding: "10px 16px",
   borderRadius: "20px",
   cursor: "pointer",
+  fontWeight: "bold",
+};
+
+const linkStyle = {
+  background: "#222",
+  color: "white",
+  textDecoration: "none",
+  borderRadius: "25px",
+  padding: "12px 22px",
+  fontWeight: "bold",
+};
+
+const creatorButton = {
+  display: "inline-block",
+  margin: "8px",
+  padding: "12px 22px",
+  background: "#2b2b2b",
+  color: "white",
+  textDecoration: "none",
+  borderRadius: "22px",
   fontWeight: "bold",
 }; 
