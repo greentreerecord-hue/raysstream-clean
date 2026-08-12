@@ -280,6 +280,9 @@ export default function Home() {
           <a href="/uploads" style={linkStyle}>
             🎬 Creator Videos
           </a>
+<a href="/dashboard" style={linkStyle}>
+  🎛 Creator Dashboard
+</a> 
 
           <strong>
             {subscribers.toLocaleString()} subscribers
