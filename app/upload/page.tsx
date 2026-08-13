@@ -1,16 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { upload } from "@vercel/blob/client";
 
 export default function UploadPage() {
+  const [creator, setCreator] = useState("");
   const [title, setTitle] = useState("");
   const [video, setVideo] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
 
+  useEffect(() => {
+    const savedCreator = localStorage.getItem("raysstreamCreator");
+
+    if (!savedCreator) {
+      window.location.href = "/login";
+      return;
+    }
+
+    setCreator(savedCreator);
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!creator) {
+      setMessage("Creator account not found. Please log in again.");
+      return;
+    }
 
     if (!title || !video) {
       setMessage("Please add a title and choose a video.");
@@ -21,18 +38,27 @@ export default function UploadPage() {
       setUploading(true);
       setMessage("Uploading video...");
 
-      const blob = await upload(
-        `videos/${video.name}`,
-        video,
-        {
-          access: "public",
-          handleUploadUrl: "/api/upload",
-        }
-      );
+      const safeCreator = creator
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "-");
 
-      setMessage(`Upload successful! ${blob.url}`);
+      const safeTitle = title
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "-");
+
+      const pathname =
+        `videos/${safeCreator}/${Date.now()}-${safeTitle}-${video.name}`;
+
+      const blob = await upload(pathname, video, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+      });
+
+      setMessage("Upload successful!");
       setTitle("");
       setVideo(null);
+
+      console.log("Uploaded video:", blob.url);
     } catch (error) {
       console.error(error);
       setMessage("Upload failed.");
@@ -64,8 +90,12 @@ export default function UploadPage() {
           Ray&apos;sStream Creator Upload
         </h1>
 
-        <p style={{ color: "#bbbbbb", marginBottom: "30px" }}>
+        <p style={{ color: "#bbbbbb", marginBottom: "10px" }}>
           Upload a video to Ray&apos;sStream.
+        </p>
+
+        <p style={{ color: "#bbbbbb", marginBottom: "30px" }}>
+          Creator: <strong style={{ color: "white" }}>{creator}</strong>
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -93,6 +123,7 @@ export default function UploadPage() {
               background: "#222",
               color: "white",
               fontSize: "16px",
+              boxSizing: "border-box",
             }}
           />
 
