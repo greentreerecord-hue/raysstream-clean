@@ -1,31 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { upload } from "@vercel/blob/client";
 
 export default function UploadPage() {
-  const [creator, setCreator] = useState("");
   const [title, setTitle] = useState("");
   const [video, setVideo] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    const savedCreator = localStorage.getItem("raysstreamCreator");
-
-    if (!savedCreator) {
-      window.location.href = "/login";
-      return;
-    }
-
-    setCreator(savedCreator);
-  }, []);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!creator) {
-      setMessage("Creator account not found. Please log in again.");
+    const creatorEmail = localStorage.getItem("raysstreamCreatorEmail");
+
+    if (!creatorEmail) {
+      setMessage("Please log in as a creator first.");
       return;
     }
 
@@ -38,30 +28,25 @@ export default function UploadPage() {
       setUploading(true);
       setMessage("Uploading video...");
 
-      const safeCreator = creator
+      const safeEmail = creatorEmail
         .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, "-");
+        .replace(/[^a-z0-9]/g, "-");
 
-      const safeTitle = title
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, "-");
+      const blob = await upload(
+        `videos/${safeEmail}/${Date.now()}-${video.name}`,
+        video,
+        {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+        }
+      );
 
-      const pathname =
-        `videos/${safeCreator}/${Date.now()}-${safeTitle}-${video.name}`;
-
-      const blob = await upload(pathname, video, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-      });
-
-      setMessage("Upload successful!");
+      setMessage(`Upload successful! ${blob.url}`);
       setTitle("");
       setVideo(null);
-
-      console.log("Uploaded video:", blob.url);
     } catch (error) {
       console.error(error);
-      setMessage("Upload failed.");
+      setMessage("Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -71,7 +56,7 @@ export default function UploadPage() {
     <main
       style={{
         minHeight: "100vh",
-        background: "#0b0b0b",
+        background: "#050505",
         color: "white",
         padding: "40px 20px",
         fontFamily: "Arial, sans-serif",
@@ -79,113 +64,71 @@ export default function UploadPage() {
     >
       <div
         style={{
-          maxWidth: "650px",
+          maxWidth: "700px",
           margin: "0 auto",
-          background: "#171717",
-          padding: "30px",
-          borderRadius: "16px",
         }}
       >
-        <h1 style={{ fontSize: "32px", marginBottom: "10px" }}>
-          Ray&apos;sStream Creator Upload
-        </h1>
-
-        <p style={{ color: "#bbbbbb", marginBottom: "10px" }}>
-          Upload a video to Ray&apos;sStream.
-        </p>
-
-        <p style={{ color: "#bbbbbb", marginBottom: "30px" }}>
-          Creator: <strong style={{ color: "white" }}>{creator}</strong>
-        </p>
+        <h1>Upload Video</h1>
 
         <form onSubmit={handleSubmit}>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "8px",
-              fontWeight: "bold",
-            }}
-          >
-            Video title
-          </label>
+          <div style={{ marginBottom: "20px" }}>
+            <label>Video Title</label>
 
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter video title"
-            style={{
-              width: "100%",
-              padding: "14px",
-              marginBottom: "24px",
-              borderRadius: "8px",
-              border: "1px solid #444",
-              background: "#222",
-              color: "white",
-              fontSize: "16px",
-              boxSizing: "border-box",
-            }}
-          />
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "12px",
+                marginTop: "8px",
+                fontSize: "16px",
+              }}
+            />
+          </div>
 
-          <label
-            style={{
-              display: "block",
-              marginBottom: "8px",
-              fontWeight: "bold",
-            }}
-          >
-            Choose video
-          </label>
+          <div style={{ marginBottom: "20px" }}>
+            <label>Choose Video</label>
 
-          <input
-            type="file"
-            accept="video/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0] || null;
-              setVideo(file);
-            }}
-            style={{
-              display: "block",
-              width: "100%",
-              marginBottom: "24px",
-            }}
-          />
-
-          {video && (
-            <p style={{ color: "#bbbbbb", marginBottom: "20px" }}>
-              Selected: {video.name}
-            </p>
-          )}
+            <input
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setVideo(file);
+              }}
+              style={{
+                display: "block",
+                marginTop: "8px",
+              }}
+            />
+          </div>
 
           <button
             type="submit"
             disabled={uploading}
             style={{
-              width: "100%",
-              padding: "14px",
-              border: "none",
-              borderRadius: "8px",
-              fontSize: "18px",
-              fontWeight: "bold",
+              padding: "14px 24px",
+              fontSize: "16px",
               cursor: uploading ? "not-allowed" : "pointer",
-              opacity: uploading ? 0.6 : 1,
             }}
           >
             {uploading ? "Uploading..." : "Upload Video"}
           </button>
-
-          {message && (
-            <p
-              style={{
-                marginTop: "20px",
-                textAlign: "center",
-                wordBreak: "break-word",
-              }}
-            >
-              {message}
-            </p>
-          )}
         </form>
+
+        {message && (
+          <p
+            style={{
+              marginTop: "20px",
+              color: "#cccccc",
+              wordBreak: "break-word",
+            }}
+          >
+            {message}
+          </p>
+        )}
       </div>
     </main>
   );
