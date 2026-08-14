@@ -12,41 +12,94 @@ export default function UploadedVideosPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadVideos() {
-      const creatorEmail = localStorage.getItem("raysstreamCreatorEmail");
+  async function loadVideos() {
+    const creatorEmail = localStorage.getItem("raysstreamCreatorEmail");
 
-      if (!creatorEmail) {
-        setMessage("Please log in as a creator first.");
-        setLoading(false);
+    if (!creatorEmail) {
+      setMessage("Please log in as a creator first.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        `/api/my-videos?email=${encodeURIComponent(creatorEmail)}`
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.error || "Could not load videos.");
         return;
       }
 
-      try {
-        const response = await fetch(
-          `/api/my-videos?email=${encodeURIComponent(creatorEmail)}`
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          setMessage(data.error || "Could not load videos.");
-          setLoading(false);
-          return;
-        }
-
-        setVideos(data.videos || []);
-      } catch (error) {
-        console.error(error);
-        setMessage("Could not load your videos.");
-      } finally {
-        setLoading(false);
-      }
+      setVideos(data.videos || []);
+      setMessage("");
+    } catch (error) {
+      console.error(error);
+      setMessage("Could not load your videos.");
+    } finally {
+      setLoading(false);
     }
+  }
 
+  useEffect(() => {
     loadVideos();
   }, []);
+
+  async function deleteVideo(pathname: string) {
+    const creatorEmail = localStorage.getItem("raysstreamCreatorEmail");
+
+    if (!creatorEmail) {
+      setMessage("Please log in as a creator first.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this video?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeleting(pathname);
+
+      const response = await fetch("/api/my-videos", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: creatorEmail,
+          pathname,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.error || "Could not delete video.");
+        return;
+      }
+
+      setVideos((currentVideos) =>
+        currentVideos.filter((video) => video.pathname !== pathname)
+      );
+
+      setMessage("Video deleted successfully.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Could not delete video.");
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   return (
     <main
@@ -89,7 +142,7 @@ export default function UploadedVideosPage() {
 
         {message && <p>{message}</p>}
 
-        {!loading && !message && videos.length === 0 && (
+        {!loading && videos.length === 0 && (
           <p>You have not uploaded any videos yet.</p>
         )}
 
@@ -128,6 +181,24 @@ export default function UploadedVideosPage() {
             >
               {video.pathname}
             </p>
+
+            <button
+              onClick={() => deleteVideo(video.pathname)}
+              disabled={deleting === video.pathname}
+              style={{
+                marginTop: "10px",
+                padding: "12px 20px",
+                fontSize: "16px",
+                cursor:
+                  deleting === video.pathname
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              {deleting === video.pathname
+                ? "Deleting..."
+                : "Delete Video"}
+            </button>
           </div>
         ))}
       </div>
