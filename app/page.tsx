@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const videos = [
   {
@@ -28,6 +28,8 @@ export default function Home() {
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
   const [subscribing, setSubscribing] = useState(false);
 
+  const viewedVideos = useRef<Set<number>>(new Set());
+
   const [comments, setComments] = useState<string[][]>([
     [],
     [],
@@ -54,15 +56,57 @@ export default function Home() {
       }
     }
 
+    async function loadVideoViews() {
+      try {
+        const response = await fetch("/api/views");
+        const data = await response.json();
+
+        if (response.ok) {
+          setViews(
+            videos.map((video) => Number(data.views?.[video.id] || 0))
+          );
+        }
+      } catch (error) {
+        console.error("Unable to load video views:", error);
+      }
+    }
+
     loadSubscriberCount();
+    loadVideoViews();
   }, []);
 
-  function addView(index: number) {
-    setViews((current) => {
-      const updated = [...current];
-      updated[index] = (updated[index] || 0) + 1;
-      return updated;
-    });
+  async function addView(index: number, videoId: number) {
+    if (viewedVideos.current.has(videoId)) {
+      return;
+    }
+
+    viewedVideos.current.add(videoId);
+
+    try {
+      const response = await fetch("/api/views", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ videoId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        viewedVideos.current.delete(videoId);
+        return;
+      }
+
+      setViews((current) => {
+        const updated = [...current];
+        updated[index] = Number(data.count || 0);
+        return updated;
+      });
+    } catch (error) {
+      viewedVideos.current.delete(videoId);
+      console.error("Unable to save video view:", error);
+    }
   }
 
   function likeVideo(index: number) {
@@ -380,7 +424,7 @@ export default function Home() {
               loop
               playsInline
               preload="metadata"
-              onPlay={() => addView(index)}
+              onPlay={() => addView(index, video.id)}
               style={{
                 width: "100%",
                 background: "black",
