@@ -5,16 +5,19 @@ import { useEffect, useRef, useState } from "react";
 const videos = [
   {
     id: 1,
+    slug: "video-1",
     title: "Ray'sStream Video 1",
     src: "/videos/video1.mp4",
   },
   {
     id: 2,
+    slug: "video-2",
     title: "Ray'sStream Video 2",
     src: "/videos/video2.mp4",
   },
   {
     id: 3,
+    slug: "video-3",
     title: "Ray'sStream Video 3",
     src: "/videos/video3.mp4",
   },
@@ -63,7 +66,9 @@ export default function Home() {
 
         if (response.ok) {
           setViews(
-            videos.map((video) => Number(data.views?.[video.id] || 0))
+            videos.map((video) =>
+              Number(data.views?.[video.id] || 0)
+            )
           );
         }
       } catch (error) {
@@ -88,7 +93,9 @@ export default function Home() {
           );
 
           if (videoIndex >= 0) {
-            groupedComments[videoIndex].push(String(comment.text));
+            groupedComments[videoIndex].push(
+              String(comment.text)
+            );
           }
         }
 
@@ -233,7 +240,9 @@ export default function Home() {
       setSubscriberEmail("");
     } catch (error) {
       console.error("Subscription error:", error);
-      setSubscriptionMessage("Unable to connect to the database.");
+      setSubscriptionMessage(
+        "Unable to connect to the database."
+      );
     } finally {
       setSubscribing(false);
     }
@@ -244,7 +253,7 @@ export default function Home() {
     title: string;
     src: string;
   }) {
-    const url = window.location.href;
+    const url = `${window.location.origin}/watch/video-${video.id}`;
 
     if (navigator.share) {
       try {
@@ -258,12 +267,14 @@ export default function Home() {
       }
     } else {
       await navigator.clipboard.writeText(url);
-      alert("Ray'sStream link copied!");
+      alert("Ray'sStream video link copied!");
     }
   }
 
-  function shareFacebook() {
-    const url = encodeURIComponent(window.location.href);
+  function shareFacebook(videoId: number) {
+    const url = encodeURIComponent(
+      `${window.location.origin}/watch/video-${videoId}`
+    );
 
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${url}`,
@@ -271,9 +282,14 @@ export default function Home() {
     );
   }
 
-  function shareX() {
-    const url = encodeURIComponent(window.location.href);
-    const text = encodeURIComponent("Watch this on Ray'sStream");
+  function shareX(videoId: number) {
+    const url = encodeURIComponent(
+      `${window.location.origin}/watch/video-${videoId}`
+    );
+
+    const text = encodeURIComponent(
+      "Watch this video on Ray'sStream"
+    );
 
     window.open(
       `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
@@ -281,9 +297,12 @@ export default function Home() {
     );
   }
 
-  async function copyForTikTokInstagram() {
-    await navigator.clipboard.writeText(window.location.href);
-    alert("Ray'sStream link copied!");
+  async function copyForTikTokInstagram(videoId: number) {
+    const url =
+      `${window.location.origin}/watch/video-${videoId}`;
+
+    await navigator.clipboard.writeText(url);
+    alert("Ray'sStream video link copied!");
   }
 
   return (
@@ -501,6 +520,13 @@ export default function Home() {
                 gap: "9px",
               }}
             >
+              <a
+                href={`/watch/${video.slug}`}
+                style={linkStyle}
+              >
+                ▶ Watch Page
+              </a>
+
               <button
                 onClick={() => likeVideo(index)}
                 style={buttonStyle}
@@ -515,23 +541,33 @@ export default function Home() {
                 Share
               </button>
 
-              <button onClick={shareFacebook} style={buttonStyle}>
+              <button
+                onClick={() => shareFacebook(video.id)}
+                style={buttonStyle}
+              >
                 Facebook
               </button>
 
-              <button onClick={shareX} style={buttonStyle}>
+              <button
+                onClick={() => shareX(video.id)}
+                style={buttonStyle}
+              >
                 X
               </button>
 
               <button
-                onClick={copyForTikTokInstagram}
+                onClick={() =>
+                  copyForTikTokInstagram(video.id)
+                }
                 style={buttonStyle}
               >
                 TikTok
               </button>
 
               <button
-                onClick={copyForTikTokInstagram}
+                onClick={() =>
+                  copyForTikTokInstagram(video.id)
+                }
                 style={buttonStyle}
               >
                 Instagram
@@ -565,28 +601,32 @@ export default function Home() {
                 />
 
                 <button
-                  onClick={() => postComment(index, video.id)}
+                  onClick={() =>
+                    postComment(index, video.id)
+                  }
                   style={buttonStyle}
                 >
                   Post
                 </button>
               </div>
 
-              {comments[index]?.map((comment, commentIndex) => (
-                <div
-                  key={commentIndex}
-                  style={{
-                    background: "#1b1b1b",
-                    marginTop: "8px",
-                    padding: "12px",
-                    border: "2px solid black",
-                    borderRadius: "10px",
-                  }}
-                >
-                  <strong>Ray&apos;sStream User</strong>
-                  <div>{comment}</div>
-                </div>
-              ))}
+              {comments[index]?.map(
+                (comment, commentIndex) => (
+                  <div
+                    key={commentIndex}
+                    style={{
+                      background: "#1b1b1b",
+                      marginTop: "8px",
+                      padding: "12px",
+                      border: "2px solid black",
+                      borderRadius: "10px",
+                    }}
+                  >
+                    <strong>Ray&apos;sStream User</strong>
+                    <div>{comment}</div>
+                  </div>
+                )
+              )}
             </div>
           </article>
         ))}
@@ -652,12 +692,13 @@ const buttonStyle = {
 };
 
 const linkStyle = {
+  display: "inline-block",
   background: "#222",
   color: "white",
   textDecoration: "none",
   border: "2px solid black",
-  borderRadius: "25px",
-  padding: "12px 22px",
+  borderRadius: "20px",
+  padding: "10px 16px",
   fontWeight: "bold",
 };
 
