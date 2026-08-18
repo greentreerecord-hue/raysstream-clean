@@ -71,8 +71,36 @@ export default function Home() {
       }
     }
 
+    async function loadVideoComments() {
+      try {
+        const response = await fetch("/api/comments");
+        const data = await response.json();
+
+        if (!response.ok) {
+          return;
+        }
+
+        const groupedComments: string[][] = videos.map(() => []);
+
+        for (const comment of data.comments || []) {
+          const videoIndex = videos.findIndex(
+            (video) => video.id === Number(comment.videoId)
+          );
+
+          if (videoIndex >= 0) {
+            groupedComments[videoIndex].push(String(comment.text));
+          }
+        }
+
+        setComments(groupedComments);
+      } catch (error) {
+        console.error("Unable to load comments:", error);
+      }
+    }
+
     loadSubscriberCount();
     loadVideoViews();
+    loadVideoComments();
   }, []);
 
   async function addView(index: number, videoId: number) {
@@ -125,24 +153,50 @@ export default function Home() {
     });
   }
 
-  function postComment(index: number) {
-    const comment = commentInputs[index]?.trim();
+  async function postComment(index: number, videoId: number) {
+    const commentText = commentInputs[index]?.trim();
 
-    if (!comment) {
+    if (!commentText) {
       return;
     }
 
-    setComments((current) => {
-      const updated = [...current];
-      updated[index] = [...(updated[index] || []), comment];
-      return updated;
-    });
+    try {
+      const response = await fetch("/api/comments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          videoId,
+          text: commentText,
+        }),
+      });
 
-    setCommentInputs((current) => {
-      const updated = [...current];
-      updated[index] = "";
-      return updated;
-    });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Unable to save comment.");
+        return;
+      }
+
+      setComments((current) => {
+        const updated = current.map((videoComments) => [
+          ...videoComments,
+        ]);
+
+        updated[index].push(data.comment.text);
+        return updated;
+      });
+
+      setCommentInputs((current) => {
+        const updated = [...current];
+        updated[index] = "";
+        return updated;
+      });
+    } catch (error) {
+      console.error("Unable to save comment:", error);
+      alert("Unable to connect to the comments database.");
+    }
   }
 
   async function subscribe() {
@@ -499,6 +553,7 @@ export default function Home() {
                     updateComment(index, event.target.value)
                   }
                   placeholder="Add a comment..."
+                  maxLength={1000}
                   style={{
                     flex: 1,
                     padding: "12px",
@@ -510,7 +565,7 @@ export default function Home() {
                 />
 
                 <button
-                  onClick={() => postComment(index)}
+                  onClick={() => postComment(index, video.id)}
                   style={buttonStyle}
                 >
                   Post
