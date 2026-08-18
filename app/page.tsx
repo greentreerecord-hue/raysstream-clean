@@ -2,13 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Video = {
-  id: number;
-  title: string;
-  src: string;
-};
-
-const videos: Video[] = [
+const videos = [
   {
     id: 1,
     title: "Ray'sStream Video 1",
@@ -27,10 +21,12 @@ const videos: Video[] = [
 ];
 
 export default function Home() {
-  const [likes, setLikes] = useState<number[]>([0, 0, 0]);
   const [views, setViews] = useState<number[]>([0, 0, 0]);
+  const [likes, setLikes] = useState<number[]>([0, 0, 0]);
   const [subscribers, setSubscribers] = useState(0);
-  const [subscribed, setSubscribed] = useState(false);
+  const [subscriberEmail, setSubscriberEmail] = useState("");
+  const [subscriptionMessage, setSubscriptionMessage] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
 
   const [comments, setComments] = useState<string[][]>([
     [],
@@ -45,149 +41,112 @@ export default function Home() {
   ]);
 
   useEffect(() => {
-    const savedLikes = localStorage.getItem("raysstream-likes");
-    const savedViews = localStorage.getItem("raysstream-views");
+    async function loadSubscriberCount() {
+      try {
+        const response = await fetch("/api/subscribe");
+        const data = await response.json();
 
-    const savedSubscribers = localStorage.getItem(
-      "raysstream-subscribers"
-    );
-
-    const savedSubscribed = localStorage.getItem(
-      "raysstream-subscribed"
-    );
-
-    const savedComments = localStorage.getItem(
-      "raysstream-comments"
-    );
-
-    if (savedLikes) {
-      setLikes(JSON.parse(savedLikes));
+        if (response.ok) {
+          setSubscribers(data.count || 0);
+        }
+      } catch (error) {
+        console.error("Unable to load subscribers:", error);
+      }
     }
 
-    if (savedViews) {
-      setViews(JSON.parse(savedViews));
-    }
-
-    if (savedSubscribers) {
-      setSubscribers(Number(savedSubscribers));
-    }
-
-    if (savedSubscribed === "true") {
-      setSubscribed(true);
-    }
-
-    if (savedComments) {
-      setComments(JSON.parse(savedComments));
-    }
+    loadSubscriberCount();
   }, []);
 
   function addView(index: number) {
-    setViews((oldViews) => {
-      const next = [...oldViews];
-
-      next[index] = (next[index] || 0) + 1;
-
-      localStorage.setItem(
-        "raysstream-views",
-        JSON.stringify(next)
-      );
-
-      return next;
+    setViews((current) => {
+      const updated = [...current];
+      updated[index] = (updated[index] || 0) + 1;
+      return updated;
     });
   }
 
   function likeVideo(index: number) {
-    setLikes((oldLikes) => {
-      const next = [...oldLikes];
-
-      next[index] = (next[index] || 0) + 1;
-
-      localStorage.setItem(
-        "raysstream-likes",
-        JSON.stringify(next)
-      );
-
-      return next;
+    setLikes((current) => {
+      const updated = [...current];
+      updated[index] = (updated[index] || 0) + 1;
+      return updated;
     });
   }
 
-  function subscribe() {
-    if (subscribed) {
-      setSubscribed(false);
-
-      const newCount = Math.max(0, subscribers - 1);
-
-      setSubscribers(newCount);
-
-      localStorage.setItem(
-        "raysstream-subscribers",
-        String(newCount)
-      );
-
-      localStorage.setItem(
-        "raysstream-subscribed",
-        "false"
-      );
-    } else {
-      setSubscribed(true);
-
-      const newCount = subscribers + 1;
-
-      setSubscribers(newCount);
-
-      localStorage 
-  localStorage.setItem(
-        "raysstream-subscribers",
-        String(newCount)
-      );
-
-      localStorage.setItem(
-        "raysstream-subscribed",
-        "true"
-      );
-    }
-  }
-
   function updateComment(index: number, value: string) {
-    setCommentInputs((oldInputs) => {
-      const next = [...oldInputs];
-      next[index] = value;
-      return next;
+    setCommentInputs((current) => {
+      const updated = [...current];
+      updated[index] = value;
+      return updated;
     });
   }
 
   function postComment(index: number) {
-    const text = commentInputs[index]?.trim();
+    const comment = commentInputs[index]?.trim();
 
-    if (!text) return;
+    if (!comment) {
+      return;
+    }
 
-    setComments((oldComments) => {
-      const next = oldComments.map((videoComments) => [
-        ...videoComments,
-      ]);
-
-      next[index].push(text);
-
-      localStorage.setItem(
-        "raysstream-comments",
-        JSON.stringify(next)
-      );
-
-      return next;
+    setComments((current) => {
+      const updated = [...current];
+      updated[index] = [...(updated[index] || []), comment];
+      return updated;
     });
 
-    setCommentInputs((oldInputs) => {
-      const next = [...oldInputs];
-      next[index] = "";
-      return next;
+    setCommentInputs((current) => {
+      const updated = [...current];
+      updated[index] = "";
+      return updated;
     });
   }
 
-  async function shareVideo(video: Video) {
-    const url =
-      typeof window !== "undefined"
-        ? window.location.href
-        : "";
+  async function subscribe() {
+    const email = subscriberEmail.trim();
+
+    if (!email) {
+      setSubscriptionMessage("Please enter your email.");
+      return;
+    }
+
+    try {
+      setSubscribing(true);
+      setSubscriptionMessage("Saving subscription...");
+
+      const response = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setSubscriptionMessage(
+          data.error || "Unable to complete subscription."
+        );
+        return;
+      }
+
+      setSubscribers(data.count || 0);
+      setSubscriptionMessage(data.message);
+      setSubscriberEmail("");
+    } catch (error) {
+      console.error("Subscription error:", error);
+      setSubscriptionMessage("Unable to connect to the database.");
+    } finally {
+      setSubscribing(false);
+    }
+  }
+
+  async function shareVideo(video: {
+    id: number;
+    title: string;
+    src: string;
+  }) {
+    const url = window.location.href;
 
     if (navigator.share) {
       try {
@@ -196,13 +155,13 @@ export default function Home() {
           text: `Watch ${video.title} on Ray'sStream`,
           url,
         });
-
-        return;
-      } catch {}
+      } catch {
+        // User cancelled sharing.
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      alert("Ray'sStream link copied!");
     }
-
-    await navigator.clipboard.writeText(url);
-    alert("Ray'sStream link copied!");
   }
 
   function shareFacebook() {
@@ -214,12 +173,9 @@ export default function Home() {
     );
   }
 
-  function shareX(video: Video) {
+  function shareX() {
     const url = encodeURIComponent(window.location.href);
-
-    const text = encodeURIComponent(
-      `Watch ${video.title} on Ray'sStream`
-    );
+    const text = encodeURIComponent("Watch this on Ray'sStream");
 
     window.open(
       `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
@@ -228,13 +184,8 @@ export default function Home() {
   }
 
   async function copyForTikTokInstagram() {
-    await navigator.clipboard.writeText(
-      window.location.href
-    );
-
-    alert(
-      "Ray'sStream link copied. Paste it into TikTok or Instagram."
-    );
+    await navigator.clipboard.writeText(window.location.href);
+    alert("Ray'sStream link copied!");
   }
 
   return (
@@ -248,76 +199,138 @@ export default function Home() {
     >
       <header
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
-          background: "#0d0d0d",
-          borderBottom: "1px solid #333",
-          padding: "16px 22px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "15px",
-          flexWrap: "wrap",
+          padding: "24px",
+          borderBottom: "2px solid black",
+          textAlign: "center",
         }}
       >
-        <h1 style={{ margin: 0, fontSize: "30px" }}>
-          🔥 Ray&apos;sStream
+        <h1
+          style={{
+            fontSize: "42px",
+            margin: "0 0 10px",
+          }}
+        >
+          Ray&apos;sStream
         </h1>
+
+        <p
+          style={{
+            color: "#bbb",
+            fontSize: "18px",
+          }}
+        >
+          Watch • Like • Comment • Subscribe • Share
+        </p>
 
         <div
           style={{
             display: "flex",
-            gap: "10px",
-            alignItems: "center",
+            justifyContent: "center",
             flexWrap: "wrap",
+            gap: "10px",
+            marginTop: "20px",
           }}
         >
-          <a href="/upload" style={linkStyle}>
-            ⬆ Upload
+          <a href="/creator/signup" style={linkStyle}>
+            Creator Sign Up
           </a>
 
-          <a href="/uploads" style={linkStyle}>
-            🎬 Creator Videos
+          <a href="/creator/login" style={linkStyle}>
+            Creator Login
           </a>
-<a href="/dashboard" style={linkStyle}>
-  🎛 Creator Dashboard
-</a> 
 
-          <strong>
-            {subscribers.toLocaleString()} subscribers
-          </strong>
+          <a href="/creator/dashboard" style={linkStyle}>
+            Creator Dashboard
+          </a>
 
-          <button
-            onClick={subscribe}
-            style={{
-              border: "none",
-              borderRadius: "25px",
-              padding: "12px 22px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              background: subscribed ? "#444" : "#ff0000",
-              color: "white",
-            }}
-          >
-            {subscribed ? "Subscribed ✓" : "Subscribe"}
-          </button>
+          <a href="/admin/login" style={linkStyle}>
+            Admin Dashboard
+          </a>
 
           <a
             href="https://buy.stripe.com/fZu6oH08q6VV3Zw5TP2Nq02"
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              background: "#635bff",
-              color: "white",
+              background: "#fff",
+              color: "#000",
               textDecoration: "none",
-              borderRadius: "25px",
+              border: "2px solid black",
+              borderRadius: "22px",
               padding: "12px 22px",
               fontWeight: "bold",
             }}
           >
             💳 Paid Subscription
           </a>
+        </div>
+
+        <div
+          style={{
+            width: "min(500px, 100%)",
+            margin: "22px auto 0",
+            padding: "18px",
+            background: "#121212",
+            border: "2px solid black",
+            borderRadius: "16px",
+            boxSizing: "border-box",
+          }}
+        >
+          <h3 style={{ marginTop: 0 }}>
+            Subscribe to Ray&apos;sStream
+          </h3>
+
+          <p style={{ color: "#bbb" }}>
+            {subscribers} subscribers
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              gap: "8px",
+            }}
+          >
+            <input
+              type="email"
+              value={subscriberEmail}
+              onChange={(event) =>
+                setSubscriberEmail(event.target.value)
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  subscribe();
+                }
+              }}
+              placeholder="Enter your email"
+              style={{
+                flex: "1 1 230px",
+                padding: "12px",
+                borderRadius: "20px",
+                border: "2px solid black",
+                background: "#1b1b1b",
+                color: "white",
+              }}
+            />
+
+            <button
+              onClick={subscribe}
+              disabled={subscribing}
+              style={{
+                ...buttonStyle,
+                opacity: subscribing ? 0.6 : 1,
+              }}
+            >
+              {subscribing ? "Saving..." : "Subscribe"}
+            </button>
+          </div>
+
+          {subscriptionMessage && (
+            <p style={{ marginBottom: 0 }}>
+              {subscriptionMessage}
+            </p>
+          )}
         </div>
       </header>
 
@@ -327,7 +340,12 @@ export default function Home() {
           padding: "30px 20px 10px",
         }}
       >
-        <h2 style={{ fontSize: "34px", marginBottom: "8px" }}>
+        <h2
+          style={{
+            fontSize: "34px",
+            marginBottom: "8px",
+          }}
+        >
           Welcome to Ray&apos;sStream
         </h2>
 
@@ -350,6 +368,7 @@ export default function Home() {
               background: "#121212",
               marginTop: "28px",
               borderRadius: "18px",
+              border: "2px solid black",
               padding: "18px",
             }}
           >
@@ -365,6 +384,7 @@ export default function Home() {
               style={{
                 width: "100%",
                 background: "black",
+                border: "2px solid black",
                 borderRadius: "14px",
                 maxHeight: "600px",
               }}
@@ -394,17 +414,14 @@ export default function Home() {
                 onClick={() => shareVideo(video)}
                 style={buttonStyle}
               >
-                📤 Share
+                Share
               </button>
 
               <button onClick={shareFacebook} style={buttonStyle}>
                 Facebook
               </button>
 
-              <button
-                onClick={() => shareX(video)}
-                style={buttonStyle}
-              >
+              <button onClick={shareX} style={buttonStyle}>
                 X
               </button>
 
@@ -426,7 +443,12 @@ export default function Home() {
             <div style={{ marginTop: "24px" }}>
               <h3>Comments</h3>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "8px",
+                }}
+              >
                 <input
                   value={commentInputs[index] || ""}
                   onChange={(event) =>
@@ -437,8 +459,8 @@ export default function Home() {
                     flex: 1,
                     padding: "12px",
                     borderRadius: "10px",
-                    border: "1px solid #444",
-                    background: "#1c1c1c",
+                    border: "2px solid black",
+                    background: "#1b1b1b",
                     color: "white",
                   }}
                 />
@@ -458,6 +480,7 @@ export default function Home() {
                     background: "#1b1b1b",
                     marginTop: "8px",
                     padding: "12px",
+                    border: "2px solid black",
                     borderRadius: "10px",
                   }}
                 >
@@ -477,7 +500,9 @@ export default function Home() {
           padding: "30px",
           textAlign: "center",
           background: "#121212",
+          border: "2px solid black",
           borderRadius: "18px",
+          boxSizing: "border-box",
         }}
       >
         <h2>🎬 Creator Uploads</h2>
@@ -486,11 +511,19 @@ export default function Home() {
           Upload your own videos and watch creator uploads.
         </p>
 
-        <a href="/upload" style={creatorButton}>
-          ⬆ Upload Video
+        <a href="/creator/signup" style={creatorButton}>
+          ✨ Creator Sign Up
         </a>
 
-        <a href="/uploads" style={creatorButton}>
+        <a href="/creator/login" style={creatorButton}>
+          🔐 Creator Login
+        </a>
+
+        <a href="/upload" style={creatorButton}>
+          ↑ Upload Video
+        </a>
+
+        <a href="/uploaded" style={creatorButton}>
           ▶ View Uploaded Videos
         </a>
       </section>
@@ -499,7 +532,7 @@ export default function Home() {
         style={{
           padding: "30px",
           textAlign: "center",
-          borderTop: "1px solid #222",
+          borderTop: "2px solid black",
           color: "#777",
         }}
       >
@@ -512,7 +545,7 @@ export default function Home() {
 const buttonStyle = {
   background: "#2b2b2b",
   color: "white",
-  border: "none",
+  border: "2px solid black",
   padding: "10px 16px",
   borderRadius: "20px",
   cursor: "pointer",
@@ -523,6 +556,7 @@ const linkStyle = {
   background: "#222",
   color: "white",
   textDecoration: "none",
+  border: "2px solid black",
   borderRadius: "25px",
   padding: "12px 22px",
   fontWeight: "bold",
@@ -535,6 +569,7 @@ const creatorButton = {
   background: "#2b2b2b",
   color: "white",
   textDecoration: "none",
+  border: "2px solid black",
   borderRadius: "22px",
   fontWeight: "bold",
 }; 

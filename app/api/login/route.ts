@@ -1,43 +1,35 @@
-import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
-import { scryptSync, timingSafeEqual } from "crypto";
+import bcrypt from "bcryptjs";
+import postgres from "postgres";
 
-const sql = neon(process.env.NEON_DATABASE_URL!);
+const connectionString = process.env.RAYSSTREAM_DB_DATABASE_URL;
 
-function verifyPassword(password: string, storedPassword: string) {
-  const parts = storedPassword.split(":");
-
-  if (parts.length !== 2) {
-    return false;
-  }
-
-  const [salt, storedHash] = parts;
-
-  const hash = scryptSync(password, salt, 64);
-  const storedHashBuffer = Buffer.from(storedHash, "hex");
-
-  if (hash.length !== storedHashBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(hash, storedHashBuffer);
+if (!connectionString) {
+  throw new Error("RAYSSTREAM_DB_DATABASE_URL is missing");
 }
+
+const sql = postgres(connectionString, {
+  ssl: "require",
+});
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    const body = await request.json();
+
+    const email = body.email?.trim().toLowerCase();
+    const password = body.password;
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: "Please enter your email and password." },
+        { error: "Email and password are required." },
         { status: 400 }
       );
     }
 
     const creators = await sql`
-      SELECT id, username, email, password
+      SELECT id, name, email, password_hash
       FROM creators
-      WHERE LOWER(email) = LOWER(${email})
+      WHERE email = ${email}
       LIMIT 1
     `;
 
@@ -50,9 +42,9 @@ export async function POST(request: Request) {
 
     const creator = creators[0];
 
-    const passwordMatches = verifyPassword(
+    const passwordMatches = await bcrypt.compare(
       password,
-      creator.password
+      creator.password_hash
     );
 
     if (!passwordMatches) {
@@ -64,14 +56,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      username: creator.username,
+      name: creator.name,
       email: creator.email,
     });
   } catch (error) {
-    console.error("Creator login error:", error);
+    console.error("Login error:", error);
 
     return NextResponse.json(
-      { error: "Could not sign in." },
+      { error: "Something went wrong logging in." },
       { status: 500 }
     );
   }

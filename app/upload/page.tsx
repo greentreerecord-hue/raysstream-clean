@@ -41,7 +41,32 @@ export default function UploadPage() {
         }
       );
 
-      setMessage(`Upload successful! ${blob.url}`);
+      setMessage("Saving video information...");
+
+      const saveResponse = await fetch("/api/my-videos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: creatorEmail,
+          url: blob.url,
+          pathname: blob.pathname,
+          title: title,
+        }),
+      });
+
+      const saveData = await saveResponse.json();
+
+      if (!saveResponse.ok) {
+        setMessage(
+          saveData.error ||
+            "Video uploaded, but the title could not be saved."
+        );
+        return;
+      }
+
+      setMessage("Upload successful!");
       setTitle("");
       setVideo(null);
     } catch (error) {
