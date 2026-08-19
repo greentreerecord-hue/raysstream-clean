@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 type CreatorVideo = {
   id: string | number;
@@ -13,7 +13,8 @@ type CreatorVideo = {
 
 export default function CreatorWatchPage() {
   const params = useParams();
-  const id = String(params.id);
+  const router = useRouter();
+  const id = String(params?.id || "");
 
   const [video, setVideo] = useState<CreatorVideo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,35 +27,28 @@ export default function CreatorWatchPage() {
           cache: "no-store",
         });
 
-        const data = await response.json();
-
         if (!response.ok) {
-          throw new Error(data.error || "Unable to load video.");
+          throw new Error("Could not load videos.");
         }
 
-        const videoList = Array.isArray(data) ? data : data.videos || [];
+        const data = await response.json();
 
-        const selectedVideo = videoList.find(
-          (
-            item: CreatorVideo & {
-              blob_url?: string;
-            }
-          ) => String(item.id) === id
+        const videos: CreatorVideo[] = Array.isArray(data)
+          ? data
+          : data.videos || [];
+
+        const selectedVideo = videos.find(
+          (item) => String(item.id) === id
         );
 
         if (!selectedVideo) {
-          setMessage("Creator video not found.");
+          setMessage("Video not found.");
           return;
         }
 
-        setVideo({
-          ...selectedVideo,
-          url: selectedVideo.url || selectedVideo.blob_url || "",
-        });
-      } catch (error) {
-        setMessage(
-          error instanceof Error ? error.message : "Unable to load video."
-        );
+        setVideo(selectedVideo);
+      } catch {
+        setMessage("Unable to load this video.");
       } finally {
         setLoading(false);
       }
@@ -62,186 +56,153 @@ export default function CreatorWatchPage() {
 
     if (id) {
       loadVideo();
-    } else {
-      setMessage("Invalid creator video.");
-      setLoading(false);
     }
   }, [id]);
 
-  async function copyLink() {
-    const watchUrl = window.location.href;
+  function openWatchLink() {
+    const watchLink = window.location.href;
 
-    try {
-      await navigator.clipboard.writeText(watchUrl);
-      alert("Ray'sStream watch link copied!");
-    } catch {
-      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
-    }
+    window.open(
+      watchLink,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
-  async function shareVideo() {
-    if (!video) return;
-
-    const watchUrl = window.location.href;
-
-    const shareData = {
-      title: video.title,
-      text: `Watch ${video.title} on Ray'sStream`,
-      url: watchUrl,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch {
-        await copyLink();
-        return;
-      }
-    }
-
-    await copyLink();
+  function openMoreVideos() {
+    router.push("/");
   }
 
   if (loading) {
     return (
-      <main style={pageStyle}>
-        <p style={messageStyle}>Loading creator video...</p>
+      <main style={styles.page}>
+        <p style={styles.message}>Loading video...</p>
       </main>
     );
   }
 
   if (!video) {
     return (
-      <main style={pageStyle}>
-        <h1 style={headingStyle}>Ray&apos;sStream</h1>
+      <main style={styles.page}>
+        <p style={styles.message}>
+          {message || "Video not found."}
+        </p>
 
-        <p style={messageStyle}>{message}</p>
-
-        <a href="/" style={linkStyle}>
-          Back to Homepage
-        </a>
+        <button style={styles.button} onClick={openMoreVideos}>
+          More Videos
+        </button>
       </main>
     );
   }
 
   return (
-    <main style={pageStyle}>
-      <a href="/" style={backLinkStyle}>
-        ← Back to Ray&apos;sStream
-      </a>
+    <main style={styles.page}>
+      <section style={styles.card}>
+        <h1 style={styles.logo}>Ray&apos;sStream</h1>
 
-      <section style={cardStyle}>
-        <h1 style={titleStyle}>{video.title}</h1>
+        <h2 style={styles.title}>{video.title}</h2>
 
         <video
+          style={styles.video}
           src={video.url}
           controls
           autoPlay
           playsInline
-          style={videoStyle}
         />
 
-        <div style={buttonRowStyle}>
-          <button type="button" onClick={shareVideo} style={buttonStyle}>
-            Share Video
+        {video.creator_email && (
+          <p style={styles.creator}>
+            Creator: {video.creator_email}
+          </p>
+        )}
+
+        <div style={styles.buttons}>
+          <button style={styles.button} onClick={openWatchLink}>
+            Open Watch Link
           </button>
 
-          <a href="/" style={linkStyle}>
+          <button style={styles.button} onClick={openMoreVideos}>
             More Videos
-          </a>
+          </button>
         </div>
       </section>
 
-      <footer style={footerStyle}>© 2026 Ray&apos;sStream</footer>
+      <footer style={styles.footer}>
+        © 2026 Ray&apos;sStream
+      </footer>
     </main>
   );
 }
 
-const pageStyle = {
-  minHeight: "100vh",
-  padding: "30px 16px",
-  background:
-    "linear-gradient(180deg, #061a35 0%, #052b58 50%, #031426 100%)",
-  color: "white",
-};
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background: "#050505",
+    color: "white",
+    padding: "30px 16px",
+    textAlign: "center",
+    fontFamily: "Arial, sans-serif",
+  },
 
-const headingStyle = {
-  textAlign: "center" as const,
-  fontSize: "42px",
-};
+  card: {
+    width: "100%",
+    maxWidth: "760px",
+    margin: "0 auto",
+  },
 
-const cardStyle = {
-  width: "min(1000px, 96%)",
-  margin: "30px auto",
-  overflow: "hidden",
-  background: "#202020",
-  border: "2px solid black",
-  borderRadius: "22px",
-  boxShadow: "0 14px 35px rgba(0, 0, 0, 0.45)",
-};
+  logo: {
+    color: "#22c55e",
+    fontSize: "38px",
+    marginBottom: "24px",
+  },
 
-const titleStyle = {
-  padding: "20px",
-  margin: 0,
-  fontSize: "clamp(26px, 5vw, 42px)",
-  textAlign: "center" as const,
-};
+  title: {
+    color: "white",
+    fontSize: "28px",
+    marginBottom: "18px",
+  },
 
-const videoStyle = {
-  display: "block",
-  width: "100%",
-  maxHeight: "700px",
-  background: "black",
-};
+  video: {
+    display: "block",
+    width: "100%",
+    maxHeight: "650px",
+    margin: "0 auto",
+    background: "black",
+    border: "3px solid white",
+    borderRadius: "12px",
+  },
 
-const buttonRowStyle = {
-  display: "flex",
-  flexWrap: "wrap" as const,
-  justifyContent: "center",
-  gap: "14px",
-  padding: "22px",
-};
+  creator: {
+    color: "#d1d5db",
+    marginTop: "14px",
+  },
 
-const buttonStyle = {
-  padding: "12px 24px",
-  background: "#222",
-  color: "white",
-  border: "2px solid black",
-  borderRadius: "22px",
-  cursor: "pointer",
-  fontWeight: "bold",
-  fontSize: "16px",
-};
+  buttons: {
+    display: "flex",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: "14px",
+    marginTop: "24px",
+  },
 
-const linkStyle = {
-  display: "inline-block",
-  padding: "12px 24px",
-  background: "#222",
-  color: "white",
-  border: "2px solid black",
-  borderRadius: "22px",
-  textDecoration: "none",
-  fontWeight: "bold",
-};
+  button: {
+    background: "#22c55e",
+    color: "black",
+    border: "2px solid white",
+    borderRadius: "9px",
+    padding: "12px 22px",
+    fontSize: "17px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
 
-const backLinkStyle = {
-  display: "inline-block",
-  color: "white",
-  textDecoration: "none",
-  fontWeight: "bold",
-  marginLeft: "3%",
-};
+  message: {
+    fontSize: "22px",
+    marginBottom: "24px",
+  },
 
-const messageStyle = {
-  color: "white",
-  textAlign: "center" as const,
-  fontSize: "20px",
-  padding: "40px",
-};
-
-const footerStyle = {
-  textAlign: "center" as const,
-  padding: "30px",
-  color: "#dddddd",
+  footer: {
+    color: "#9ca3af",
+    marginTop: "70px",
+  },
 }; 
