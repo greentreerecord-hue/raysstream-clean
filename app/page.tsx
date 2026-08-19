@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import CreatorFeed from "./creator-feed";
 
 const videos = [
   {
@@ -686,6 +687,8 @@ export default function Home() {
         ))}
       </section>
 
+      <CreatorFeed />
+
       <section
         style={{
           width: "min(1000px, 94%)",
@@ -719,7 +722,8 @@ export default function Home() {
         <a href="/uploaded" style={creatorButton}>
           ▶ View Uploaded Videos
         </a>
-      </section>
+      </section> 
+<CreatorFeed />
 
       <footer
         style={{

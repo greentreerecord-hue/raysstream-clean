@@ -160,19 +160,11 @@ export default function WatchPage() {
   async function shareVideo() {
     const url = window.location.href;
 
-    if (navigator.share && video) {
-      try {
-        await navigator.share({
-          title: video.title,
-          text: `Watch ${video.title} on Ray'sStream`,
-          url,
-        });
-      } catch {
-        // User cancelled sharing.
-      }
-    } else {
+    try {
       await navigator.clipboard.writeText(url);
       alert("Video link copied!");
+    } catch {
+      window.prompt("Copy this video link:", url);
     }
   }
 
@@ -286,7 +278,7 @@ export default function WatchPage() {
           }}
         >
           <button onClick={shareVideo} style={buttonStyle}>
-            Share Video
+            Copy Video Link
           </button>
 
           <a href="/" style={linkStyle}>
