@@ -723,7 +723,7 @@ export default function Home() {
           ▶ View Uploaded Videos
         </a>
       </section> 
-<CreatorFeed />
+
 
       <footer
         style={{
