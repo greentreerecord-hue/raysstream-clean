@@ -76,6 +76,30 @@ export default function Home() {
       }
     }
 
+    async function loadVideoLikes() {
+      try {
+        const likeCounts = await Promise.all(
+          videos.map(async (video) => {
+            const response = await fetch(
+              `/api/likes?videoId=${video.id}`
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              return 0;
+            }
+
+            return Number(data.likes || 0);
+          })
+        );
+
+        setLikes(likeCounts);
+      } catch (error) {
+        console.error("Unable to load video likes:", error);
+      }
+    }
+
     async function loadVideoComments() {
       try {
         const response = await fetch("/api/comments");
@@ -107,6 +131,7 @@ export default function Home() {
 
     loadSubscriberCount();
     loadVideoViews();
+    loadVideoLikes();
     loadVideoComments();
   }, []);
 
@@ -144,12 +169,41 @@ export default function Home() {
     }
   }
 
-  function likeVideo(index: number) {
-    setLikes((current) => {
-      const updated = [...current];
-      updated[index] = (updated[index] || 0) + 1;
-      return updated;
-    });
+  async function likeVideo(index: number, videoId: number) {
+    const likeKey = `raysstream-liked-${videoId}`;
+
+    if (localStorage.getItem(likeKey) === "true") {
+      alert("You already liked this video.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/likes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ videoId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Unable to save like.");
+        return;
+      }
+
+      localStorage.setItem(likeKey, "true");
+
+      setLikes((current) => {
+        const updated = [...current];
+        updated[index] = Number(data.likes || 0);
+        return updated;
+      });
+    } catch (error) {
+      console.error("Unable to save like:", error);
+      alert("Unable to connect to the likes database.");
+    }
   }
 
   function updateComment(index: number, value: string) {
@@ -528,7 +582,7 @@ export default function Home() {
               </a>
 
               <button
-                onClick={() => likeVideo(index)}
+                onClick={() => likeVideo(index, video.id)}
                 style={buttonStyle}
               >
                 👍 Like
