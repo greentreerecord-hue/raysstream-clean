@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type CreatorVideo = {
-  id: number;
+  id: string | number;
   title: string;
   url: string;
   creator_email?: string;
@@ -31,7 +31,11 @@ export default function CreatorFeed() {
         const videoList = Array.isArray(data) ? data : data.videos || [];
 
         const normalizedVideos = videoList.map(
-          (video: CreatorVideo & { blob_url?: string }) => ({
+          (
+            video: CreatorVideo & {
+              blob_url?: string;
+            }
+          ) => ({
             ...video,
             url: video.url || video.blob_url || "",
           })
@@ -52,24 +56,28 @@ export default function CreatorFeed() {
     loadVideos();
   }, []);
 
-  async function copyVideoLink(url: string) {
+  function getWatchUrl(video: CreatorVideo) {
+    return `${window.location.origin}/watch/creator/${video.id}`;
+  }
+
+  async function copyVideoLink(video: CreatorVideo) {
+    const watchUrl = getWatchUrl(video);
+
     try {
-      await navigator.clipboard.writeText(url);
-      alert("Ray'sStream video link copied!");
+      await navigator.clipboard.writeText(watchUrl);
+      alert("Ray'sStream watch link copied!");
     } catch {
-      window.prompt("Copy this Ray'sStream video link:", url);
+      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
     }
   }
 
   async function shareVideo(video: CreatorVideo) {
-    const videoUrl = video.url.startsWith("http")
-      ? video.url
-      : new URL(video.url, window.location.origin).href;
+    const watchUrl = getWatchUrl(video);
 
     const shareData = {
       title: video.title,
       text: `Watch ${video.title} on Ray'sStream`,
-      url: videoUrl,
+      url: watchUrl,
     };
 
     if (navigator.share) {
@@ -77,12 +85,12 @@ export default function CreatorFeed() {
         await navigator.share(shareData);
         return;
       } catch {
-        await copyVideoLink(videoUrl);
+        await copyVideoLink(video);
         return;
       }
     }
 
-    await copyVideoLink(videoUrl);
+    await copyVideoLink(video);
   }
 
   if (loading) {
@@ -124,6 +132,13 @@ export default function CreatorFeed() {
             />
 
             <div style={buttonRowStyle}>
+              <a
+                href={`/watch/creator/${video.id}`}
+                style={watchButtonStyle}
+              >
+                Watch Page
+              </a>
+
               <button
                 type="button"
                 onClick={() => shareVideo(video)}
@@ -198,8 +213,22 @@ const videoStyle = {
 
 const buttonRowStyle = {
   display: "flex",
+  flexWrap: "wrap" as const,
   justifyContent: "center",
+  gap: "12px",
   padding: "16px",
+};
+
+const watchButtonStyle = {
+  display: "inline-block",
+  padding: "11px 22px",
+  background: "#222222",
+  color: "white",
+  border: "2px solid black",
+  borderRadius: "20px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  textDecoration: "none",
 };
 
 const shareButtonStyle = {
