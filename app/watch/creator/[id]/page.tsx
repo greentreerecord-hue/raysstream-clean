@@ -9,7 +9,6 @@ type CreatorVideo = {
   url: string;
   blob_url?: string;
   creator_email?: string;
-  created_at?: string;
 };
 
 type Comment = {
@@ -21,19 +20,20 @@ type Comment = {
 export default function CreatorWatchPage() {
   const params = useParams();
   const router = useRouter();
+
   const idValue = Array.isArray(params.id) ? params.id[0] : params.id;
   const id = String(idValue || "");
 
   const [video, setVideo] = useState<CreatorVideo | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-
   const [views, setViews] = useState(0);
   const [likes, setLikes] = useState(0);
   const [shares, setShares] = useState(0);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const [liked, setLiked] = useState(false);
+  const [showShareButtons, setShowShareButtons] = useState(false);
 
   const viewed = useRef(false);
 
@@ -84,6 +84,7 @@ export default function CreatorWatchPage() {
           setViews(Number(activityData.views || 0));
           setLikes(Number(activityData.likes || 0));
           setShares(Number(activityData.shares || 0));
+
           setComments(
             Array.isArray(activityData.comments)
               ? activityData.comments
@@ -91,11 +92,10 @@ export default function CreatorWatchPage() {
           );
         }
 
-        const savedLike = localStorage.getItem(
-          `raysstream-liked-creator-${id}`
+        setLiked(
+          localStorage.getItem(`raysstream-liked-creator-${id}`) ===
+            "yes"
         );
-
-        setLiked(savedLike === "yes");
       } catch (error) {
         setMessage(
           error instanceof Error
@@ -149,11 +149,10 @@ export default function CreatorWatchPage() {
       setViews(Number(data.views || 0));
     } catch (error) {
       viewed.current = false;
-      console.error("Unable to save creator video view:", error);
+      console.error("Unable to save view:", error);
     }
-  }
-
-  async function likeVideo() {
+  } 
+async function likeVideo() {
     if (liked) {
       alert("You already liked this video.");
       return;
@@ -178,41 +177,92 @@ export default function CreatorWatchPage() {
     }
   }
 
-  async function shareVideo() {
-    if (!video) {
-      return;
-    }
-
-    const watchUrl = window.location.href;
-
+  async function recordShare() {
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: video.title,
-          text: `Watch ${video.title} on Ray'sStream`,
-          url: watchUrl,
-        });
-      } else {
-        await navigator.clipboard.writeText(watchUrl);
-        alert("Ray'sStream watch link copied!");
-      }
-
       const data = await saveAction("share");
       setShares(Number(data.shares || 0));
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        return;
-      }
-
-      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
-
-      try {
-        const data = await saveAction("share");
-        setShares(Number(data.shares || 0));
-      } catch {
-        console.error("Unable to save creator video share.");
-      }
+      console.error("Unable to save share:", error);
     }
+  }
+
+  async function copyWatchLink() {
+    const watchUrl = window.location.href;
+
+    try {
+      await navigator.clipboard.writeText(watchUrl);
+      alert("Ray'sStream watch link copied!");
+    } catch {
+      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
+    }
+
+    await recordShare();
+  }
+
+  async function shareToFacebook() {
+    const watchUrl = encodeURIComponent(window.location.href);
+
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${watchUrl}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+
+    await recordShare();
+  }
+
+  async function shareToX() {
+    const watchUrl = encodeURIComponent(window.location.href);
+
+    const text = encodeURIComponent(
+      `Watch ${video?.title || "this video"} on Ray'sStream`
+    );
+
+    window.open(
+      `https://twitter.com/intent/tweet?text=${text}&url=${watchUrl}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+
+    await recordShare();
+  }
+
+  async function shareToTikTok() {
+    const watchUrl = window.location.href;
+
+    try {
+      await navigator.clipboard.writeText(watchUrl);
+    } catch {
+      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
+    }
+
+    window.open(
+      "https://www.tiktok.com/",
+      "_blank",
+      "noopener,noreferrer"
+    );
+
+    alert("Video link copied. Paste it into TikTok.");
+    await recordShare();
+  }
+
+  async function shareToInstagram() {
+    const watchUrl = window.location.href;
+
+    try {
+      await navigator.clipboard.writeText(watchUrl);
+    } catch {
+      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
+    }
+
+    window.open(
+      "https://www.instagram.com/",
+      "_blank",
+      "noopener,noreferrer"
+    );
+
+    alert("Video link copied. Paste it into Instagram.");
+    await recordShare();
   }
 
   async function postComment() {
@@ -225,11 +275,7 @@ export default function CreatorWatchPage() {
     try {
       const data = await saveAction("comment", text);
 
-      setComments((current) => [
-        ...current,
-        data.comment,
-      ]);
-
+      setComments((current) => [...current, data.comment]);
       setCommentInput("");
     } catch (error) {
       alert(
@@ -263,13 +309,11 @@ export default function CreatorWatchPage() {
         </button>
       </main>
     );
-  }
-
-  return (
+  } 
+return (
     <main style={styles.page}>
       <section style={styles.card}>
         <h1 style={styles.logo}>Ray&apos;sStream</h1>
-
         <h2 style={styles.title}>{video.title}</h2>
 
         <video
@@ -307,7 +351,12 @@ export default function CreatorWatchPage() {
             {liked ? "Liked" : "Like Video"}
           </button>
 
-          <button style={styles.button} onClick={shareVideo}>
+          <button
+            style={styles.button}
+            onClick={() =>
+              setShowShareButtons((current) => !current)
+            }
+          >
             Share Video
           </button>
 
@@ -318,6 +367,45 @@ export default function CreatorWatchPage() {
             More Videos
           </button>
         </div>
+
+        {showShareButtons && (
+          <div style={styles.sharePanel}>
+            <button
+              style={styles.shareButton}
+              onClick={shareToFacebook}
+            >
+              Facebook
+            </button>
+
+            <button
+              style={styles.shareButton}
+              onClick={shareToX}
+            >
+              X
+            </button>
+
+            <button
+              style={styles.shareButton}
+              onClick={shareToTikTok}
+            >
+              TikTok
+            </button>
+
+            <button
+              style={styles.shareButton}
+              onClick={shareToInstagram}
+            >
+              Instagram
+            </button>
+
+            <button
+              style={styles.shareButton}
+              onClick={copyWatchLink}
+            >
+              Copy Link
+            </button>
+          </div>
+        )}
 
         <section style={styles.commentSection}>
           <h3 style={styles.commentHeading}>Comments</h3>
@@ -338,7 +426,10 @@ export default function CreatorWatchPage() {
               style={styles.input}
             />
 
-            <button style={styles.button} onClick={postComment}>
+            <button
+              style={styles.button}
+              onClick={postComment}
+            >
               Post
             </button>
           </div>
@@ -374,25 +465,20 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "center",
     fontFamily: "Arial, sans-serif",
   },
-
   card: {
     width: "100%",
     maxWidth: "800px",
     margin: "0 auto",
   },
-
   logo: {
     color: "#22c55e",
     fontSize: "38px",
     marginBottom: "24px",
   },
-
   title: {
-    color: "white",
     fontSize: "28px",
     marginBottom: "18px",
   },
-
   video: {
     display: "block",
     width: "100%",
@@ -402,12 +488,10 @@ const styles: Record<string, React.CSSProperties> = {
     border: "3px solid white",
     borderRadius: "12px",
   },
-
   creator: {
     color: "#d1d5db",
     marginTop: "14px",
   },
-
   stats: {
     display: "flex",
     justifyContent: "center",
@@ -417,7 +501,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "17px",
     marginTop: "20px",
   },
-
   buttons: {
     display: "flex",
     justifyContent: "center",
@@ -425,7 +508,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "14px",
     marginTop: "24px",
   },
-
   button: {
     background: "#22c55e",
     color: "black",
@@ -436,7 +518,26 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: "bold",
     cursor: "pointer",
   },
-
+  sharePanel: {
+    display: "flex",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: "10px",
+    background: "#171717",
+    border: "2px solid black",
+    borderRadius: "12px",
+    padding: "16px",
+    marginTop: "16px",
+  },
+  shareButton: {
+    background: "#262626",
+    color: "white",
+    border: "2px solid white",
+    borderRadius: "20px",
+    padding: "10px 18px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
   commentSection: {
     background: "#171717",
     border: "2px solid black",
@@ -445,18 +546,15 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "20px",
     textAlign: "left",
   },
-
   commentHeading: {
     fontSize: "25px",
     marginTop: 0,
   },
-
   commentForm: {
     display: "flex",
     flexWrap: "wrap",
     gap: "10px",
   },
-
   input: {
     flex: "1 1 300px",
     background: "#262626",
@@ -466,12 +564,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px",
     fontSize: "16px",
   },
-
   emptyComments: {
     color: "#a3a3a3",
     marginTop: "22px",
   },
-
   comment: {
     background: "#262626",
     border: "2px solid black",
@@ -479,17 +575,14 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px",
     marginTop: "12px",
   },
-
   commentText: {
     marginTop: "5px",
     overflowWrap: "anywhere",
   },
-
   message: {
     fontSize: "22px",
     marginBottom: "24px",
   },
-
   footer: {
     color: "#9ca3af",
     marginTop: "70px",
