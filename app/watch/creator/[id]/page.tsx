@@ -1,43 +1,70 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 type CreatorVideo = {
   id: string | number;
   title: string;
   url: string;
+  blob_url?: string;
   creator_email?: string;
   created_at?: string;
+};
+
+type Comment = {
+  id: number;
+  text: string;
+  createdAt?: string;
 };
 
 export default function CreatorWatchPage() {
   const params = useParams();
   const router = useRouter();
-  const id = String(params?.id || "");
+  const idValue = Array.isArray(params.id) ? params.id[0] : params.id;
+  const id = String(idValue || "");
 
   const [video, setVideo] = useState<CreatorVideo | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    async function loadVideo() {
-      try {
-        const response = await fetch("/api/feed", {
-          cache: "no-store",
-        });
+  const [views, setViews] = useState(0);
+  const [likes, setLikes] = useState(0);
+  const [shares, setShares] = useState(0);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentInput, setCommentInput] = useState("");
+  const [liked, setLiked] = useState(false);
 
-        if (!response.ok) {
-          throw new Error("Could not load videos.");
+  const viewed = useRef(false);
+
+  useEffect(() => {
+    async function loadPage() {
+      try {
+        const [videoResponse, activityResponse] = await Promise.all([
+          fetch("/api/feed", {
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/creator-interactions?videoId=${encodeURIComponent(id)}`,
+            {
+              cache: "no-store",
+            }
+          ),
+        ]);
+
+        const videoData = await videoResponse.json();
+
+        if (!videoResponse.ok) {
+          throw new Error(
+            videoData.error || "Could not load creator videos."
+          );
         }
 
-        const data = await response.json();
+        const videoList: CreatorVideo[] = Array.isArray(videoData)
+          ? videoData
+          : videoData.videos || [];
 
-        const videos: CreatorVideo[] = Array.isArray(data)
-          ? data
-          : data.videos || [];
-
-        const selectedVideo = videos.find(
+        const selectedVideo = videoList.find(
           (item) => String(item.id) === id
         );
 
@@ -46,31 +73,171 @@ export default function CreatorWatchPage() {
           return;
         }
 
-        setVideo(selectedVideo);
-      } catch {
-        setMessage("Unable to load this video.");
+        setVideo({
+          ...selectedVideo,
+          url: selectedVideo.url || selectedVideo.blob_url || "",
+        });
+
+        if (activityResponse.ok) {
+          const activityData = await activityResponse.json();
+
+          setViews(Number(activityData.views || 0));
+          setLikes(Number(activityData.likes || 0));
+          setShares(Number(activityData.shares || 0));
+          setComments(
+            Array.isArray(activityData.comments)
+              ? activityData.comments
+              : []
+          );
+        }
+
+        const savedLike = localStorage.getItem(
+          `raysstream-liked-creator-${id}`
+        );
+
+        setLiked(savedLike === "yes");
+      } catch (error) {
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to load this video."
+        );
       } finally {
         setLoading(false);
       }
     }
 
     if (id) {
-      loadVideo();
+      loadPage();
     }
   }, [id]);
 
-  function openWatchLink() {
-    const watchLink = window.location.href;
+  async function saveAction(
+    action: "view" | "like" | "share" | "comment",
+    text?: string
+  ) {
+    const response = await fetch("/api/creator-interactions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        videoId: id,
+        action,
+        text,
+      }),
+    });
 
-    window.open(
-      watchLink,
-      "_blank",
-      "noopener,noreferrer"
-    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to save video activity.");
+    }
+
+    return data;
   }
 
-  function openMoreVideos() {
-    router.push("/");
+  async function addView() {
+    if (!id || viewed.current) {
+      return;
+    }
+
+    viewed.current = true;
+
+    try {
+      const data = await saveAction("view");
+      setViews(Number(data.views || 0));
+    } catch (error) {
+      viewed.current = false;
+      console.error("Unable to save creator video view:", error);
+    }
+  }
+
+  async function likeVideo() {
+    if (liked) {
+      alert("You already liked this video.");
+      return;
+    }
+
+    try {
+      const data = await saveAction("like");
+
+      setLikes(Number(data.likes || 0));
+      setLiked(true);
+
+      localStorage.setItem(
+        `raysstream-liked-creator-${id}`,
+        "yes"
+      );
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to like this video."
+      );
+    }
+  }
+
+  async function shareVideo() {
+    if (!video) {
+      return;
+    }
+
+    const watchUrl = window.location.href;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: video.title,
+          text: `Watch ${video.title} on Ray'sStream`,
+          url: watchUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(watchUrl);
+        alert("Ray'sStream watch link copied!");
+      }
+
+      const data = await saveAction("share");
+      setShares(Number(data.shares || 0));
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+
+      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
+
+      try {
+        const data = await saveAction("share");
+        setShares(Number(data.shares || 0));
+      } catch {
+        console.error("Unable to save creator video share.");
+      }
+    }
+  }
+
+  async function postComment() {
+    const text = commentInput.trim();
+
+    if (!text) {
+      return;
+    }
+
+    try {
+      const data = await saveAction("comment", text);
+
+      setComments((current) => [
+        ...current,
+        data.comment,
+      ]);
+
+      setCommentInput("");
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to post comment."
+      );
+    }
   }
 
   if (loading) {
@@ -88,7 +255,10 @@ export default function CreatorWatchPage() {
           {message || "Video not found."}
         </p>
 
-        <button style={styles.button} onClick={openMoreVideos}>
+        <button
+          style={styles.button}
+          onClick={() => router.push("/")}
+        >
           More Videos
         </button>
       </main>
@@ -108,6 +278,8 @@ export default function CreatorWatchPage() {
           controls
           autoPlay
           playsInline
+          preload="metadata"
+          onPlay={addView}
         />
 
         {video.creator_email && (
@@ -116,15 +288,74 @@ export default function CreatorWatchPage() {
           </p>
         )}
 
+        <div style={styles.stats}>
+          <span>👁 {views} views</span>
+          <span>👍 {likes} likes</span>
+          <span>💬 {comments.length} comments</span>
+          <span>↗ {shares} shares</span>
+        </div>
+
         <div style={styles.buttons}>
-          <button style={styles.button} onClick={openWatchLink}>
-            Open Watch Link
+          <button
+            style={{
+              ...styles.button,
+              background: liked ? "#166534" : "#22c55e",
+              color: liked ? "white" : "black",
+            }}
+            onClick={likeVideo}
+          >
+            {liked ? "Liked" : "Like Video"}
           </button>
 
-          <button style={styles.button} onClick={openMoreVideos}>
+          <button style={styles.button} onClick={shareVideo}>
+            Share Video
+          </button>
+
+          <button
+            style={styles.button}
+            onClick={() => router.push("/")}
+          >
             More Videos
           </button>
         </div>
+
+        <section style={styles.commentSection}>
+          <h3 style={styles.commentHeading}>Comments</h3>
+
+          <div style={styles.commentForm}>
+            <input
+              value={commentInput}
+              onChange={(event) =>
+                setCommentInput(event.target.value)
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  postComment();
+                }
+              }}
+              placeholder="Add a comment..."
+              maxLength={1000}
+              style={styles.input}
+            />
+
+            <button style={styles.button} onClick={postComment}>
+              Post
+            </button>
+          </div>
+
+          {comments.length === 0 && (
+            <p style={styles.emptyComments}>
+              Be the first to comment.
+            </p>
+          )}
+
+          {comments.map((comment) => (
+            <div key={comment.id} style={styles.comment}>
+              <strong>Ray&apos;sStream User</strong>
+              <div style={styles.commentText}>{comment.text}</div>
+            </div>
+          ))}
+        </section>
       </section>
 
       <footer style={styles.footer}>
@@ -146,7 +377,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   card: {
     width: "100%",
-    maxWidth: "760px",
+    maxWidth: "800px",
     margin: "0 auto",
   },
 
@@ -177,6 +408,16 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: "14px",
   },
 
+  stats: {
+    display: "flex",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: "18px",
+    color: "#e5e7eb",
+    fontSize: "17px",
+    marginTop: "20px",
+  },
+
   buttons: {
     display: "flex",
     justifyContent: "center",
@@ -194,6 +435,54 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "17px",
     fontWeight: "bold",
     cursor: "pointer",
+  },
+
+  commentSection: {
+    background: "#171717",
+    border: "2px solid black",
+    borderRadius: "14px",
+    marginTop: "34px",
+    padding: "20px",
+    textAlign: "left",
+  },
+
+  commentHeading: {
+    fontSize: "25px",
+    marginTop: 0,
+  },
+
+  commentForm: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "10px",
+  },
+
+  input: {
+    flex: "1 1 300px",
+    background: "#262626",
+    color: "white",
+    border: "2px solid black",
+    borderRadius: "9px",
+    padding: "12px",
+    fontSize: "16px",
+  },
+
+  emptyComments: {
+    color: "#a3a3a3",
+    marginTop: "22px",
+  },
+
+  comment: {
+    background: "#262626",
+    border: "2px solid black",
+    borderRadius: "10px",
+    padding: "12px",
+    marginTop: "12px",
+  },
+
+  commentText: {
+    marginTop: "5px",
+    overflowWrap: "anywhere",
   },
 
   message: {
