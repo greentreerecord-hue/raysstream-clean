@@ -8,18 +8,18 @@ type CreatorVideo = {
   title: string;
   url: string;
   blob_url?: string;
-  creator_email?: string;
+  channelId?: string;
 };
 
 export default function CreatorChannelPage() {
   const params = useParams();
 
-  const emailValue = Array.isArray(params.email)
+  const channelValue = Array.isArray(params.email)
     ? params.email[0]
     : params.email;
 
-  const creatorEmail = decodeURIComponent(
-    String(emailValue || "")
+  const channelId = String(
+    channelValue || ""
   ).toLowerCase();
 
   const [videos, setVideos] = useState<CreatorVideo[]>([]);
@@ -60,15 +60,15 @@ export default function CreatorChannelPage() {
           }))
           .filter(
             (video: CreatorVideo) =>
-              String(video.creator_email || "").toLowerCase() ===
-              creatorEmail
+              String(video.channelId || "").toLowerCase() ===
+              channelId
           );
 
         setVideos(creatorVideos);
 
         const countResponse = await fetch(
-          `/api/creator-subscribe?creatorEmail=${encodeURIComponent(
-            creatorEmail
+          `/api/creator-subscribe?channelId=${encodeURIComponent(
+            channelId
           )}`,
           {
             cache: "no-store",
@@ -82,7 +82,7 @@ export default function CreatorChannelPage() {
         }
 
         const subscriptionKey =
-          `raysstream-creator-subscribed-${creatorEmail}`;
+          `raysstream-creator-subscribed-${channelId}`;
 
         setSubscribed(
           localStorage.getItem(subscriptionKey) === "true"
@@ -98,10 +98,10 @@ export default function CreatorChannelPage() {
       }
     }
 
-    if (creatorEmail) {
+    if (channelId) {
       loadChannel();
     }
-  }, [creatorEmail]);
+  }, [channelId]);
 
   function getSubscriberId() {
     const storageKey = "raysstreamSubscriberId";
@@ -139,7 +139,7 @@ export default function CreatorChannelPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            creatorEmail,
+            channelId,
             subscriberId: getSubscriberId(),
           }),
         }
@@ -156,7 +156,7 @@ export default function CreatorChannelPage() {
       }
 
       localStorage.setItem(
-        `raysstream-creator-subscribed-${creatorEmail}`,
+        `raysstream-creator-subscribed-${channelId}`,
         "true"
       );
 

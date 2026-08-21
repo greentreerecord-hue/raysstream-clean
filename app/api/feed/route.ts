@@ -36,22 +36,22 @@ export async function GET() {
     const rows = await sql`
       SELECT
         id,
-        creator_email,
         blob_url,
         pathname,
         title,
-        created_at
+        created_at,
+        MD5(LOWER(creator_email)) AS channel_id
       FROM creator_videos
       ORDER BY created_at DESC
     `;
 
     const videos = rows.map((video) => ({
       id: `creator-${video.id}`,
-      creator_email: video.creator_email,
       url: video.blob_url,
       pathname: video.pathname,
       title: video.title,
       createdAt: video.created_at,
+      channelId: video.channel_id,
     }));
 
     return NextResponse.json(

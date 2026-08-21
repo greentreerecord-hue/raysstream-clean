@@ -16,7 +16,18 @@ const sql = postgres(connectionString, {
   ssl: "require",
 });
 
-async function ensureTable() {
+async function ensureTables() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS creator_videos (
+      id SERIAL PRIMARY KEY,
+      creator_email TEXT NOT NULL,
+      blob_url TEXT UNIQUE NOT NULL,
+      pathname TEXT NOT NULL,
+      title TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS creator_subscriptions (
       id SERIAL PRIMARY KEY,
@@ -28,25 +39,60 @@ async function ensureTable() {
   `;
 }
 
+function validChannelId(channelId: string) {
+  return /^[a-f0-9]{32}$/.test(channelId);
+}
+
+async function findCreatorEmail(channelId: string) {
+  const rows = await sql`
+    SELECT creator_email
+    FROM creator_videos
+    WHERE MD5(LOWER(creator_email)) = ${channelId}
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) {
+    return "";
+  }
+
+  return String(rows[0].creator_email)
+    .trim()
+    .toLowerCase();
+}
+
 export async function GET(request: Request) {
   try {
-    await ensureTable();
+    await ensureTables();
 
     const { searchParams } = new URL(request.url);
 
-    const creatorEmail = String(
-      searchParams.get("creatorEmail") || ""
+    const channelId = String(
+      searchParams.get("channelId") || ""
     )
       .trim()
       .toLowerCase();
 
-    if (!creatorEmail) {
+    if (!validChannelId(channelId)) {
       return NextResponse.json(
         {
-          error: "Creator email is required.",
+          error: "A valid creator channel ID is required.",
         },
         {
           status: 400,
+        }
+      );
+    }
+
+    const creatorEmail =
+      await findCreatorEmail(channelId);
+
+    if (!creatorEmail) {
+      return NextResponse.json(
+        {
+          error: "Creator channel not found.",
+        },
+        {
+          status: 404,
         }
       );
     }
@@ -58,7 +104,7 @@ export async function GET(request: Request) {
     `;
 
     return NextResponse.json({
-      creatorEmail,
+      channelId,
       count: Number(rows[0].count || 0),
     });
   } catch (error) {
@@ -81,12 +127,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await ensureTable();
+    await ensureTables();
 
     const body = await request.json();
 
-    const creatorEmail = String(
-      body.creatorEmail || ""
+    const channelId = String(
+      body.channelId || ""
     )
       .trim()
       .toLowerCase();
@@ -95,10 +141,10 @@ export async function POST(request: Request) {
       body.subscriberId || ""
     ).trim();
 
-    if (!creatorEmail) {
+    if (!validChannelId(channelId)) {
       return NextResponse.json(
         {
-          error: "Creator email is required.",
+          error: "A valid creator channel ID is required.",
         },
         {
           status: 400,
@@ -124,6 +170,20 @@ export async function POST(request: Request) {
         },
         {
           status: 400,
+        }
+      );
+    }
+
+    const creatorEmail =
+      await findCreatorEmail(channelId);
+
+    if (!creatorEmail) {
+      return NextResponse.json(
+        {
+          error: "Creator channel not found.",
+        },
+        {
+          status: 404,
         }
       );
     }
@@ -154,7 +214,7 @@ export async function POST(request: Request) {
     const newSubscription = inserted.length > 0;
 
     return NextResponse.json({
-      creatorEmail,
+      channelId,
       subscribed: true,
       alreadySubscribed: !newSubscription,
       count: Number(countRows[0].count || 0),
@@ -178,4 +238,3 @@ export async function POST(request: Request) {
     );
   }
 } 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
