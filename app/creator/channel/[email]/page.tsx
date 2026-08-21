@@ -203,13 +203,10 @@ export default function CreatorChannelPage() {
     }
   }
 
-  const initial =
-    creatorEmail.charAt(0).toUpperCase() || "C";
-
   if (loading) {
     return (
-      <main style={pageStyle}>
-        <p style={messageStyle}>
+      <main style={styles.page}>
+        <p style={styles.message}>
           Loading creator channel...
         </p>
       </main>
@@ -217,19 +214,21 @@ export default function CreatorChannelPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <section style={channelStyle}>
-        <a href="/" style={homeButtonStyle}>
+    <main style={styles.page}>
+      <section style={styles.channel}>
+        <a href="/" style={styles.homeButton}>
           ← Back to Home Page
         </a>
 
-        <div style={avatarStyle}>{initial}</div>
+        <div style={styles.avatar}>C</div>
 
-        <h1 style={headingStyle}>Creator Channel</h1>
+        <h1 style={styles.heading}>Creator Channel</h1>
 
-        <p style={emailStyle}>{creatorEmail}</p>
+        <p style={styles.privateText}>
+          Ray&apos;sStream Creator
+        </p>
 
-        <p style={statisticsStyle}>
+        <p style={styles.statistics}>
           {subscriberCount}{" "}
           {subscriberCount === 1
             ? "subscriber"
@@ -244,7 +243,7 @@ export default function CreatorChannelPage() {
           onClick={subscribeToCreator}
           disabled={subscribed || subscribing}
           style={{
-            ...subscribeButtonStyle,
+            ...styles.subscribeButton,
             opacity: subscribed || subscribing ? 0.7 : 1,
           }}
         >
@@ -256,28 +255,28 @@ export default function CreatorChannelPage() {
         </button>
 
         {subscriptionMessage && (
-          <p style={subscriptionMessageStyle}>
+          <p style={styles.subscriptionMessage}>
             {subscriptionMessage}
           </p>
         )}
 
         {message && (
-          <p style={errorStyle}>{message}</p>
+          <p style={styles.error}>{message}</p>
         )}
 
         {!message && videos.length === 0 && (
-          <p style={messageStyle}>
+          <p style={styles.message}>
             This creator has not uploaded any videos yet.
           </p>
         )}
 
-        <div style={videoGridStyle}>
+        <div style={styles.videoGrid}>
           {videos.map((video) => (
             <article
               key={video.id}
-              style={videoCardStyle}
+              style={styles.videoCard}
             >
-              <h2 style={videoTitleStyle}>
+              <h2 style={styles.videoTitle}>
                 {video.title}
               </h2>
 
@@ -286,13 +285,13 @@ export default function CreatorChannelPage() {
                 controls
                 playsInline
                 preload="metadata"
-                style={videoStyle}
+                style={styles.video}
               />
 
-              <div style={buttonRowStyle}>
+              <div style={styles.buttonRow}>
                 <a
                   href={`/watch/creator/${video.id}`}
-                  style={watchButtonStyle}
+                  style={styles.watchButton}
                 >
                   Watch Page
                 </a>
@@ -300,7 +299,7 @@ export default function CreatorChannelPage() {
                 <button
                   type="button"
                   onClick={() => shareVideo(video)}
-                  style={shareButtonStyle}
+                  style={styles.shareButton}
                 >
                   Share Video
                 </button>
@@ -310,169 +309,170 @@ export default function CreatorChannelPage() {
         </div>
       </section>
 
-      <footer style={footerStyle}>
+      <footer style={styles.footer}>
         © 2026 Ray&apos;sStream
       </footer>
     </main>
   );
 }
 
-const pageStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "#050505",
-  color: "white",
-  padding: "30px 16px",
-  fontFamily: "Arial, sans-serif",
-  boxSizing: "border-box",
-};
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background: "#050505",
+    color: "white",
+    padding: "30px 16px",
+    fontFamily: "Arial, sans-serif",
+    boxSizing: "border-box",
+  },
 
-const channelStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: "1000px",
-  margin: "0 auto",
-  textAlign: "center",
-};
+  channel: {
+    width: "100%",
+    maxWidth: "1000px",
+    margin: "0 auto",
+    textAlign: "center",
+  },
 
-const homeButtonStyle: React.CSSProperties = {
-  display: "inline-block",
-  marginBottom: "28px",
-  padding: "12px 22px",
-  background: "white",
-  color: "#222",
-  border: "2px solid black",
-  borderRadius: "24px",
-  textDecoration: "none",
-  fontWeight: "bold",
-};
+  homeButton: {
+    display: "inline-block",
+    marginBottom: "28px",
+    padding: "12px 22px",
+    background: "white",
+    color: "#222",
+    border: "2px solid black",
+    borderRadius: "24px",
+    textDecoration: "none",
+    fontWeight: "bold",
+  },
 
-const avatarStyle: React.CSSProperties = {
-  width: "120px",
-  height: "120px",
-  margin: "0 auto 20px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "#22c55e",
-  color: "black",
-  border: "4px solid white",
-  borderRadius: "50%",
-  fontSize: "55px",
-  fontWeight: "bold",
-};
+  avatar: {
+    width: "120px",
+    height: "120px",
+    margin: "0 auto 20px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#22c55e",
+    color: "black",
+    border: "4px solid white",
+    borderRadius: "50%",
+    fontSize: "55px",
+    fontWeight: "bold",
+  },
 
-const headingStyle: React.CSSProperties = {
-  margin: "0 0 14px",
-  fontSize: "clamp(38px, 7vw, 66px)",
-};
+  heading: {
+    margin: "0 0 14px",
+    fontSize: "clamp(38px, 7vw, 66px)",
+  },
 
-const emailStyle: React.CSSProperties = {
-  margin: "0 0 12px",
-  color: "#e5e7eb",
-  fontSize: "20px",
-  fontWeight: "bold",
-  wordBreak: "break-word",
-};
+  privateText: {
+    margin: "0 0 12px",
+    color: "#e5e7eb",
+    fontSize: "20px",
+    fontWeight: "bold",
+  },
 
-const statisticsStyle: React.CSSProperties = {
-  margin: "0 0 20px",
-  color: "#d1d5db",
-  fontSize: "18px",
-  fontWeight: "bold",
-};
+  statistics: {
+    margin: "0 0 20px",
+    color: "#d1d5db",
+    fontSize: "18px",
+    fontWeight: "bold",
+  },
 
-const subscribeButtonStyle: React.CSSProperties = {
-  padding: "13px 25px",
-  background: "#22c55e",
-  color: "black",
-  border: "3px solid white",
-  borderRadius: "24px",
-  fontSize: "18px",
-  fontWeight: "bold",
-  cursor: "pointer",
-};
+  subscribeButton: {
+    padding: "13px 25px",
+    background: "#22c55e",
+    color: "black",
+    border: "3px solid white",
+    borderRadius: "24px",
+    fontSize: "18px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
 
-const subscriptionMessageStyle: React.CSSProperties = {
-  margin: "12px 0 0",
-  color: "#86efac",
-  fontWeight: "bold",
-};
+  subscriptionMessage: {
+    margin: "12px 0 0",
+    color: "#86efac",
+    fontWeight: "bold",
+  },
 
-const errorStyle: React.CSSProperties = {
-  marginTop: "30px",
-  padding: "18px",
-  color: "#fca5a5",
-  background: "#281313",
-  border: "2px solid #7f1d1d",
-  borderRadius: "12px",
-};
+  error: {
+    marginTop: "30px",
+    padding: "18px",
+    color: "#fca5a5",
+    background: "#281313",
+    border: "2px solid #7f1d1d",
+    borderRadius: "12px",
+  },
 
-const messageStyle: React.CSSProperties = {
-  marginTop: "35px",
-  color: "#d1d5db",
-  fontSize: "20px",
-  textAlign: "center",
-};
+  message: {
+    marginTop: "35px",
+    color: "#d1d5db",
+    fontSize: "20px",
+    textAlign: "center",
+  },
 
-const videoGridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: "30px",
-  marginTop: "55px",
-  textAlign: "left",
-};
+  videoGrid: {
+    display: "grid",
+    gap: "30px",
+    marginTop: "55px",
+    textAlign: "left",
+  },
 
-const videoCardStyle: React.CSSProperties = {
-  overflow: "hidden",
-  background: "#242424",
-  border: "2px solid black",
-  borderRadius: "18px",
-};
+  videoCard: {
+    overflow: "hidden",
+    background: "#242424",
+    border: "2px solid black",
+    borderRadius: "18px",
+  },
 
-const videoTitleStyle: React.CSSProperties = {
-  margin: 0,
-  padding: "18px 20px",
-  color: "white",
-  fontSize: "26px",
-};
+  videoTitle: {
+    margin: 0,
+    padding: "18px 20px",
+    color: "white",
+    fontSize: "26px",
+  },
 
-const videoStyle: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  maxHeight: "650px",
-  background: "black",
-};
+  video: {
+    display: "block",
+    width: "100%",
+    maxHeight: "650px",
+    background: "black",
+  },
 
-const buttonRowStyle: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  justifyContent: "center",
-  gap: "12px",
-  padding: "18px",
-};
+  buttonRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "12px",
+    padding: "18px",
+  },
 
-const watchButtonStyle: React.CSSProperties = {
-  display: "inline-block",
-  padding: "11px 22px",
-  background: "#22c55e",
-  color: "black",
-  border: "2px solid black",
-  borderRadius: "22px",
-  textDecoration: "none",
-  fontWeight: "bold",
-};
+  watchButton: {
+    display: "inline-block",
+    padding: "11px 22px",
+    background: "#22c55e",
+    color: "black",
+    border: "2px solid black",
+    borderRadius: "22px",
+    textDecoration: "none",
+    fontWeight: "bold",
+  },
 
-const shareButtonStyle: React.CSSProperties = {
-  padding: "11px 22px",
-  background: "#2b2b2b",
-  color: "white",
-  border: "2px solid black",
-  borderRadius: "22px",
-  cursor: "pointer",
-  fontWeight: "bold",
-};
+  shareButton: {
+    padding: "11px 22px",
+    background: "#2b2b2b",
+    color: "white",
+    border: "2px solid black",
+    borderRadius: "22px",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
 
-const footerStyle: React.CSSProperties = {
-  marginTop: "70px",
-  padding: "25px",
-  color: "#9ca3af",
-  textAlign: "center",
+  footer: {
+    marginTop: "70px",
+    padding: "25px",
+    color: "#9ca3af",
+    textAlign: "center",
+  },
 }; 
