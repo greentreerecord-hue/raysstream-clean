@@ -9,7 +9,6 @@ type CreatorVideo = {
   url: string;
   blob_url?: string;
   creator_email?: string;
-  created_at?: string;
 };
 
 export default function CreatorChannelPage() {
@@ -21,49 +20,73 @@ export default function CreatorChannelPage() {
 
   const creatorEmail = decodeURIComponent(
     String(emailValue || "")
-  );
+  ).toLowerCase();
 
   const [videos, setVideos] = useState<CreatorVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
+  const [subscriberCount, setSubscriberCount] = useState(0);
+  const [subscribed, setSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [subscriptionMessage, setSubscriptionMessage] =
+    useState("");
+
   useEffect(() => {
-    async function loadCreatorVideos() {
+    async function loadChannel() {
       try {
-        const response = await fetch("/api/feed", {
+        setLoading(true);
+
+        const feedResponse = await fetch("/api/feed", {
           cache: "no-store",
         });
 
-        const data = await response.json();
+        const feedData = await feedResponse.json();
 
-        if (!response.ok) {
+        if (!feedResponse.ok) {
           throw new Error(
-            data.error || "Unable to load creator videos."
+            feedData.error || "Unable to load creator videos."
           );
         }
 
-        const videoList: CreatorVideo[] = Array.isArray(data)
-          ? data
-          : data.videos || [];
+        const videoList = Array.isArray(feedData)
+          ? feedData
+          : feedData.videos || [];
 
         const creatorVideos = videoList
-          .map((video) => ({
+          .map((video: CreatorVideo) => ({
             ...video,
             url: video.url || video.blob_url || "",
           }))
           .filter(
-            (video) =>
+            (video: CreatorVideo) =>
               String(video.creator_email || "").toLowerCase() ===
-              creatorEmail.toLowerCase()
+              creatorEmail
           );
 
         setVideos(creatorVideos);
 
-        if (creatorVideos.length === 0) {
-          setMessage(
-            "This creator has not uploaded any videos yet."
-          );
+        const countResponse = await fetch(
+          `/api/creator-subscribe?creatorEmail=${encodeURIComponent(
+            creatorEmail
+          )}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        const countData = await countResponse.json();
+
+        if (countResponse.ok) {
+          setSubscriberCount(Number(countData.count || 0));
         }
+
+        const subscriptionKey =
+          `raysstream-creator-subscribed-${creatorEmail}`;
+
+        setSubscribed(
+          localStorage.getItem(subscriptionKey) === "true"
+        );
       } catch (error) {
         setMessage(
           error instanceof Error
@@ -76,12 +99,80 @@ export default function CreatorChannelPage() {
     }
 
     if (creatorEmail) {
-      loadCreatorVideos();
-    } else {
-      setMessage("Creator channel not found.");
-      setLoading(false);
+      loadChannel();
     }
   }, [creatorEmail]);
+
+  function getSubscriberId() {
+    const storageKey = "raysstreamSubscriberId";
+    let subscriberId = localStorage.getItem(storageKey);
+
+    if (!subscriberId) {
+      subscriberId =
+        typeof crypto !== "undefined" &&
+        typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `subscriber-${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2)}`;
+
+      localStorage.setItem(storageKey, subscriberId);
+    }
+
+    return subscriberId;
+  }
+
+  async function subscribeToCreator() {
+    if (subscribed || subscribing) {
+      return;
+    }
+
+    try {
+      setSubscribing(true);
+      setSubscriptionMessage("Saving subscription...");
+
+      const response = await fetch(
+        "/api/creator-subscribe",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            creatorEmail,
+            subscriberId: getSubscriberId(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setSubscriptionMessage(
+          data.error ||
+            "Unable to subscribe to this creator."
+        );
+        return;
+      }
+
+      localStorage.setItem(
+        `raysstream-creator-subscribed-${creatorEmail}`,
+        "true"
+      );
+
+      setSubscribed(true);
+      setSubscriberCount(Number(data.count || 0));
+      setSubscriptionMessage(data.message || "Subscribed!");
+    } catch (error) {
+      console.error("Creator subscription error:", error);
+
+      setSubscriptionMessage(
+        "Unable to connect to the subscription database."
+      );
+    } finally {
+      setSubscribing(false);
+    }
+  }
 
   async function shareVideo(video: CreatorVideo) {
     const watchUrl =
@@ -97,7 +188,7 @@ export default function CreatorChannelPage() {
 
         return;
       } catch {
-        return;
+        // Sharing was cancelled.
       }
     }
 
@@ -112,49 +203,81 @@ export default function CreatorChannelPage() {
     }
   }
 
-  const creatorInitial =
-    creatorEmail.trim().charAt(0).toUpperCase() || "C";
+  const initial =
+    creatorEmail.charAt(0).toUpperCase() || "C";
+
+  if (loading) {
+    return (
+      <main style={pageStyle}>
+        <p style={messageStyle}>
+          Loading creator channel...
+        </p>
+      </main>
+    );
+  }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
-        <a href="/" style={styles.homeButton}>
+    <main style={pageStyle}>
+      <section style={channelStyle}>
+        <a href="/" style={homeButtonStyle}>
           ← Back to Home Page
         </a>
 
-        <div style={styles.avatar}>
-          {creatorInitial}
-        </div>
+        <div style={avatarStyle}>{initial}</div>
 
-        <h1 style={styles.channelTitle}>
-          Creator Channel
-        </h1>
+        <h1 style={headingStyle}>Creator Channel</h1>
 
-        <p style={styles.creatorEmail}>
-          {creatorEmail}
-        </p>
+        <p style={emailStyle}>{creatorEmail}</p>
 
-        <p style={styles.videoCount}>
+        <p style={statisticsStyle}>
+          {subscriberCount}{" "}
+          {subscriberCount === 1
+            ? "subscriber"
+            : "subscribers"}
+          {" • "}
           {videos.length}{" "}
           {videos.length === 1 ? "video" : "videos"}
         </p>
-      </header>
 
-      <section style={styles.content}>
-        {loading && (
-          <p style={styles.message}>
-            Loading creator channel...
+        <button
+          type="button"
+          onClick={subscribeToCreator}
+          disabled={subscribed || subscribing}
+          style={{
+            ...subscribeButtonStyle,
+            opacity: subscribed || subscribing ? 0.7 : 1,
+          }}
+        >
+          {subscribing
+            ? "Subscribing..."
+            : subscribed
+              ? "✓ Subscribed"
+              : "Subscribe to Creator"}
+        </button>
+
+        {subscriptionMessage && (
+          <p style={subscriptionMessageStyle}>
+            {subscriptionMessage}
           </p>
         )}
 
-        {!loading && message && (
-          <p style={styles.message}>{message}</p>
+        {message && (
+          <p style={errorStyle}>{message}</p>
         )}
 
-        <div style={styles.videoGrid}>
+        {!message && videos.length === 0 && (
+          <p style={messageStyle}>
+            This creator has not uploaded any videos yet.
+          </p>
+        )}
+
+        <div style={videoGridStyle}>
           {videos.map((video) => (
-            <article key={video.id} style={styles.card}>
-              <h2 style={styles.videoTitle}>
+            <article
+              key={video.id}
+              style={videoCardStyle}
+            >
+              <h2 style={videoTitleStyle}>
                 {video.title}
               </h2>
 
@@ -163,21 +286,21 @@ export default function CreatorChannelPage() {
                 controls
                 playsInline
                 preload="metadata"
-                style={styles.video}
+                style={videoStyle}
               />
 
-              <div style={styles.buttons}>
+              <div style={buttonRowStyle}>
                 <a
                   href={`/watch/creator/${video.id}`}
-                  style={styles.watchButton}
+                  style={watchButtonStyle}
                 >
-                  ▶ Watch Page
+                  Watch Page
                 </a>
 
                 <button
                   type="button"
                   onClick={() => shareVideo(video)}
-                  style={styles.shareButton}
+                  style={shareButtonStyle}
                 >
                   Share Video
                 </button>
@@ -187,144 +310,169 @@ export default function CreatorChannelPage() {
         </div>
       </section>
 
-      <footer style={styles.footer}>
+      <footer style={footerStyle}>
         © 2026 Ray&apos;sStream
       </footer>
     </main>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background: "#050505",
-    color: "white",
-    fontFamily: "Arial, sans-serif",
-  },
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  background: "#050505",
+  color: "white",
+  padding: "30px 16px",
+  fontFamily: "Arial, sans-serif",
+  boxSizing: "border-box",
+};
 
-  header: {
-    padding: "35px 20px",
-    textAlign: "center",
-    borderBottom: "2px solid black",
-    background:
-      "linear-gradient(180deg, #17351f 0%, #0b0b0b 100%)",
-  },
+const channelStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "1000px",
+  margin: "0 auto",
+  textAlign: "center",
+};
 
-  homeButton: {
-    display: "inline-block",
-    marginBottom: "25px",
-    padding: "10px 18px",
-    background: "white",
-    color: "black",
-    border: "2px solid black",
-    borderRadius: "20px",
-    textDecoration: "none",
-    fontWeight: "bold",
-  },
+const homeButtonStyle: React.CSSProperties = {
+  display: "inline-block",
+  marginBottom: "28px",
+  padding: "12px 22px",
+  background: "white",
+  color: "#222",
+  border: "2px solid black",
+  borderRadius: "24px",
+  textDecoration: "none",
+  fontWeight: "bold",
+};
 
-  avatar: {
-    width: "90px",
-    height: "90px",
-    margin: "0 auto 18px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#22c55e",
-    color: "black",
-    border: "4px solid white",
-    borderRadius: "50%",
-    fontSize: "42px",
-    fontWeight: "bold",
-  },
+const avatarStyle: React.CSSProperties = {
+  width: "120px",
+  height: "120px",
+  margin: "0 auto 20px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#22c55e",
+  color: "black",
+  border: "4px solid white",
+  borderRadius: "50%",
+  fontSize: "55px",
+  fontWeight: "bold",
+};
 
-  channelTitle: {
-    margin: "0 0 10px",
-    fontSize: "clamp(34px, 6vw, 52px)",
-  },
+const headingStyle: React.CSSProperties = {
+  margin: "0 0 14px",
+  fontSize: "clamp(38px, 7vw, 66px)",
+};
 
-  creatorEmail: {
-    color: "#d1d5db",
-    fontSize: "18px",
-    overflowWrap: "anywhere",
-  },
+const emailStyle: React.CSSProperties = {
+  margin: "0 0 12px",
+  color: "#e5e7eb",
+  fontSize: "20px",
+  fontWeight: "bold",
+  wordBreak: "break-word",
+};
 
-  videoCount: {
-    color: "#86efac",
-    fontWeight: "bold",
-  },
+const statisticsStyle: React.CSSProperties = {
+  margin: "0 0 20px",
+  color: "#d1d5db",
+  fontSize: "18px",
+  fontWeight: "bold",
+};
 
-  content: {
-    width: "min(1000px, 94%)",
-    margin: "0 auto",
-    padding: "35px 0 60px",
-  },
+const subscribeButtonStyle: React.CSSProperties = {
+  padding: "13px 25px",
+  background: "#22c55e",
+  color: "black",
+  border: "3px solid white",
+  borderRadius: "24px",
+  fontSize: "18px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
 
-  message: {
-    textAlign: "center",
-    color: "#d1d5db",
-    fontSize: "20px",
-    padding: "30px",
-  },
+const subscriptionMessageStyle: React.CSSProperties = {
+  margin: "12px 0 0",
+  color: "#86efac",
+  fontWeight: "bold",
+};
 
-  videoGrid: {
-    display: "grid",
-    gap: "30px",
-  },
+const errorStyle: React.CSSProperties = {
+  marginTop: "30px",
+  padding: "18px",
+  color: "#fca5a5",
+  background: "#281313",
+  border: "2px solid #7f1d1d",
+  borderRadius: "12px",
+};
 
-  card: {
-    overflow: "hidden",
-    background: "#202020",
-    border: "2px solid black",
-    borderRadius: "18px",
-    boxShadow: "0 12px 30px rgba(0, 0, 0, 0.35)",
-  },
+const messageStyle: React.CSSProperties = {
+  marginTop: "35px",
+  color: "#d1d5db",
+  fontSize: "20px",
+  textAlign: "center",
+};
 
-  videoTitle: {
-    margin: 0,
-    padding: "18px 20px",
-    fontSize: "25px",
-  },
+const videoGridStyle: React.CSSProperties = {
+  display: "grid",
+  gap: "30px",
+  marginTop: "55px",
+  textAlign: "left",
+};
 
-  video: {
-    display: "block",
-    width: "100%",
-    maxHeight: "650px",
-    background: "black",
-  },
+const videoCardStyle: React.CSSProperties = {
+  overflow: "hidden",
+  background: "#242424",
+  border: "2px solid black",
+  borderRadius: "18px",
+};
 
-  buttons: {
-    display: "flex",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: "12px",
-    padding: "18px",
-  },
+const videoTitleStyle: React.CSSProperties = {
+  margin: 0,
+  padding: "18px 20px",
+  color: "white",
+  fontSize: "26px",
+};
 
-  watchButton: {
-    display: "inline-block",
-    padding: "11px 22px",
-    background: "#22c55e",
-    color: "black",
-    border: "2px solid white",
-    borderRadius: "20px",
-    textDecoration: "none",
-    fontWeight: "bold",
-  },
+const videoStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  maxHeight: "650px",
+  background: "black",
+};
 
-  shareButton: {
-    padding: "11px 22px",
-    background: "#292929",
-    color: "white",
-    border: "2px solid white",
-    borderRadius: "20px",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
+const buttonRowStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "center",
+  gap: "12px",
+  padding: "18px",
+};
 
-  footer: {
-    padding: "30px",
-    textAlign: "center",
-    borderTop: "2px solid black",
-    color: "#777",
-  },
+const watchButtonStyle: React.CSSProperties = {
+  display: "inline-block",
+  padding: "11px 22px",
+  background: "#22c55e",
+  color: "black",
+  border: "2px solid black",
+  borderRadius: "22px",
+  textDecoration: "none",
+  fontWeight: "bold",
+};
+
+const shareButtonStyle: React.CSSProperties = {
+  padding: "11px 22px",
+  background: "#2b2b2b",
+  color: "white",
+  border: "2px solid black",
+  borderRadius: "22px",
+  cursor: "pointer",
+  fontWeight: "bold",
+};
+
+const footerStyle: React.CSSProperties = {
+  marginTop: "70px",
+  padding: "25px",
+  color: "#9ca3af",
+  textAlign: "center",
 }; 
