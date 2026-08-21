@@ -117,6 +117,12 @@ export default function CreatorFeed() {
     return `${window.location.origin}/watch/creator/${video.id}`;
   }
 
+  function getChannelUrl(video: CreatorVideo) {
+    return `/creator/channel/${encodeURIComponent(
+      video.creator_email || ""
+    )}`;
+  }
+
   async function copyVideoLink(video: CreatorVideo) {
     const watchUrl = getWatchUrl(video);
 
@@ -187,29 +193,32 @@ export default function CreatorFeed() {
         </div>
       </div>
 
-      {normalizedSearch && matchingRegularVideos.length > 0 && (
-        <div style={searchResultsStyle}>
-          <h3 style={resultHeadingStyle}>
-            Ray&apos;sStream Videos
-          </h3>
+      {normalizedSearch &&
+        matchingRegularVideos.length > 0 && (
+          <div style={searchResultsStyle}>
+            <h3 style={resultHeadingStyle}>
+              Ray&apos;sStream Videos
+            </h3>
 
-          {matchingRegularVideos.map((video) => (
-            <a
-              key={video.id}
-              href={video.watchUrl}
-              style={resultLinkStyle}
-            >
-              ▶ {video.title}
-            </a>
-          ))}
-        </div>
-      )}
+            {matchingRegularVideos.map((video) => (
+              <a
+                key={video.id}
+                href={video.watchUrl}
+                style={resultLinkStyle}
+              >
+                ▶ {video.title}
+              </a>
+            ))}
+          </div>
+        )}
 
-      {normalizedSearch && !hasSearchResults && !loading && (
-        <p style={messageStyle}>
-          No videos matched “{searchQuery}”.
-        </p>
-      )}
+      {normalizedSearch &&
+        !hasSearchResults &&
+        !loading && (
+          <p style={messageStyle}>
+            No videos matched “{searchQuery}”.
+          </p>
+        )}
 
       <div style={creatorHeaderStyle}>
         <h2 style={creatorHeadingStyle}>
@@ -252,9 +261,12 @@ export default function CreatorFeed() {
             <h3 style={titleStyle}>{video.title}</h3>
 
             {video.creator_email && (
-              <p style={creatorStyle}>
+              <a
+                href={getChannelUrl(video)}
+                style={creatorLinkStyle}
+              >
                 Creator: {video.creator_email}
-              </p>
+              </a>
             )}
 
             <video
@@ -272,6 +284,15 @@ export default function CreatorFeed() {
               >
                 Watch Page
               </a>
+
+              {video.creator_email && (
+                <a
+                  href={getChannelUrl(video)}
+                  style={channelButtonStyle}
+                >
+                  Creator Channel
+                </a>
+              )}
 
               <button
                 type="button"
@@ -412,10 +433,12 @@ const titleStyle = {
   margin: 0,
 };
 
-const creatorStyle = {
-  color: "#cccccc",
+const creatorLinkStyle = {
+  display: "inline-block",
+  color: "#86efac",
   padding: "0 20px 14px",
-  margin: 0,
+  textDecoration: "none",
+  fontWeight: "bold",
 };
 
 const videoStyle = {
@@ -438,6 +461,18 @@ const watchButtonStyle = {
   padding: "11px 22px",
   background: "#222222",
   color: "white",
+  border: "2px solid black",
+  borderRadius: "20px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  textDecoration: "none",
+};
+
+const channelButtonStyle = {
+  display: "inline-block",
+  padding: "11px 22px",
+  background: "#22c55e",
+  color: "black",
   border: "2px solid black",
   borderRadius: "20px",
   cursor: "pointer",
