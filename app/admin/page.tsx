@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Video = {
   url: string;
@@ -53,7 +53,9 @@ export default function AdminPage() {
       `Delete ${video.pathname}? This cannot be undone.`
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
       setMessage("Deleting video...");
@@ -96,18 +98,46 @@ export default function AdminPage() {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <h1 style={{ fontSize: "32px", marginBottom: "8px" }}>
+      <h1
+        style={{
+          fontSize: "32px",
+          marginBottom: "8px",
+        }}
+      >
         Ray&apos;sStream Administrator
       </h1>
 
-      <p style={{ color: "#bbb", marginBottom: "25px" }}>
+      <p
+        style={{
+          color: "#bbb",
+          marginBottom: "18px",
+        }}
+      >
         Manage uploaded videos
       </p>
+
+      <a
+        href="/"
+        style={{
+          display: "inline-block",
+          marginBottom: "25px",
+          padding: "10px 18px",
+          background: "#ffffff",
+          color: "#000000",
+          textDecoration: "none",
+          border: "2px solid black",
+          borderRadius: "20px",
+          fontWeight: "bold",
+        }}
+      >
+        ← Back to Home Page
+      </a>
 
       <div
         style={{
           maxWidth: "500px",
           display: "flex",
+          flexWrap: "wrap",
           gap: "10px",
           marginBottom: "25px",
         }}
@@ -116,9 +146,16 @@ export default function AdminPage() {
           type="password"
           placeholder="Administrator password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(event) =>
+            setPassword(event.target.value)
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              loadVideos();
+            }
+          }}
           style={{
-            flex: 1,
+            flex: "1 1 260px",
             padding: "12px",
             borderRadius: "6px",
             border: "1px solid #555",
@@ -135,6 +172,7 @@ export default function AdminPage() {
             borderRadius: "6px",
             cursor: "pointer",
             fontWeight: "bold",
+            opacity: loading ? 0.6 : 1,
           }}
         >
           {loading ? "Loading..." : "Open Dashboard"}
@@ -142,7 +180,12 @@ export default function AdminPage() {
       </div>
 
       {message && (
-        <p style={{ marginBottom: "20px", color: "#ffd166" }}>
+        <p
+          style={{
+            marginBottom: "20px",
+            color: "#ffd166",
+          }}
+        >
           {message}
         </p>
       )}
@@ -212,7 +255,9 @@ export default function AdminPage() {
       )}
 
       {!loading && videos.length === 0 && !message && (
-        <p style={{ color: "#888" }}>No videos loaded.</p>
+        <p style={{ color: "#888" }}>
+          No videos loaded.
+        </p>
       )}
     </main>
   );
