@@ -115,6 +115,23 @@ export default function UploadPage() {
           margin: "0 auto",
         }}
       >
+        <a
+          href="/"
+          style={{
+            display: "inline-block",
+            marginBottom: "24px",
+            padding: "12px 20px",
+            background: "#2b2b2b",
+            color: "white",
+            textDecoration: "none",
+            border: "2px solid black",
+            borderRadius: "22px",
+            fontWeight: "bold",
+          }}
+        >
+          ← Back to Homepage
+        </a>
+
         <h1>Upload Video</h1>
 
         <form onSubmit={handleSubmit}>
