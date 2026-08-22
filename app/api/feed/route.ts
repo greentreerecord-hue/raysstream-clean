@@ -24,10 +24,16 @@ async function ensureVideoTable() {
       blob_url TEXT UNIQUE NOT NULL,
       pathname TEXT NOT NULL,
       title TEXT NOT NULL,
+      description TEXT,
       thumbnail_url TEXT,
       thumbnail_pathname TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
+  `;
+
+  await sql`
+    ALTER TABLE creator_videos
+    ADD COLUMN IF NOT EXISTS description TEXT
   `;
 
   await sql`
@@ -51,6 +57,7 @@ export async function GET() {
         blob_url,
         pathname,
         title,
+        description,
         thumbnail_url,
         created_at,
         MD5(LOWER(creator_email)) AS channel_id
@@ -63,6 +70,7 @@ export async function GET() {
       url: video.blob_url,
       pathname: video.pathname,
       title: video.title,
+      description: video.description || "",
       thumbnailUrl: video.thumbnail_url,
       createdAt: video.created_at,
       channelId: video.channel_id,

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 type CreatorVideo = {
   id: string | number;
   title: string;
+  description?: string;
   url: string;
   blob_url?: string;
   pathname?: string;
@@ -95,11 +96,17 @@ export default function CreatorFeed() {
       return videos;
     }
 
-    return videos.filter((video) =>
-      String(video.title || "")
-        .toLowerCase()
-        .includes(searchText)
-    );
+    return videos.filter((video) => {
+      const title = String(video.title || "").toLowerCase();
+      const description = String(
+        video.description || ""
+      ).toLowerCase();
+
+      return (
+        title.includes(searchText) ||
+        description.includes(searchText)
+      );
+    });
   }, [searchText, videos]);
 
   function getWatchUrl(video: CreatorVideo) {
@@ -231,6 +238,12 @@ export default function CreatorFeed() {
               playsInline
               style={videoStyle}
             />
+
+            {video.description && (
+              <p style={descriptionStyle}>
+                {video.description}
+              </p>
+            )}
 
             <div style={buttonRowStyle}>
               <a
@@ -388,6 +401,16 @@ const videoStyle: React.CSSProperties = {
   width: "100%",
   maxHeight: "600px",
   background: "black",
+};
+
+const descriptionStyle: React.CSSProperties = {
+  color: "#e5e5e5",
+  fontSize: "17px",
+  lineHeight: 1.6,
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+  margin: 0,
+  padding: "18px 20px 4px",
 };
 
 const buttonRowStyle: React.CSSProperties = {

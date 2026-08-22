@@ -6,9 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 type CreatorVideo = {
   id: string | number;
   title: string;
+  description?: string;
   url: string;
   blob_url?: string;
-  creator_email?: string;
+  thumbnailUrl?: string;
 };
 
 type Comment = {
@@ -21,7 +22,10 @@ export default function CreatorWatchPage() {
   const params = useParams();
   const router = useRouter();
 
-  const idValue = Array.isArray(params.id) ? params.id[0] : params.id;
+  const idValue = Array.isArray(params.id)
+    ? params.id[0]
+    : params.id;
+
   const id = String(idValue || "");
 
   const [video, setVideo] = useState<CreatorVideo | null>(null);
@@ -33,34 +37,41 @@ export default function CreatorWatchPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const [liked, setLiked] = useState(false);
-  const [showShareButtons, setShowShareButtons] = useState(false);
+  const [showShareButtons, setShowShareButtons] =
+    useState(false);
 
   const viewed = useRef(false);
 
   useEffect(() => {
     async function loadPage() {
       try {
-        const [videoResponse, activityResponse] = await Promise.all([
-          fetch("/api/feed", {
-            cache: "no-store",
-          }),
-          fetch(
-            `/api/creator-interactions?videoId=${encodeURIComponent(id)}`,
-            {
+        const [videoResponse, activityResponse] =
+          await Promise.all([
+            fetch("/api/feed", {
               cache: "no-store",
-            }
-          ),
-        ]);
+            }),
+            fetch(
+              `/api/creator-interactions?videoId=${encodeURIComponent(
+                id
+              )}`,
+              {
+                cache: "no-store",
+              }
+            ),
+          ]);
 
         const videoData = await videoResponse.json();
 
         if (!videoResponse.ok) {
           throw new Error(
-            videoData.error || "Could not load creator videos."
+            videoData.error ||
+              "Could not load creator videos."
           );
         }
 
-        const videoList: CreatorVideo[] = Array.isArray(videoData)
+        const videoList: CreatorVideo[] = Array.isArray(
+          videoData
+        )
           ? videoData
           : videoData.videos || [];
 
@@ -75,11 +86,15 @@ export default function CreatorWatchPage() {
 
         setVideo({
           ...selectedVideo,
-          url: selectedVideo.url || selectedVideo.blob_url || "",
+          url:
+            selectedVideo.url ||
+            selectedVideo.blob_url ||
+            "",
         });
 
         if (activityResponse.ok) {
-          const activityData = await activityResponse.json();
+          const activityData =
+            await activityResponse.json();
 
           setViews(Number(activityData.views || 0));
           setLikes(Number(activityData.likes || 0));
@@ -93,8 +108,9 @@ export default function CreatorWatchPage() {
         }
 
         setLiked(
-          localStorage.getItem(`raysstream-liked-creator-${id}`) ===
-            "yes"
+          localStorage.getItem(
+            `raysstream-liked-creator-${id}`
+          ) === "yes"
         );
       } catch (error) {
         setMessage(
@@ -116,22 +132,27 @@ export default function CreatorWatchPage() {
     action: "view" | "like" | "share" | "comment",
     text?: string
   ) {
-    const response = await fetch("/api/creator-interactions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        videoId: id,
-        action,
-        text,
-      }),
-    });
+    const response = await fetch(
+      "/api/creator-interactions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          videoId: id,
+          action,
+          text,
+        }),
+      }
+    );
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Unable to save video activity.");
+      throw new Error(
+        data.error || "Unable to save video activity."
+      );
     }
 
     return data;
@@ -151,8 +172,9 @@ export default function CreatorWatchPage() {
       viewed.current = false;
       console.error("Unable to save view:", error);
     }
-  } 
-async function likeVideo() {
+  }
+
+  async function likeVideo() {
     if (liked) {
       alert("You already liked this video.");
       return;
@@ -193,14 +215,19 @@ async function likeVideo() {
       await navigator.clipboard.writeText(watchUrl);
       alert("Ray'sStream watch link copied!");
     } catch {
-      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
+      window.prompt(
+        "Copy this Ray'sStream watch link:",
+        watchUrl
+      );
     }
 
     await recordShare();
   }
 
   async function shareToFacebook() {
-    const watchUrl = encodeURIComponent(window.location.href);
+    const watchUrl = encodeURIComponent(
+      window.location.href
+    );
 
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${watchUrl}`,
@@ -212,10 +239,14 @@ async function likeVideo() {
   }
 
   async function shareToX() {
-    const watchUrl = encodeURIComponent(window.location.href);
+    const watchUrl = encodeURIComponent(
+      window.location.href
+    );
 
     const text = encodeURIComponent(
-      `Watch ${video?.title || "this video"} on Ray'sStream`
+      `Watch ${
+        video?.title || "this video"
+      } on Ray'sStream`
     );
 
     window.open(
@@ -233,7 +264,10 @@ async function likeVideo() {
     try {
       await navigator.clipboard.writeText(watchUrl);
     } catch {
-      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
+      window.prompt(
+        "Copy this Ray'sStream watch link:",
+        watchUrl
+      );
     }
 
     window.open(
@@ -252,7 +286,10 @@ async function likeVideo() {
     try {
       await navigator.clipboard.writeText(watchUrl);
     } catch {
-      window.prompt("Copy this Ray'sStream watch link:", watchUrl);
+      window.prompt(
+        "Copy this Ray'sStream watch link:",
+        watchUrl
+      );
     }
 
     window.open(
@@ -275,7 +312,11 @@ async function likeVideo() {
     try {
       const data = await saveAction("comment", text);
 
-      setComments((current) => [...current, data.comment]);
+      setComments((current) => [
+        ...current,
+        data.comment,
+      ]);
+
       setCommentInput("");
     } catch (error) {
       alert(
@@ -309,16 +350,19 @@ async function likeVideo() {
         </button>
       </main>
     );
-  } 
-return (
+  }
+
+  return (
     <main style={styles.page}>
       <section style={styles.card}>
         <h1 style={styles.logo}>Ray&apos;sStream</h1>
+
         <h2 style={styles.title}>{video.title}</h2>
 
         <video
           style={styles.video}
           src={video.url}
+          poster={video.thumbnailUrl || undefined}
           controls
           autoPlay
           playsInline
@@ -326,10 +370,16 @@ return (
           onPlay={addView}
         />
 
-        {video.creator_email && (
-          <p style={styles.creator}>
-            Creator: {video.creator_email}
-          </p>
+        {video.description && (
+          <div style={styles.description}>
+            <h3 style={styles.descriptionHeading}>
+              Description
+            </h3>
+
+            <p style={styles.descriptionText}>
+              {video.description}
+            </p>
+          </div>
         )}
 
         <div style={styles.stats}>
@@ -441,9 +491,15 @@ return (
           )}
 
           {comments.map((comment) => (
-            <div key={comment.id} style={styles.comment}>
+            <div
+              key={comment.id}
+              style={styles.comment}
+            >
               <strong>Ray&apos;sStream User</strong>
-              <div style={styles.commentText}>{comment.text}</div>
+
+              <div style={styles.commentText}>
+                {comment.text}
+              </div>
             </div>
           ))}
         </section>
@@ -488,9 +544,25 @@ const styles: Record<string, React.CSSProperties> = {
     border: "3px solid white",
     borderRadius: "12px",
   },
-  creator: {
-    color: "#d1d5db",
-    marginTop: "14px",
+  description: {
+    background: "#171717",
+    border: "2px solid black",
+    borderRadius: "12px",
+    padding: "18px",
+    marginTop: "20px",
+    textAlign: "left",
+  },
+  descriptionHeading: {
+    fontSize: "22px",
+    margin: "0 0 10px",
+  },
+  descriptionText: {
+    color: "#e5e7eb",
+    fontSize: "17px",
+    lineHeight: 1.6,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+    margin: 0,
   },
   stats: {
     display: "flex",

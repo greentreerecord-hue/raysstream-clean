@@ -5,6 +5,7 @@ import { upload } from "@vercel/blob/client";
 
 export default function UploadPage() {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [video, setVideo] = useState<File | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [message, setMessage] = useState("");
@@ -72,6 +73,7 @@ export default function UploadPage() {
           url: videoBlob.url,
           pathname: videoBlob.pathname,
           title,
+          description,
           thumbnailUrl: thumbnailBlob.url,
           thumbnailPathname: thumbnailBlob.pathname,
         }),
@@ -89,6 +91,7 @@ export default function UploadPage() {
 
       setMessage("Video and thumbnail uploaded successfully!");
       setTitle("");
+      setDescription("");
       setVideo(null);
       setThumbnail(null);
     } catch (error) {
@@ -142,6 +145,7 @@ export default function UploadPage() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              maxLength={150}
               style={{
                 display: "block",
                 width: "100%",
@@ -151,6 +155,36 @@ export default function UploadPage() {
                 fontSize: "16px",
               }}
             />
+          </div>
+
+          <div style={{ marginBottom: "20px" }}>
+            <label>Video Description</label>
+
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={2000}
+              placeholder="Tell viewers about your video..."
+              rows={6}
+              style={{
+                display: "block",
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "12px",
+                marginTop: "8px",
+                fontSize: "16px",
+                resize: "vertical",
+              }}
+            />
+
+            <p
+              style={{
+                color: "#bbbbbb",
+                margin: "6px 0 0",
+              }}
+            >
+              {description.length}/2000 characters
+            </p>
           </div>
 
           <div style={{ marginBottom: "20px" }}>
