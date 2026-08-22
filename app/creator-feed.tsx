@@ -8,6 +8,7 @@ type CreatorVideo = {
   url: string;
   blob_url?: string;
   pathname?: string;
+  thumbnailUrl?: string;
   channelId?: string;
   createdAt?: string;
 };
@@ -224,6 +225,7 @@ export default function CreatorFeed() {
 
             <video
               src={video.url}
+              poster={video.thumbnailUrl || undefined}
               controls
               preload="metadata"
               playsInline

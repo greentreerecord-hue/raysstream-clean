@@ -6,34 +6,53 @@ import { upload } from "@vercel/blob/client";
 export default function UploadPage() {
   const [title, setTitle] = useState("");
   const [video, setVideo] = useState<File | null>(null);
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const creatorEmail = localStorage.getItem("raysstreamCreatorEmail");
+    const creatorEmail = localStorage.getItem(
+      "raysstreamCreatorEmail"
+    );
 
     if (!creatorEmail) {
       setMessage("Please log in as a creator first.");
       return;
     }
 
-    if (!title || !video) {
-      setMessage("Please add a title and choose a video.");
+    if (!title || !video || !thumbnail) {
+      setMessage(
+        "Please add a title, choose a video, and choose a thumbnail."
+      );
       return;
     }
 
     try {
       setUploading(true);
-      setMessage("Uploading video...");
 
       const safeEmail = creatorEmail
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "-");
 
-      const blob = await upload(
-        `videos/${safeEmail}/${Date.now()}-${video.name}`,
+      const uploadTime = Date.now();
+
+      setMessage("Uploading thumbnail...");
+
+      const thumbnailBlob = await upload(
+        `thumbnails/${safeEmail}/${uploadTime}-${thumbnail.name}`,
+        thumbnail,
+        {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+        }
+      );
+
+      setMessage("Uploading video...");
+
+      const videoBlob = await upload(
+        `videos/${safeEmail}/${uploadTime}-${video.name}`,
         video,
         {
           access: "public",
@@ -50,9 +69,11 @@ export default function UploadPage() {
         },
         body: JSON.stringify({
           email: creatorEmail,
-          url: blob.url,
-          pathname: blob.pathname,
-          title: title,
+          url: videoBlob.url,
+          pathname: videoBlob.pathname,
+          title,
+          thumbnailUrl: thumbnailBlob.url,
+          thumbnailPathname: thumbnailBlob.pathname,
         }),
       });
 
@@ -61,14 +82,15 @@ export default function UploadPage() {
       if (!saveResponse.ok) {
         setMessage(
           saveData.error ||
-            "Video uploaded, but the title could not be saved."
+            "The files uploaded, but the video information could not be saved."
         );
         return;
       }
 
-      setMessage("Upload successful!");
+      setMessage("Video and thumbnail uploaded successfully!");
       setTitle("");
       setVideo(null);
+      setThumbnail(null);
     } catch (error) {
       console.error(error);
       setMessage("Upload failed. Please try again.");
@@ -106,9 +128,36 @@ export default function UploadPage() {
               style={{
                 display: "block",
                 width: "100%",
+                boxSizing: "border-box",
                 padding: "12px",
                 marginTop: "8px",
                 fontSize: "16px",
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: "20px" }}>
+            <label>Choose Thumbnail</label>
+
+            <p
+              style={{
+                color: "#bbbbbb",
+                margin: "6px 0 0",
+              }}
+            >
+              Choose a JPG, PNG, or WebP image.
+            </p>
+
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setThumbnail(file);
+              }}
+              style={{
+                display: "block",
+                marginTop: "8px",
               }}
             />
           </div>

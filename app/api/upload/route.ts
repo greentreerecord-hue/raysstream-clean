@@ -13,12 +13,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       token: process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
 
-      onBeforeGenerateToken: async (pathname) => {
+      onBeforeGenerateToken: async () => {
         return {
           allowedContentTypes: [
             "video/mp4",
             "video/webm",
             "video/quicktime",
+            "image/jpeg",
+            "image/png",
+            "image/webp",
           ],
           addRandomSuffix: true,
         };
@@ -34,7 +37,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.error("Client upload error:", error);
 
     return NextResponse.json(
-      { error: "Unable to authorize video upload." },
+      { error: "Unable to authorize media upload." },
       { status: 400 }
     );
   }
