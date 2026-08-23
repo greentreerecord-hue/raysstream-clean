@@ -6,6 +6,7 @@ type CreatorVideo = {
   id: string | number;
   title: string;
   description?: string;
+  creatorName?: string;
   url: string;
   blob_url?: string;
   pathname?: string;
@@ -33,36 +34,53 @@ const raysStreamVideos = [
 ];
 
 export default function CreatorFeed() {
-  const [videos, setVideos] = useState<CreatorVideo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const [search, setSearch] = useState("");
+  const [videos, setVideos] =
+    useState<CreatorVideo[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [search, setSearch] =
+    useState("");
 
   useEffect(() => {
     async function loadVideos() {
       try {
-        const response = await fetch("/api/feed", {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          "/api/feed",
+          {
+            cache: "no-store",
+          }
+        );
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data.error || "Unable to load creator videos."
+            data.error ||
+              "Unable to load creator videos."
           );
         }
 
-        const videoList = Array.isArray(data)
-          ? data
-          : data.videos || [];
+        const videoList =
+          Array.isArray(data)
+            ? data
+            : data.videos || [];
 
-        const normalizedVideos = videoList.map(
-          (video: CreatorVideo) => ({
-            ...video,
-            url: video.url || video.blob_url || "",
-          })
-        );
+        const normalizedVideos =
+          videoList.map(
+            (video: CreatorVideo) => ({
+              ...video,
+              url:
+                video.url ||
+                video.blob_url ||
+                "",
+            })
+          );
 
         setVideos(normalizedVideos);
       } catch (error) {
@@ -79,48 +97,76 @@ export default function CreatorFeed() {
     loadVideos();
   }, []);
 
-  const searchText = search.trim().toLowerCase();
+  const searchText =
+    search.trim().toLowerCase();
 
-  const matchingRayVideos = useMemo(() => {
-    if (!searchText) {
-      return raysStreamVideos;
-    }
+  const matchingRayVideos =
+    useMemo(() => {
+      if (!searchText) {
+        return raysStreamVideos;
+      }
 
-    return raysStreamVideos.filter((video) =>
-      video.title.toLowerCase().includes(searchText)
-    );
-  }, [searchText]);
-
-  const matchingCreatorVideos = useMemo(() => {
-    if (!searchText) {
-      return videos;
-    }
-
-    return videos.filter((video) => {
-      const title = String(video.title || "").toLowerCase();
-      const description = String(
-        video.description || ""
-      ).toLowerCase();
-
-      return (
-        title.includes(searchText) ||
-        description.includes(searchText)
+      return raysStreamVideos.filter(
+        (video) =>
+          video.title
+            .toLowerCase()
+            .includes(searchText)
       );
-    });
-  }, [searchText, videos]);
+    }, [searchText]);
 
-  function getWatchUrl(video: CreatorVideo) {
-    return (
-      `${window.location.origin}/watch/creator/${video.id}`
-    );
+  const matchingCreatorVideos =
+    useMemo(() => {
+      if (!searchText) {
+        return videos;
+      }
+
+      return videos.filter(
+        (video) => {
+          const title = String(
+            video.title || ""
+          ).toLowerCase();
+
+          const description = String(
+            video.description || ""
+          ).toLowerCase();
+
+          const creatorName = String(
+            video.creatorName || ""
+          ).toLowerCase();
+
+          return (
+            title.includes(searchText) ||
+            description.includes(
+              searchText
+            ) ||
+            creatorName.includes(
+              searchText
+            )
+          );
+        }
+      );
+    }, [searchText, videos]);
+
+  function getWatchUrl(
+    video: CreatorVideo
+  ) {
+    return `${window.location.origin}/watch/creator/${video.id}`;
   }
 
-  async function copyVideoLink(video: CreatorVideo) {
-    const watchUrl = getWatchUrl(video);
+  async function copyVideoLink(
+    video: CreatorVideo
+  ) {
+    const watchUrl =
+      getWatchUrl(video);
 
     try {
-      await navigator.clipboard.writeText(watchUrl);
-      alert("Ray'sStream watch link copied!");
+      await navigator.clipboard.writeText(
+        watchUrl
+      );
+
+      alert(
+        "Ray'sStream watch link copied!"
+      );
     } catch {
       window.prompt(
         "Copy this Ray'sStream watch link:",
@@ -129,14 +175,20 @@ export default function CreatorFeed() {
     }
   }
 
-  async function shareVideo(video: CreatorVideo) {
-    const watchUrl = getWatchUrl(video);
+  async function shareVideo(
+    video: CreatorVideo
+  ) {
+    const watchUrl =
+      getWatchUrl(video);
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: video.title,
-          text: `Watch ${video.title} on Ray'sStream`,
+          text: `Watch ${video.title} by ${
+            video.creatorName ||
+            "a Ray'sStream creator"
+          } on Ray'sStream`,
           url: watchUrl,
         });
 
@@ -157,19 +209,24 @@ export default function CreatorFeed() {
         </h2>
 
         <p style={subtitleStyle}>
-          Find Ray&apos;sStream videos and creator uploads
+          Find Ray&apos;sStream videos,
+          creators, and uploads
         </p>
 
         <div style={searchBoxStyle}>
-          <span style={searchIconStyle}>🔎</span>
+          <span style={searchIconStyle}>
+            🔎
+          </span>
 
           <input
             type="search"
             value={search}
             onChange={(event) =>
-              setSearch(event.target.value)
+              setSearch(
+                event.target.value
+              )
             }
-            placeholder="Search videos..."
+            placeholder="Search videos or creators..."
             style={searchInputStyle}
           />
         </div>
@@ -180,28 +237,35 @@ export default function CreatorFeed() {
           Ray&apos;sStream Videos
         </h3>
 
-        {matchingRayVideos.length === 0 && (
+        {matchingRayVideos.length ===
+          0 && (
           <p style={emptyStyle}>
-            No Ray&apos;sStream videos matched this search.
+            No Ray&apos;sStream videos
+            matched this search.
           </p>
         )}
 
-        {matchingRayVideos.map((video) => (
-          <a
-            key={video.id}
-            href={`/watch/${video.slug}`}
-            style={resultLinkStyle}
-          >
-            ▶ {video.title}
-          </a>
-        ))}
+        {matchingRayVideos.map(
+          (video) => (
+            <a
+              key={video.id}
+              href={`/watch/${video.slug}`}
+              style={resultLinkStyle}
+            >
+              ▶ {video.title}
+            </a>
+          )
+        )}
       </div>
 
       <div style={headerStyle}>
-        <h2 style={headingStyle}>Creator Video Feed</h2>
+        <h2 style={headingStyle}>
+          Creator Video Feed
+        </h2>
 
         <p style={subtitleStyle}>
-          New videos uploaded by Ray&apos;sStream creators
+          New videos uploaded by
+          Ray&apos;sStream creators
         </p>
       </div>
 
@@ -212,12 +276,15 @@ export default function CreatorFeed() {
       )}
 
       {message && (
-        <p style={messageStyle}>{message}</p>
+        <p style={messageStyle}>
+          {message}
+        </p>
       )}
 
       {!loading &&
         !message &&
-        matchingCreatorVideos.length === 0 && (
+        matchingCreatorVideos.length ===
+          0 && (
           <p style={messageStyle}>
             {searchText
               ? "No creator uploads matched this search."
@@ -226,52 +293,74 @@ export default function CreatorFeed() {
         )}
 
       <div style={feedStyle}>
-        {matchingCreatorVideos.map((video) => (
-          <article key={video.id} style={cardStyle}>
-            <h3 style={titleStyle}>{video.title}</h3>
+        {matchingCreatorVideos.map(
+          (video) => (
+            <article
+              key={video.id}
+              style={cardStyle}
+            >
+              <h3 style={titleStyle}>
+                {video.title}
+              </h3>
 
-            <video
-              src={video.url}
-              poster={video.thumbnailUrl || undefined}
-              controls
-              preload="metadata"
-              playsInline
-              style={videoStyle}
-            />
-
-            {video.description && (
-              <p style={descriptionStyle}>
-                {video.description}
+              <p style={creatorNameStyle}>
+                👤{" "}
+                {video.creatorName ||
+                  "Ray'sStream Creator"}
               </p>
-            )}
 
-            <div style={buttonRowStyle}>
-              <a
-                href={`/watch/creator/${video.id}`}
-                style={watchButtonStyle}
-              >
-                Watch Page
-              </a>
+              <video
+                src={video.url}
+                poster={
+                  video.thumbnailUrl ||
+                  undefined
+                }
+                controls
+                preload="metadata"
+                playsInline
+                style={videoStyle}
+              />
 
-              {video.channelId && (
-                <a
-                  href={`/creator/channel/${video.channelId}`}
-                  style={channelButtonStyle}
+              {video.description && (
+                <p
+                  style={descriptionStyle}
                 >
-                  Creator Channel
-                </a>
+                  {video.description}
+                </p>
               )}
 
-              <button
-                type="button"
-                onClick={() => shareVideo(video)}
-                style={shareButtonStyle}
-              >
-                Share
-              </button>
-            </div>
-          </article>
-        ))}
+              <div style={buttonRowStyle}>
+                <a
+                  href={`/watch/creator/${video.id}`}
+                  style={watchButtonStyle}
+                >
+                  Watch Page
+                </a>
+
+                {video.channelId && (
+                  <a
+                    href={`/creator/channel/${video.channelId}`}
+                    style={
+                      channelButtonStyle
+                    }
+                  >
+                    Creator Channel
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    shareVideo(video)
+                  }
+                  style={shareButtonStyle}
+                >
+                  Share
+                </button>
+              </div>
+            </article>
+          )
+        )}
       </div>
     </section>
   );
@@ -290,7 +379,8 @@ const searchHeaderStyle: React.CSSProperties = {
 
 const searchHeadingStyle: React.CSSProperties = {
   color: "white",
-  fontSize: "clamp(38px, 7vw, 62px)",
+  fontSize:
+    "clamp(38px, 7vw, 62px)",
   margin: "0 0 12px",
 };
 
@@ -359,7 +449,8 @@ const headerStyle: React.CSSProperties = {
 
 const headingStyle: React.CSSProperties = {
   color: "white",
-  fontSize: "clamp(30px, 5vw, 48px)",
+  fontSize:
+    "clamp(30px, 5vw, 48px)",
   margin: "0 0 12px",
 };
 
@@ -386,13 +477,22 @@ const cardStyle: React.CSSProperties = {
   background: "#242424",
   border: "2px solid black",
   borderRadius: "20px",
-  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.35)",
+  boxShadow:
+    "0 12px 30px rgba(0, 0, 0, 0.35)",
 };
 
 const titleStyle: React.CSSProperties = {
   color: "white",
   fontSize: "25px",
-  padding: "18px 20px",
+  padding: "18px 20px 4px",
+  margin: 0,
+};
+
+const creatorNameStyle: React.CSSProperties = {
+  color: "#22c55e",
+  fontSize: "17px",
+  fontWeight: "bold",
+  padding: "6px 20px 16px",
   margin: 0,
 };
 

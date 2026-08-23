@@ -53,16 +53,22 @@ export async function GET() {
 
     const rows = await sql`
       SELECT
-        id,
-        blob_url,
-        pathname,
-        title,
-        description,
-        thumbnail_url,
-        created_at,
-        MD5(LOWER(creator_email)) AS channel_id
+        creator_videos.id,
+        creator_videos.blob_url,
+        creator_videos.pathname,
+        creator_videos.title,
+        creator_videos.description,
+        creator_videos.thumbnail_url,
+        creator_videos.created_at,
+        creators.name AS creator_name,
+        MD5(
+          LOWER(creator_videos.creator_email)
+        ) AS channel_id
       FROM creator_videos
-      ORDER BY created_at DESC
+      LEFT JOIN creators
+        ON LOWER(creators.email) =
+           LOWER(creator_videos.creator_email)
+      ORDER BY creator_videos.created_at DESC
     `;
 
     const videos = rows.map((video) => ({
@@ -72,6 +78,8 @@ export async function GET() {
       title: video.title,
       description: video.description || "",
       thumbnailUrl: video.thumbnail_url,
+      creatorName:
+        video.creator_name || "Ray'sStream Creator",
       createdAt: video.created_at,
       channelId: video.channel_id,
     }));

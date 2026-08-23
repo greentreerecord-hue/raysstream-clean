@@ -6,8 +6,11 @@ import { useParams } from "next/navigation";
 type CreatorVideo = {
   id: string | number;
   title: string;
+  description?: string;
+  creatorName?: string;
   url: string;
   blob_url?: string;
+  thumbnailUrl?: string;
   channelId?: string;
 };
 
@@ -18,14 +21,11 @@ export default function CreatorChannelPage() {
     ? params.email[0]
     : params.email;
 
-  const channelId = String(
-    channelValue || ""
-  ).toLowerCase();
+  const channelId = String(channelValue || "").toLowerCase();
 
   const [videos, setVideos] = useState<CreatorVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-
   const [subscriberCount, setSubscriberCount] = useState(0);
   const [subscribed, setSubscribed] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
@@ -102,6 +102,12 @@ export default function CreatorChannelPage() {
       loadChannel();
     }
   }, [channelId]);
+
+  const creatorName =
+    videos[0]?.creatorName || "Ray'sStream Creator";
+
+  const creatorInitial =
+    creatorName.trim().charAt(0).toUpperCase() || "C";
 
   function getSubscriberId() {
     const storageKey = "raysstreamSubscriberId";
@@ -182,7 +188,9 @@ export default function CreatorChannelPage() {
       try {
         await navigator.share({
           title: video.title,
-          text: `Watch ${video.title} on Ray'sStream`,
+          text: `Watch ${video.title} by ${
+            video.creatorName || creatorName
+          } on Ray'sStream`,
           url: watchUrl,
         });
 
@@ -220,12 +228,16 @@ export default function CreatorChannelPage() {
           ← Back to Home Page
         </a>
 
-        <div style={styles.avatar}>C</div>
+        <div style={styles.avatar}>
+          {creatorInitial}
+        </div>
 
-        <h1 style={styles.heading}>Creator Channel</h1>
+        <h1 style={styles.heading}>
+          {creatorName}
+        </h1>
 
         <p style={styles.privateText}>
-          Ray&apos;sStream Creator
+          Ray&apos;sStream Creator Channel
         </p>
 
         <p style={styles.statistics}>
@@ -244,14 +256,15 @@ export default function CreatorChannelPage() {
           disabled={subscribed || subscribing}
           style={{
             ...styles.subscribeButton,
-            opacity: subscribed || subscribing ? 0.7 : 1,
+            opacity:
+              subscribed || subscribing ? 0.7 : 1,
           }}
         >
           {subscribing
             ? "Subscribing..."
             : subscribed
               ? "✓ Subscribed"
-              : "Subscribe to Creator"}
+              : `Subscribe to ${creatorName}`}
         </button>
 
         {subscriptionMessage && (
@@ -282,11 +295,18 @@ export default function CreatorChannelPage() {
 
               <video
                 src={video.url}
+                poster={video.thumbnailUrl || undefined}
                 controls
                 playsInline
                 preload="metadata"
                 style={styles.video}
               />
+
+              {video.description && (
+                <p style={styles.description}>
+                  {video.description}
+                </p>
+              )}
 
               <div style={styles.buttonRow}>
                 <a
@@ -361,7 +381,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 
   heading: {
-    margin: "0 0 14px",
+    margin: "0 0 10px",
     fontSize: "clamp(38px, 7vw, 66px)",
   },
 
@@ -438,6 +458,16 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     maxHeight: "650px",
     background: "black",
+  },
+
+  description: {
+    margin: 0,
+    padding: "18px 20px 4px",
+    color: "#e5e7eb",
+    fontSize: "17px",
+    lineHeight: 1.6,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
   },
 
   buttonRow: {

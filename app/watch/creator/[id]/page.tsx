@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  useParams,
+  useRouter,
+} from "next/navigation";
 
 type CreatorVideo = {
   id: string | number;
   title: string;
   description?: string;
+  creatorName?: string;
   url: string;
   blob_url?: string;
   thumbnailUrl?: string;
@@ -22,45 +31,72 @@ export default function CreatorWatchPage() {
   const params = useParams();
   const router = useRouter();
 
-  const idValue = Array.isArray(params.id)
+  const idValue = Array.isArray(
+    params.id
+  )
     ? params.id[0]
     : params.id;
 
   const id = String(idValue || "");
 
-  const [video, setVideo] = useState<CreatorVideo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const [views, setViews] = useState(0);
-  const [likes, setLikes] = useState(0);
-  const [shares, setShares] = useState(0);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [commentInput, setCommentInput] = useState("");
-  const [liked, setLiked] = useState(false);
-  const [showShareButtons, setShowShareButtons] =
+  const [video, setVideo] =
+    useState<CreatorVideo | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [views, setViews] =
+    useState(0);
+
+  const [likes, setLikes] =
+    useState(0);
+
+  const [shares, setShares] =
+    useState(0);
+
+  const [comments, setComments] =
+    useState<Comment[]>([]);
+
+  const [
+    commentInput,
+    setCommentInput,
+  ] = useState("");
+
+  const [liked, setLiked] =
     useState(false);
+
+  const [
+    showShareButtons,
+    setShowShareButtons,
+  ] = useState(false);
 
   const viewed = useRef(false);
 
   useEffect(() => {
     async function loadPage() {
       try {
-        const [videoResponse, activityResponse] =
-          await Promise.all([
-            fetch("/api/feed", {
+        const [
+          videoResponse,
+          activityResponse,
+        ] = await Promise.all([
+          fetch("/api/feed", {
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/creator-interactions?videoId=${encodeURIComponent(
+              id
+            )}`,
+            {
               cache: "no-store",
-            }),
-            fetch(
-              `/api/creator-interactions?videoId=${encodeURIComponent(
-                id
-              )}`,
-              {
-                cache: "no-store",
-              }
-            ),
-          ]);
+            }
+          ),
+        ]);
 
-        const videoData = await videoResponse.json();
+        const videoData =
+          await videoResponse.json();
 
         if (!videoResponse.ok) {
           throw new Error(
@@ -69,18 +105,22 @@ export default function CreatorWatchPage() {
           );
         }
 
-        const videoList: CreatorVideo[] = Array.isArray(
-          videoData
-        )
-          ? videoData
-          : videoData.videos || [];
+        const videoList:
+          CreatorVideo[] =
+          Array.isArray(videoData)
+            ? videoData
+            : videoData.videos || [];
 
-        const selectedVideo = videoList.find(
-          (item) => String(item.id) === id
-        );
+        const selectedVideo =
+          videoList.find(
+            (item) =>
+              String(item.id) === id
+          );
 
         if (!selectedVideo) {
-          setMessage("Video not found.");
+          setMessage(
+            "Video not found."
+          );
           return;
         }
 
@@ -92,16 +132,34 @@ export default function CreatorWatchPage() {
             "",
         });
 
-        if (activityResponse.ok) {
+        if (
+          activityResponse.ok
+        ) {
           const activityData =
             await activityResponse.json();
 
-          setViews(Number(activityData.views || 0));
-          setLikes(Number(activityData.likes || 0));
-          setShares(Number(activityData.shares || 0));
+          setViews(
+            Number(
+              activityData.views || 0
+            )
+          );
+
+          setLikes(
+            Number(
+              activityData.likes || 0
+            )
+          );
+
+          setShares(
+            Number(
+              activityData.shares || 0
+            )
+          );
 
           setComments(
-            Array.isArray(activityData.comments)
+            Array.isArray(
+              activityData.comments
+            )
               ? activityData.comments
               : []
           );
@@ -129,7 +187,11 @@ export default function CreatorWatchPage() {
   }, [id]);
 
   async function saveAction(
-    action: "view" | "like" | "share" | "comment",
+    action:
+      | "view"
+      | "like"
+      | "share"
+      | "comment",
     text?: string
   ) {
     const response = await fetch(
@@ -137,7 +199,8 @@ export default function CreatorWatchPage() {
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
         },
         body: JSON.stringify({
           videoId: id,
@@ -147,11 +210,13 @@ export default function CreatorWatchPage() {
       }
     );
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
     if (!response.ok) {
       throw new Error(
-        data.error || "Unable to save video activity."
+        data.error ||
+          "Unable to save video activity."
       );
     }
 
@@ -159,31 +224,48 @@ export default function CreatorWatchPage() {
   }
 
   async function addView() {
-    if (!id || viewed.current) {
+    if (
+      !id ||
+      viewed.current
+    ) {
       return;
     }
 
     viewed.current = true;
 
     try {
-      const data = await saveAction("view");
-      setViews(Number(data.views || 0));
+      const data =
+        await saveAction("view");
+
+      setViews(
+        Number(data.views || 0)
+      );
     } catch (error) {
       viewed.current = false;
-      console.error("Unable to save view:", error);
+
+      console.error(
+        "Unable to save view:",
+        error
+      );
     }
   }
 
   async function likeVideo() {
     if (liked) {
-      alert("You already liked this video.");
+      alert(
+        "You already liked this video."
+      );
       return;
     }
 
     try {
-      const data = await saveAction("like");
+      const data =
+        await saveAction("like");
 
-      setLikes(Number(data.likes || 0));
+      setLikes(
+        Number(data.likes || 0)
+      );
+
       setLiked(true);
 
       localStorage.setItem(
@@ -201,19 +283,32 @@ export default function CreatorWatchPage() {
 
   async function recordShare() {
     try {
-      const data = await saveAction("share");
-      setShares(Number(data.shares || 0));
+      const data =
+        await saveAction("share");
+
+      setShares(
+        Number(data.shares || 0)
+      );
     } catch (error) {
-      console.error("Unable to save share:", error);
+      console.error(
+        "Unable to save share:",
+        error
+      );
     }
   }
 
   async function copyWatchLink() {
-    const watchUrl = window.location.href;
+    const watchUrl =
+      window.location.href;
 
     try {
-      await navigator.clipboard.writeText(watchUrl);
-      alert("Ray'sStream watch link copied!");
+      await navigator.clipboard.writeText(
+        watchUrl
+      );
+
+      alert(
+        "Ray'sStream watch link copied!"
+      );
     } catch {
       window.prompt(
         "Copy this Ray'sStream watch link:",
@@ -225,9 +320,10 @@ export default function CreatorWatchPage() {
   }
 
   async function shareToFacebook() {
-    const watchUrl = encodeURIComponent(
-      window.location.href
-    );
+    const watchUrl =
+      encodeURIComponent(
+        window.location.href
+      );
 
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${watchUrl}`,
@@ -239,15 +335,21 @@ export default function CreatorWatchPage() {
   }
 
   async function shareToX() {
-    const watchUrl = encodeURIComponent(
-      window.location.href
-    );
+    const watchUrl =
+      encodeURIComponent(
+        window.location.href
+      );
 
-    const text = encodeURIComponent(
-      `Watch ${
-        video?.title || "this video"
-      } on Ray'sStream`
-    );
+    const text =
+      encodeURIComponent(
+        `Watch ${
+          video?.title ||
+          "this video"
+        } by ${
+          video?.creatorName ||
+          "a Ray'sStream creator"
+        } on Ray'sStream`
+      );
 
     window.open(
       `https://twitter.com/intent/tweet?text=${text}&url=${watchUrl}`,
@@ -259,10 +361,13 @@ export default function CreatorWatchPage() {
   }
 
   async function shareToTikTok() {
-    const watchUrl = window.location.href;
+    const watchUrl =
+      window.location.href;
 
     try {
-      await navigator.clipboard.writeText(watchUrl);
+      await navigator.clipboard.writeText(
+        watchUrl
+      );
     } catch {
       window.prompt(
         "Copy this Ray'sStream watch link:",
@@ -276,15 +381,21 @@ export default function CreatorWatchPage() {
       "noopener,noreferrer"
     );
 
-    alert("Video link copied. Paste it into TikTok.");
+    alert(
+      "Video link copied. Paste it into TikTok."
+    );
+
     await recordShare();
   }
 
   async function shareToInstagram() {
-    const watchUrl = window.location.href;
+    const watchUrl =
+      window.location.href;
 
     try {
-      await navigator.clipboard.writeText(watchUrl);
+      await navigator.clipboard.writeText(
+        watchUrl
+      );
     } catch {
       window.prompt(
         "Copy this Ray'sStream watch link:",
@@ -298,24 +409,34 @@ export default function CreatorWatchPage() {
       "noopener,noreferrer"
     );
 
-    alert("Video link copied. Paste it into Instagram.");
+    alert(
+      "Video link copied. Paste it into Instagram."
+    );
+
     await recordShare();
   }
 
   async function postComment() {
-    const text = commentInput.trim();
+    const text =
+      commentInput.trim();
 
     if (!text) {
       return;
     }
 
     try {
-      const data = await saveAction("comment", text);
+      const data =
+        await saveAction(
+          "comment",
+          text
+        );
 
-      setComments((current) => [
-        ...current,
-        data.comment,
-      ]);
+      setComments(
+        (current) => [
+          ...current,
+          data.comment,
+        ]
+      );
 
       setCommentInput("");
     } catch (error) {
@@ -330,7 +451,9 @@ export default function CreatorWatchPage() {
   if (loading) {
     return (
       <main style={styles.page}>
-        <p style={styles.message}>Loading video...</p>
+        <p style={styles.message}>
+          Loading video...
+        </p>
       </main>
     );
   }
@@ -339,12 +462,15 @@ export default function CreatorWatchPage() {
     return (
       <main style={styles.page}>
         <p style={styles.message}>
-          {message || "Video not found."}
+          {message ||
+            "Video not found."}
         </p>
 
         <button
           style={styles.button}
-          onClick={() => router.push("/")}
+          onClick={() =>
+            router.push("/")
+          }
         >
           More Videos
         </button>
@@ -355,14 +481,27 @@ export default function CreatorWatchPage() {
   return (
     <main style={styles.page}>
       <section style={styles.card}>
-        <h1 style={styles.logo}>Ray&apos;sStream</h1>
+        <h1 style={styles.logo}>
+          Ray&apos;sStream
+        </h1>
 
-        <h2 style={styles.title}>{video.title}</h2>
+        <h2 style={styles.title}>
+          {video.title}
+        </h2>
+
+        <p style={styles.creatorName}>
+          👤{" "}
+          {video.creatorName ||
+            "Ray'sStream Creator"}
+        </p>
 
         <video
           style={styles.video}
           src={video.url}
-          poster={video.thumbnailUrl || undefined}
+          poster={
+            video.thumbnailUrl ||
+            undefined
+          }
           controls
           autoPlay
           playsInline
@@ -371,40 +510,70 @@ export default function CreatorWatchPage() {
         />
 
         {video.description && (
-          <div style={styles.description}>
-            <h3 style={styles.descriptionHeading}>
+          <div
+            style={styles.description}
+          >
+            <h3
+              style={
+                styles.descriptionHeading
+              }
+            >
               Description
             </h3>
 
-            <p style={styles.descriptionText}>
+            <p
+              style={
+                styles.descriptionText
+              }
+            >
               {video.description}
             </p>
           </div>
         )}
 
         <div style={styles.stats}>
-          <span>👁 {views} views</span>
-          <span>👍 {likes} likes</span>
-          <span>💬 {comments.length} comments</span>
-          <span>↗ {shares} shares</span>
+          <span>
+            👁 {views} views
+          </span>
+
+          <span>
+            👍 {likes} likes
+          </span>
+
+          <span>
+            💬 {comments.length}{" "}
+            comments
+          </span>
+
+          <span>
+            ↗ {shares} shares
+          </span>
         </div>
 
         <div style={styles.buttons}>
           <button
             style={{
               ...styles.button,
-              background: liked ? "#166534" : "#22c55e",
-              color: liked ? "white" : "black",
+              background: liked
+                ? "#166534"
+                : "#22c55e",
+              color: liked
+                ? "white"
+                : "black",
             }}
             onClick={likeVideo}
           >
-            {liked ? "Liked" : "Like Video"}
+            {liked
+              ? "Liked"
+              : "Like Video"}
           </button>
 
           <button
             style={styles.button}
             onClick={() =>
-              setShowShareButtons((current) => !current)
+              setShowShareButtons(
+                (current) => !current
+              )
             }
           >
             Share Video
@@ -412,44 +581,64 @@ export default function CreatorWatchPage() {
 
           <button
             style={styles.button}
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push("/")
+            }
           >
             More Videos
           </button>
         </div>
 
         {showShareButtons && (
-          <div style={styles.sharePanel}>
+          <div
+            style={
+              styles.sharePanel
+            }
+          >
             <button
-              style={styles.shareButton}
-              onClick={shareToFacebook}
+              style={
+                styles.shareButton
+              }
+              onClick={
+                shareToFacebook
+              }
             >
               Facebook
             </button>
 
             <button
-              style={styles.shareButton}
+              style={
+                styles.shareButton
+              }
               onClick={shareToX}
             >
               X
             </button>
 
             <button
-              style={styles.shareButton}
+              style={
+                styles.shareButton
+              }
               onClick={shareToTikTok}
             >
               TikTok
             </button>
 
             <button
-              style={styles.shareButton}
-              onClick={shareToInstagram}
+              style={
+                styles.shareButton
+              }
+              onClick={
+                shareToInstagram
+              }
             >
               Instagram
             </button>
 
             <button
-              style={styles.shareButton}
+              style={
+                styles.shareButton
+              }
               onClick={copyWatchLink}
             >
               Copy Link
@@ -457,17 +646,35 @@ export default function CreatorWatchPage() {
           </div>
         )}
 
-        <section style={styles.commentSection}>
-          <h3 style={styles.commentHeading}>Comments</h3>
+        <section
+          style={
+            styles.commentSection
+          }
+        >
+          <h3
+            style={
+              styles.commentHeading
+            }
+          >
+            Comments
+          </h3>
 
-          <div style={styles.commentForm}>
+          <div
+            style={
+              styles.commentForm
+            }
+          >
             <input
               value={commentInput}
               onChange={(event) =>
-                setCommentInput(event.target.value)
+                setCommentInput(
+                  event.target.value
+                )
               }
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
+                if (
+                  event.key === "Enter"
+                ) {
                   postComment();
                 }
               }}
@@ -485,41 +692,62 @@ export default function CreatorWatchPage() {
           </div>
 
           {comments.length === 0 && (
-            <p style={styles.emptyComments}>
-              Be the first to comment.
+            <p
+              style={
+                styles.emptyComments
+              }
+            >
+              Be the first to
+              comment.
             </p>
           )}
 
-          {comments.map((comment) => (
-            <div
-              key={comment.id}
-              style={styles.comment}
-            >
-              <strong>Ray&apos;sStream User</strong>
+          {comments.map(
+            (comment) => (
+              <div
+                key={comment.id}
+                style={
+                  styles.comment
+                }
+              >
+                <strong>
+                  Ray&apos;sStream User
+                </strong>
 
-              <div style={styles.commentText}>
-                {comment.text}
+                <div
+                  style={
+                    styles.commentText
+                  }
+                >
+                  {comment.text}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          )}
         </section>
       </section>
 
-      <footer style={styles.footer}>
+      <footer
+        style={styles.footer}
+      >
         © 2026 Ray&apos;sStream
       </footer>
     </main>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<
+  string,
+  React.CSSProperties
+> = {
   page: {
     minHeight: "100vh",
     background: "#050505",
     color: "white",
     padding: "30px 16px",
     textAlign: "center",
-    fontFamily: "Arial, sans-serif",
+    fontFamily:
+      "Arial, sans-serif",
   },
   card: {
     width: "100%",
@@ -533,7 +761,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     fontSize: "28px",
-    marginBottom: "18px",
+    marginBottom: "8px",
+  },
+  creatorName: {
+    color: "#22c55e",
+    fontSize: "19px",
+    fontWeight: "bold",
+    margin: "0 0 18px",
   },
   video: {
     display: "block",
