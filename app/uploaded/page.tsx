@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 
 type Video = {
   url: string;
   pathname: string;
   title: string | null;
   description?: string;
-  thumbnailUrl?: string;
+  thumbnailUrl?: string | null;
+  thumbnailPathname?: string | null;
 };
 
 export default function UploadedPage() {
@@ -22,6 +24,9 @@ export default function UploadedPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] =
     useState("");
+  const [editThumbnail, setEditThumbnail] =
+    useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function loadVideos() {
     const creatorEmail = localStorage.getItem(
@@ -84,6 +89,7 @@ export default function UploadedPage() {
     setEditingUrl(video.url);
     setEditTitle(displayTitle(video));
     setEditDescription(video.description || "");
+    setEditThumbnail(null);
     setMessage("");
   }
 
@@ -91,6 +97,7 @@ export default function UploadedPage() {
     setEditingUrl("");
     setEditTitle("");
     setEditDescription("");
+    setEditThumbnail(null);
   }
 
   async function saveDetails(video: Video) {
@@ -112,6 +119,35 @@ export default function UploadedPage() {
     }
 
     try {
+      setSaving(true);
+
+      let newThumbnailUrl =
+        video.thumbnailUrl || null;
+
+      let newThumbnailPathname =
+        video.thumbnailPathname || null;
+
+      if (editThumbnail) {
+        setMessage("Uploading new thumbnail...");
+
+        const safeEmail = creatorEmail
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "-");
+
+        const thumbnailBlob = await upload(
+          `thumbnails/${safeEmail}/${Date.now()}-${editThumbnail.name}`,
+          editThumbnail,
+          {
+            access: "public",
+            handleUploadUrl: "/api/upload",
+          }
+        );
+
+        newThumbnailUrl = thumbnailBlob.url;
+        newThumbnailPathname =
+          thumbnailBlob.pathname;
+      }
+
       setMessage("Saving video details...");
 
       const response = await fetch(
@@ -127,6 +163,9 @@ export default function UploadedPage() {
             pathname: video.pathname,
             title: newTitle,
             description: newDescription,
+            thumbnailUrl: newThumbnailUrl,
+            thumbnailPathname:
+              newThumbnailPathname,
           }),
         }
       );
@@ -148,6 +187,12 @@ export default function UploadedPage() {
                 ...currentVideo,
                 title: newTitle,
                 description: newDescription,
+                thumbnailUrl:
+                  data.thumbnailUrl ||
+                  newThumbnailUrl,
+                thumbnailPathname:
+                  data.thumbnailPathname ||
+                  newThumbnailPathname,
               }
             : currentVideo
         )
@@ -156,12 +201,15 @@ export default function UploadedPage() {
       setEditingUrl("");
       setEditTitle("");
       setEditDescription("");
+      setEditThumbnail(null);
       setMessage(
         "Video details updated successfully."
       );
     } catch (error) {
       console.error(error);
       setMessage("Could not update video details.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -362,12 +410,48 @@ export default function UploadedPage() {
                       <p
                         style={{
                           color: "#bbbbbb",
-                          margin: "6px 0 14px",
+                          margin: "6px 0 18px",
                         }}
                       >
                         {editDescription.length}/2000
                         characters
                       </p>
+
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "8px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Change Thumbnail
+                      </label>
+
+                      <p
+                        style={{
+                          color: "#bbbbbb",
+                          margin: "0 0 8px",
+                        }}
+                      >
+                        Optional: choose a new JPG, PNG,
+                        or WebP image.
+                      </p>
+
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => {
+                          const file =
+                            event.target.files?.[0] ||
+                            null;
+
+                          setEditThumbnail(file);
+                        }}
+                        style={{
+                          display: "block",
+                          marginBottom: "18px",
+                        }}
+                      />
 
                       <div
                         style={{
@@ -380,22 +464,30 @@ export default function UploadedPage() {
                           onClick={() =>
                             saveDetails(video)
                           }
+                          disabled={saving}
                           style={{
                             padding: "10px 16px",
                             fontSize: "15px",
                             fontWeight: "bold",
-                            cursor: "pointer",
+                            cursor: saving
+                              ? "not-allowed"
+                              : "pointer",
                           }}
                         >
-                          Save Details
+                          {saving
+                            ? "Saving..."
+                            : "Save Details"}
                         </button>
 
                         <button
                           onClick={cancelEditing}
+                          disabled={saving}
                           style={{
                             padding: "10px 16px",
                             fontSize: "15px",
-                            cursor: "pointer",
+                            cursor: saving
+                              ? "not-allowed"
+                              : "pointer",
                           }}
                         >
                           Cancel
