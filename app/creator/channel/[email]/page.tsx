@@ -8,6 +8,7 @@ type CreatorVideo = {
   title: string;
   description?: string;
   creatorName?: string;
+  creatorProfilePictureUrl?: string;
   url: string;
   blob_url?: string;
   thumbnailUrl?: string;
@@ -21,47 +22,69 @@ export default function CreatorChannelPage() {
     ? params.email[0]
     : params.email;
 
-  const channelId = String(channelValue || "").toLowerCase();
+  const channelId = String(
+    channelValue || ""
+  ).toLowerCase();
 
-  const [videos, setVideos] = useState<CreatorVideo[]>([]);
+  const [videos, setVideos] = useState<
+    CreatorVideo[]
+  >([]);
+
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [subscriberCount, setSubscriberCount] = useState(0);
-  const [subscribed, setSubscribed] = useState(false);
-  const [subscribing, setSubscribing] = useState(false);
-  const [subscriptionMessage, setSubscriptionMessage] =
-    useState("");
+  const [subscriberCount, setSubscriberCount] =
+    useState(0);
+  const [subscribed, setSubscribed] =
+    useState(false);
+  const [subscribing, setSubscribing] =
+    useState(false);
+
+  const [
+    subscriptionMessage,
+    setSubscriptionMessage,
+  ] = useState("");
 
   useEffect(() => {
     async function loadChannel() {
       try {
         setLoading(true);
 
-        const feedResponse = await fetch("/api/feed", {
-          cache: "no-store",
-        });
+        const feedResponse = await fetch(
+          "/api/feed",
+          {
+            cache: "no-store",
+          }
+        );
 
-        const feedData = await feedResponse.json();
+        const feedData =
+          await feedResponse.json();
 
         if (!feedResponse.ok) {
           throw new Error(
-            feedData.error || "Unable to load creator videos."
+            feedData.error ||
+              "Unable to load creator videos."
           );
         }
 
-        const videoList = Array.isArray(feedData)
+        const videoList = Array.isArray(
+          feedData
+        )
           ? feedData
           : feedData.videos || [];
 
         const creatorVideos = videoList
           .map((video: CreatorVideo) => ({
             ...video,
-            url: video.url || video.blob_url || "",
+            url:
+              video.url ||
+              video.blob_url ||
+              "",
           }))
           .filter(
             (video: CreatorVideo) =>
-              String(video.channelId || "").toLowerCase() ===
-              channelId
+              String(
+                video.channelId || ""
+              ).toLowerCase() === channelId
           );
 
         setVideos(creatorVideos);
@@ -75,17 +98,19 @@ export default function CreatorChannelPage() {
           }
         );
 
-        const countData = await countResponse.json();
+        const countData =
+          await countResponse.json();
 
         if (countResponse.ok) {
-          setSubscriberCount(Number(countData.count || 0));
+          setSubscriberCount(
+            Number(countData.count || 0)
+          );
         }
 
-        const subscriptionKey =
-          `raysstream-creator-subscribed-${channelId}`;
-
         setSubscribed(
-          localStorage.getItem(subscriptionKey) === "true"
+          localStorage.getItem(
+            `raysstream-creator-subscribed-${channelId}`
+          ) === "true"
         );
       } catch (error) {
         setMessage(
@@ -104,25 +129,37 @@ export default function CreatorChannelPage() {
   }, [channelId]);
 
   const creatorName =
-    videos[0]?.creatorName || "Ray'sStream Creator";
+    videos[0]?.creatorName ||
+    "Ray'sStream Creator";
+
+  const creatorProfilePictureUrl =
+    videos[0]?.creatorProfilePictureUrl || "";
 
   const creatorInitial =
-    creatorName.trim().charAt(0).toUpperCase() || "C";
+    creatorName.trim().charAt(0).toUpperCase() ||
+    "C";
 
   function getSubscriberId() {
-    const storageKey = "raysstreamSubscriberId";
-    let subscriberId = localStorage.getItem(storageKey);
+    const storageKey =
+      "raysstreamSubscriberId";
+
+    let subscriberId =
+      localStorage.getItem(storageKey);
 
     if (!subscriberId) {
       subscriberId =
         typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID === "function"
+        typeof crypto.randomUUID ===
+          "function"
           ? crypto.randomUUID()
           : `subscriber-${Date.now()}-${Math.random()
               .toString(36)
               .slice(2)}`;
 
-      localStorage.setItem(storageKey, subscriberId);
+      localStorage.setItem(
+        storageKey,
+        subscriberId
+      );
     }
 
     return subscriberId;
@@ -135,14 +172,18 @@ export default function CreatorChannelPage() {
 
     try {
       setSubscribing(true);
-      setSubscriptionMessage("Saving subscription...");
+
+      setSubscriptionMessage(
+        "Saving subscription..."
+      );
 
       const response = await fetch(
         "/api/creator-subscribe",
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
             channelId,
@@ -167,10 +208,19 @@ export default function CreatorChannelPage() {
       );
 
       setSubscribed(true);
-      setSubscriberCount(Number(data.count || 0));
-      setSubscriptionMessage(data.message || "Subscribed!");
+
+      setSubscriberCount(
+        Number(data.count || 0)
+      );
+
+      setSubscriptionMessage(
+        data.message || "Subscribed!"
+      );
     } catch (error) {
-      console.error("Creator subscription error:", error);
+      console.error(
+        "Creator subscription error:",
+        error
+      );
 
       setSubscriptionMessage(
         "Unable to connect to the subscription database."
@@ -180,7 +230,9 @@ export default function CreatorChannelPage() {
     }
   }
 
-  async function shareVideo(video: CreatorVideo) {
+  async function shareVideo(
+    video: CreatorVideo
+  ) {
     const watchUrl =
       `${window.location.origin}/watch/creator/${video.id}`;
 
@@ -201,8 +253,13 @@ export default function CreatorChannelPage() {
     }
 
     try {
-      await navigator.clipboard.writeText(watchUrl);
-      alert("Ray'sStream watch link copied!");
+      await navigator.clipboard.writeText(
+        watchUrl
+      );
+
+      alert(
+        "Ray'sStream watch link copied!"
+      );
     } catch {
       window.prompt(
         "Copy this Ray'sStream watch link:",
@@ -228,9 +285,17 @@ export default function CreatorChannelPage() {
           ← Back to Home Page
         </a>
 
-        <div style={styles.avatar}>
-          {creatorInitial}
-        </div>
+        {creatorProfilePictureUrl ? (
+          <img
+            src={creatorProfilePictureUrl}
+            alt={`${creatorName} profile`}
+            style={styles.profileImage}
+          />
+        ) : (
+          <div style={styles.avatar}>
+            {creatorInitial}
+          </div>
+        )}
 
         <h1 style={styles.heading}>
           {creatorName}
@@ -247,7 +312,9 @@ export default function CreatorChannelPage() {
             : "subscribers"}
           {" • "}
           {videos.length}{" "}
-          {videos.length === 1 ? "video" : "videos"}
+          {videos.length === 1
+            ? "video"
+            : "videos"}
         </p>
 
         <button
@@ -257,7 +324,9 @@ export default function CreatorChannelPage() {
           style={{
             ...styles.subscribeButton,
             opacity:
-              subscribed || subscribing ? 0.7 : 1,
+              subscribed || subscribing
+                ? 0.7
+                : 1,
           }}
         >
           {subscribing
@@ -274,12 +343,15 @@ export default function CreatorChannelPage() {
         )}
 
         {message && (
-          <p style={styles.error}>{message}</p>
+          <p style={styles.error}>
+            {message}
+          </p>
         )}
 
         {!message && videos.length === 0 && (
           <p style={styles.message}>
-            This creator has not uploaded any videos yet.
+            This creator has not uploaded any
+            videos yet.
           </p>
         )}
 
@@ -295,7 +367,9 @@ export default function CreatorChannelPage() {
 
               <video
                 src={video.url}
-                poster={video.thumbnailUrl || undefined}
+                poster={
+                  video.thumbnailUrl || undefined
+                }
                 controls
                 playsInline
                 preload="metadata"
@@ -318,7 +392,9 @@ export default function CreatorChannelPage() {
 
                 <button
                   type="button"
-                  onClick={() => shareVideo(video)}
+                  onClick={() =>
+                    shareVideo(video)
+                  }
                   style={styles.shareButton}
                 >
                   Share Video
@@ -336,7 +412,10 @@ export default function CreatorChannelPage() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<
+  string,
+  React.CSSProperties
+> = {
   page: {
     minHeight: "100vh",
     background: "#050505",
@@ -380,9 +459,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: "bold",
   },
 
+  profileImage: {
+    display: "block",
+    width: "120px",
+    height: "120px",
+    margin: "0 auto 20px",
+    objectFit: "cover",
+    background: "#22c55e",
+    border: "4px solid white",
+    borderRadius: "50%",
+  },
+
   heading: {
     margin: "0 0 10px",
-    fontSize: "clamp(38px, 7vw, 66px)",
+    fontSize:
+      "clamp(38px, 7vw, 66px)",
   },
 
   privateText: {
