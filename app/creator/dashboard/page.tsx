@@ -16,6 +16,8 @@ export default function CreatorDashboardPage() {
     useState("");
   const [creatorEmail, setCreatorEmail] =
     useState("");
+  const [loadingCreator, setLoadingCreator] =
+    useState(true);
   const [subscription, setSubscription] =
     useState<SubscriptionStatus>({
       active: false,
@@ -26,64 +28,81 @@ export default function CreatorDashboardPage() {
     useState(true);
 
   useEffect(() => {
-    const savedName =
-      localStorage.getItem("raysstreamCreator") || "";
-
-    const savedEmail =
-      localStorage.getItem(
-        "raysstreamCreatorEmail"
-      ) || "";
-
-    if (!savedEmail) {
-      router.push("/creator/login");
-      return;
-    }
-
-    setCreatorName(savedName);
-    setCreatorEmail(savedEmail);
-
-    async function checkSubscription() {
+    async function loadCreator() {
       try {
-        setCheckingSubscription(true);
-
-        const response = await fetch(
-          `/api/live-subscription?email=${encodeURIComponent(
-            savedEmail
-          )}`,
+        const sessionResponse = await fetch(
+          "/api/creator-session",
           {
             cache: "no-store",
           }
         );
 
-        const data = await response.json();
+        if (!sessionResponse.ok) {
+          router.push("/creator/login");
+          return;
+        }
 
-        if (response.ok) {
+        const sessionData =
+          await sessionResponse.json();
+
+        const creator =
+          sessionData.creator;
+
+        setCreatorName(creator.name || "");
+        setCreatorEmail(creator.email || "");
+
+        const subscriptionResponse =
+          await fetch(
+            `/api/live-subscription?email=${encodeURIComponent(
+              creator.email
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
+
+        const subscriptionData =
+          await subscriptionResponse.json();
+
+        if (subscriptionResponse.ok) {
           setSubscription({
-            active: Boolean(data.active),
-            status: data.status || "inactive",
+            active: Boolean(
+              subscriptionData.active
+            ),
+            status:
+              subscriptionData.status ||
+              "inactive",
             currentPeriodEnd:
-              data.currentPeriodEnd || null,
+              subscriptionData.currentPeriodEnd ||
+              null,
           });
         }
-      } catch (error) {
-        console.error(
-          "Unable to check Creator Live subscription:",
-          error
-        );
+      } catch {
+        router.push("/creator/login");
       } finally {
+        setLoadingCreator(false);
         setCheckingSubscription(false);
       }
     }
 
-    checkSubscription();
+    loadCreator();
   }, [router]);
 
-  function logout() {
-    localStorage.removeItem("raysstreamCreator");
-    localStorage.removeItem(
-      "raysstreamCreatorEmail"
-    );
-    router.push("/creator/login");
+  async function logout() {
+    try {
+      await fetch("/api/creator-session", {
+        method: "DELETE",
+      });
+    } finally {
+      localStorage.removeItem(
+        "raysstreamCreator"
+      );
+      localStorage.removeItem(
+        "raysstreamCreatorEmail"
+      );
+
+      router.push("/creator/login");
+    }
   }
 
   function openCheckout() {
@@ -109,6 +128,25 @@ export default function CreatorDashboardPage() {
     fontWeight: "bold",
     cursor: "pointer",
   };
+
+  if (loadingCreator) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+          background: "black",
+          fontFamily: "Arial, sans-serif",
+          fontSize: "22px",
+        }}
+      >
+        Verifying creator session...
+      </main>
+    );
+  }
 
   return (
     <main
@@ -275,14 +313,18 @@ export default function CreatorDashboardPage() {
           }}
         >
           <button
-            onClick={() => router.push("/upload")}
+            onClick={() =>
+              router.push("/upload")
+            }
             style={buttonStyle}
           >
             Upload Video
           </button>
 
           <button
-            onClick={() => router.push("/uploaded")}
+            onClick={() =>
+              router.push("/uploaded")
+            }
             style={buttonStyle}
           >
             My Uploaded Videos

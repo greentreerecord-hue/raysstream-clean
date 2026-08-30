@@ -24,6 +24,8 @@ export default function CreatorLivePage() {
   const [title, setTitle] = useState("");
   const [cameraReady, setCameraReady] =
     useState(false);
+  const [checkingSession, setCheckingSession] =
+    useState(true);
   const [checkingSubscription, setCheckingSubscription] =
     useState(true);
   const [subscription, setSubscription] =
@@ -36,47 +38,65 @@ export default function CreatorLivePage() {
   );
 
   useEffect(() => {
-    const savedEmail =
-      localStorage.getItem(
-        "raysstreamCreatorEmail"
-      ) || "";
-
-    if (!savedEmail) {
-      router.push("/creator/login");
-      return;
-    }
-
-    setCreatorEmail(savedEmail);
-
-    async function checkSubscription() {
+    async function loadCreator() {
       try {
-        const response = await fetch(
-          `/api/live-subscription?email=${encodeURIComponent(
-            savedEmail
-          )}`,
+        const sessionResponse = await fetch(
+          "/api/creator-session",
           {
             cache: "no-store",
           }
         );
 
-        const data = await response.json();
+        if (!sessionResponse.ok) {
+          router.push("/creator/login");
+          return;
+        }
 
-        if (response.ok) {
+        const sessionData =
+          await sessionResponse.json();
+
+        const email =
+          sessionData.creator?.email || "";
+
+        if (!email) {
+          router.push("/creator/login");
+          return;
+        }
+
+        setCreatorEmail(email);
+
+        const subscriptionResponse =
+          await fetch(
+            `/api/live-subscription?email=${encodeURIComponent(
+              email
+            )}`,
+            {
+              cache: "no-store",
+            }
+          );
+
+        const subscriptionData =
+          await subscriptionResponse.json();
+
+        if (subscriptionResponse.ok) {
           setSubscription({
-            active: Boolean(data.active),
-            status: data.status || "inactive",
+            active: Boolean(
+              subscriptionData.active
+            ),
+            status:
+              subscriptionData.status ||
+              "inactive",
           });
         }
       } catch {
-        setMessage(
-          "Unable to check the Creator Live subscription."
-        );
+        router.push("/creator/login");
       } finally {
+        setCheckingSession(false);
         setCheckingSubscription(false);
       }
     }
 
-    checkSubscription();
+    loadCreator();
 
     return () => {
       stopCameraTracks();
@@ -223,6 +243,25 @@ export default function CreatorLivePage() {
     fontWeight: "bold",
     cursor: "pointer",
   };
+
+  if (checkingSession) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+          background: "black",
+          fontFamily: "Arial, sans-serif",
+          fontSize: "22px",
+        }}
+      >
+        Verifying creator session...
+      </main>
+    );
+  }
 
   return (
     <main

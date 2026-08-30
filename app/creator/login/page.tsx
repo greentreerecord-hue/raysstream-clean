@@ -4,42 +4,54 @@ import { useState } from "react";
 
 export default function CreatorLoginPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [password, setPassword] =
+    useState("");
+  const [message, setMessage] =
+    useState("");
+  const [loading, setLoading] =
+    useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(
+    e: React.FormEvent
+  ) {
     e.preventDefault();
 
     setLoading(true);
     setMessage("");
 
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
+      const response = await fetch(
+        "/api/login",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(data.error || "Login failed.");
+        setMessage(
+          data.error || "Login failed."
+        );
         setLoading(false);
         return;
       }
 
-      localStorage.setItem("raysstreamCreator", data.name);
-      localStorage.setItem("raysstreamCreatorEmail", data.email);
-
-      window.location.href = "/creator/dashboard";
+      window.location.href =
+        "/creator/dashboard";
     } catch {
-      setMessage("Something went wrong. Please try again.");
+      setMessage(
+        "Something went wrong. Please try again."
+      );
     }
 
     setLoading(false);
@@ -68,7 +80,12 @@ export default function CreatorLoginPage() {
           padding: "32px",
         }}
       >
-        <h1 style={{ margin: "0 0 8px", fontSize: "34px" }}>
+        <h1
+          style={{
+            margin: "0 0 8px",
+            fontSize: "34px",
+          }}
+        >
           Ray&apos;sStream
         </h1>
 
@@ -82,7 +99,11 @@ export default function CreatorLoginPage() {
         </h2>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "18px" }}>
+          <div
+            style={{
+              marginBottom: "18px",
+            }}
+          >
             <label
               style={{
                 display: "block",
@@ -96,7 +117,9 @@ export default function CreatorLoginPage() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) =>
+                setEmail(e.target.value)
+              }
               required
               style={{
                 width: "100%",
@@ -111,7 +134,11 @@ export default function CreatorLoginPage() {
             />
           </div>
 
-          <div style={{ marginBottom: "22px" }}>
+          <div
+            style={{
+              marginBottom: "22px",
+            }}
+          >
             <label
               style={{
                 display: "block",
@@ -125,7 +152,9 @@ export default function CreatorLoginPage() {
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) =>
+                setPassword(e.target.value)
+              }
               required
               style={{
                 width: "100%",
@@ -152,10 +181,14 @@ export default function CreatorLoginPage() {
               color: "#000000",
               fontWeight: "bold",
               fontSize: "17px",
-              cursor: loading ? "not-allowed" : "pointer",
+              cursor: loading
+                ? "not-allowed"
+                : "pointer",
             }}
           >
-            {loading ? "Logging In..." : "Creator Login"}
+            {loading
+              ? "Logging In..."
+              : "Creator Login"}
           </button>
         </form>
 
