@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CSSProperties,
   useEffect,
   useRef,
   useState,
@@ -12,27 +13,98 @@ type SubscriptionStatus = {
   status: string;
 };
 
+type LiveAccessResponse = {
+  authorized?: boolean;
+  publishUrl?: string;
+  playbackUrl?: string;
+  error?: string;
+};
+
+function waitForIceGathering(
+  peerConnection: RTCPeerConnection
+) {
+  return new Promise<void>((resolve) => {
+    if (
+      peerConnection.iceGatheringState ===
+      "complete"
+    ) {
+      resolve();
+      return;
+    }
+
+    function checkState() {
+      if (
+        peerConnection.iceGatheringState ===
+        "complete"
+      ) {
+        peerConnection.removeEventListener(
+          "icegatheringstatechange",
+          checkState
+        );
+
+        resolve();
+      }
+    }
+
+    peerConnection.addEventListener(
+      "icegatheringstatechange",
+      checkState
+    );
+
+    window.setTimeout(() => {
+      peerConnection.removeEventListener(
+        "icegatheringstatechange",
+        checkState
+      );
+
+      resolve();
+    }, 10000);
+  });
+}
+
 export default function CreatorLivePage() {
   const router = useRouter();
+
   const videoRef =
     useRef<HTMLVideoElement | null>(null);
+
   const streamRef =
     useRef<MediaStream | null>(null);
 
+  const peerConnectionRef =
+    useRef<RTCPeerConnection | null>(null);
+
+  const whipResourceUrlRef =
+    useRef<string>("");
+
   const [creatorEmail, setCreatorEmail] =
     useState("");
+
   const [title, setTitle] = useState("");
+
   const [cameraReady, setCameraReady] =
     useState(false);
+
   const [checkingSession, setCheckingSession] =
     useState(true);
-  const [checkingSubscription, setCheckingSubscription] =
-    useState(true);
+
+  const [
+    checkingSubscription,
+    setCheckingSubscription,
+  ] = useState(true);
+
   const [subscription, setSubscription] =
     useState<SubscriptionStatus>({
       active: false,
       status: "inactive",
     });
+
+  const [broadcasting, setBroadcasting] =
+    useState(false);
+
+  const [connecting, setConnecting] =
+    useState(false);
+
   const [message, setMessage] = useState(
     "Start your camera to preview your livestream."
   );
@@ -44,6 +116,7 @@ export default function CreatorLivePage() {
           "/api/creator-session",
           {
             cache: "no-store",
+            credentials: "include",
           }
         );
 
@@ -72,6 +145,7 @@ export default function CreatorLivePage() {
             )}`,
             {
               cache: "no-store",
+              credentials: "include",
             }
           );
 
@@ -99,7 +173,29 @@ export default function CreatorLivePage() {
     loadCreator();
 
     return () => {
-      stopCameraTracks();
+      if (whipResourceUrlRef.current) {
+        fetch(whipResourceUrlRef.current, {
+          method: "DELETE",
+          keepalive: true,
+        }).catch(() => {
+          // Page is closing.
+        });
+
+        whipResourceUrlRef.current = "";
+      }
+
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+
+      if (streamRef.current) {
+        streamRef.current
+          .getTracks()
+          .forEach((track) => track.stop());
+
+        streamRef.current = null;
+      }
     };
   }, [router]);
 
@@ -115,6 +211,13 @@ export default function CreatorLivePage() {
 
   async function startCamera() {
     try {
+      if (broadcasting || connecting) {
+        setMessage(
+          "Stop the broadcast before restarting the camera."
+        );
+        return;
+      }
+
       stopCameraTracks();
 
       setMessage(
@@ -127,12 +230,8 @@ export default function CreatorLivePage() {
         mediaStream =
           await navigator.mediaDevices.getUserMedia({
             video: {
-              width: {
-                ideal: 1280,
-              },
-              height: {
-                ideal: 720,
-              },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
             },
             audio: true,
           });
@@ -156,12 +255,8 @@ export default function CreatorLivePage() {
         mediaStream =
           await navigator.mediaDevices.getUserMedia({
             video: {
-              width: {
-                ideal: 1280,
-              },
-              height: {
-                ideal: 720,
-              },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
             },
             audio: false,
           });
@@ -170,13 +265,15 @@ export default function CreatorLivePage() {
       streamRef.current = mediaStream;
 
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+        videoRef.current.srcObject =
+          mediaStream;
       }
 
       const hasAudio =
         mediaStream.getAudioTracks().length > 0;
 
       setCameraReady(true);
+
       setMessage(
         hasAudio
           ? "Camera and microphone preview are ready. You are not broadcasting yet."
@@ -189,13 +286,54 @@ export default function CreatorLivePage() {
           : "UnknownError";
 
       setCameraReady(false);
+
       setMessage(
         `Unable to start the camera (${errorName}). Check the browser and Windows camera settings.`
       );
     }
   }
 
-  function stopCamera() {
+  async function stopBroadcast(
+    showMessage = true
+  ) {
+    const resourceUrl =
+      whipResourceUrlRef.current;
+
+    whipResourceUrlRef.current = "";
+
+    if (resourceUrl) {
+      try {
+        await fetch(resourceUrl, {
+          method: "DELETE",
+        });
+      } catch (error) {
+        console.error(
+          "Unable to delete the Cloudflare broadcast session:",
+          error
+        );
+      }
+    }
+
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+
+    setBroadcasting(false);
+    setConnecting(false);
+
+    if (showMessage) {
+      setMessage(
+        "Broadcast stopped. Your camera preview is still available."
+      );
+    }
+  }
+
+  async function stopCamera() {
+    if (broadcasting || connecting) {
+      await stopBroadcast(false);
+    }
+
     stopCameraTracks();
 
     if (videoRef.current) {
@@ -203,10 +341,17 @@ export default function CreatorLivePage() {
     }
 
     setCameraReady(false);
-    setMessage("Camera and microphone stopped.");
+
+    setMessage(
+      "Camera and microphone stopped."
+    );
   }
 
-  function startBroadcast() {
+  async function startBroadcast() {
+    if (connecting || broadcasting) {
+      return;
+    }
+
     if (!subscription.active) {
       setMessage(
         "An active Creator Live subscription is required before broadcasting."
@@ -214,7 +359,7 @@ export default function CreatorLivePage() {
       return;
     }
 
-    if (!cameraReady) {
+    if (!cameraReady || !streamRef.current) {
       setMessage(
         "Start your camera before beginning the broadcast."
       );
@@ -228,12 +373,177 @@ export default function CreatorLivePage() {
       return;
     }
 
-    setMessage(
-      "Your camera is ready. The secure Cloudflare broadcast connection is the next step."
-    );
+    try {
+      setConnecting(true);
+
+      setMessage(
+        "Verifying Creator Live access..."
+      );
+
+      const accessResponse = await fetch(
+        "/api/live-access",
+        {
+          cache: "no-store",
+          credentials: "include",
+        }
+      );
+
+      const accessData =
+        (await accessResponse.json()) as LiveAccessResponse;
+
+      if (
+        !accessResponse.ok ||
+        !accessData.authorized ||
+        !accessData.publishUrl
+      ) {
+        throw new Error(
+          accessData.error ||
+            "Creator Live access was denied."
+        );
+      }
+
+      setMessage(
+        "Connecting your camera to Cloudflare Stream..."
+      );
+
+      const peerConnection =
+        new RTCPeerConnection();
+
+      peerConnectionRef.current =
+        peerConnection;
+
+      streamRef.current
+        .getTracks()
+        .forEach((track) => {
+          peerConnection.addTrack(
+            track,
+            streamRef.current as MediaStream
+          );
+        });
+
+      peerConnection.addEventListener(
+        "connectionstatechange",
+        () => {
+          const state =
+            peerConnection.connectionState;
+
+          if (state === "connected") {
+            setConnecting(false);
+            setBroadcasting(true);
+
+            setMessage(
+              `🔴 LIVE: ${title.trim()}`
+            );
+          }
+
+          if (
+            state === "failed" ||
+            state === "disconnected"
+          ) {
+            setConnecting(false);
+            setBroadcasting(false);
+
+            setMessage(
+              "The live connection was interrupted. Stop the broadcast and try again."
+            );
+          }
+        }
+      );
+
+      const offer =
+        await peerConnection.createOffer();
+
+      await peerConnection.setLocalDescription(
+        offer
+      );
+
+      await waitForIceGathering(
+        peerConnection
+      );
+
+      const localDescription =
+        peerConnection.localDescription;
+
+      if (!localDescription?.sdp) {
+        throw new Error(
+          "The browser could not create a broadcast connection."
+        );
+      }
+
+      const whipResponse = await fetch(
+        accessData.publishUrl,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/sdp",
+          },
+          body: localDescription.sdp,
+        }
+      );
+
+      if (!whipResponse.ok) {
+        const responseText =
+          await whipResponse.text();
+
+        console.error(
+          "Cloudflare WHIP error:",
+          whipResponse.status,
+          responseText
+        );
+
+        throw new Error(
+          `Cloudflare could not start the broadcast (${whipResponse.status}).`
+        );
+      }
+
+      const answerSdp =
+        await whipResponse.text();
+
+      await peerConnection.setRemoteDescription({
+        type: "answer",
+        sdp: answerSdp,
+      });
+
+      const locationHeader =
+        whipResponse.headers.get("Location");
+
+      if (locationHeader) {
+        whipResourceUrlRef.current =
+          new URL(
+            locationHeader,
+            accessData.publishUrl
+          ).toString();
+      }
+
+      setConnecting(false);
+      setBroadcasting(true);
+
+      setMessage(`🔴 LIVE: ${title.trim()}`);
+    } catch (error) {
+      console.error(
+        "Start broadcast error:",
+        error
+      );
+
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+
+      whipResourceUrlRef.current = "";
+
+      setConnecting(false);
+      setBroadcasting(false);
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to start the broadcast."
+      );
+    }
   }
 
-  const buttonStyle: React.CSSProperties = {
+  const buttonStyle: CSSProperties = {
     padding: "13px 22px",
     border: "3px solid white",
     borderRadius: "14px",
@@ -330,7 +640,9 @@ export default function CreatorLivePage() {
                 alignItems: "center",
                 justifyContent: "center",
                 background: "#111827",
-                border: "4px solid white",
+                border: broadcasting
+                  ? "4px solid #ef4444"
+                  : "4px solid white",
                 borderRadius: "20px",
               }}
             >
@@ -364,6 +676,22 @@ export default function CreatorLivePage() {
               )}
             </div>
 
+            {broadcasting && (
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "10px 14px",
+                  color: "white",
+                  background: "#dc2626",
+                  borderRadius: "10px",
+                  fontWeight: "bold",
+                  textAlign: "center",
+                }}
+              >
+                🔴 LIVE NOW
+              </div>
+            )}
+
             <div
               style={{
                 display: "flex",
@@ -375,7 +703,16 @@ export default function CreatorLivePage() {
               <button
                 type="button"
                 onClick={startCamera}
-                style={buttonStyle}
+                disabled={
+                  broadcasting || connecting
+                }
+                style={{
+                  ...buttonStyle,
+                  opacity:
+                    broadcasting || connecting
+                      ? 0.6
+                      : 1,
+                }}
               >
                 Start Camera
               </button>
@@ -425,6 +762,7 @@ export default function CreatorLivePage() {
             <input
               id="live-title"
               value={title}
+              disabled={broadcasting}
               onChange={(event) =>
                 setTitle(event.target.value)
               }
@@ -436,6 +774,7 @@ export default function CreatorLivePage() {
                 border: "3px solid black",
                 borderRadius: "10px",
                 fontSize: "17px",
+                opacity: broadcasting ? 0.7 : 1,
               }}
             />
 
@@ -458,31 +797,59 @@ export default function CreatorLivePage() {
                   : "Creator Live subscription inactive"}
             </div>
 
-            <button
-              type="button"
-              onClick={startBroadcast}
-              style={{
-                ...buttonStyle,
-                width: "100%",
-                marginTop: "22px",
-                color: "black",
-                background: subscription.active
-                  ? "#22c55e"
-                  : "#9ca3af",
-                cursor: subscription.active
-                  ? "pointer"
-                  : "not-allowed",
-              }}
-            >
-              Start Broadcast
-            </button>
+            {!broadcasting ? (
+              <button
+                type="button"
+                onClick={startBroadcast}
+                disabled={connecting}
+                style={{
+                  ...buttonStyle,
+                  width: "100%",
+                  marginTop: "22px",
+                  color: "black",
+                  background: subscription.active
+                    ? "#22c55e"
+                    : "#9ca3af",
+                  cursor:
+                    subscription.active &&
+                    !connecting
+                      ? "pointer"
+                      : "not-allowed",
+                  opacity: connecting ? 0.7 : 1,
+                }}
+              >
+                {connecting
+                  ? "Connecting..."
+                  : "Start Broadcast"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  stopBroadcast(true)
+                }
+                style={{
+                  ...buttonStyle,
+                  width: "100%",
+                  marginTop: "22px",
+                  background: "#dc2626",
+                }}
+              >
+                Stop Broadcast
+              </button>
+            )}
 
             <p
               style={{
                 marginBottom: 0,
                 marginTop: "18px",
                 lineHeight: 1.5,
-                color: "#374151",
+                color: broadcasting
+                  ? "#b91c1c"
+                  : "#374151",
+                fontWeight: broadcasting
+                  ? "bold"
+                  : "normal",
               }}
             >
               {message}
