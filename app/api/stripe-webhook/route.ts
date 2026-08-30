@@ -10,8 +10,11 @@ const databaseUrl =
 const stripeSecretKey =
   process.env.STRIPE_SECRET_KEY;
 
-const webhookSecret =
+const liveWebhookSecret =
   process.env.STRIPE_WEBHOOK_SECRET;
+
+const testWebhookSecret =
+  process.env.STRIPE_TEST_WEBHOOK_SECRET;
 
 if (!databaseUrl) {
   throw new Error(
@@ -54,10 +57,48 @@ function getId(
     : value.id;
 }
 
+function verifyWebhook(
+  stripe: Stripe,
+  body: string,
+  signature: string
+) {
+  if (liveWebhookSecret) {
+    try {
+      return {
+        event: stripe.webhooks.constructEvent(
+          body,
+          signature,
+          liveWebhookSecret
+        ),
+        mode: "live" as const,
+      };
+    } catch {
+      // Try the sandbox signing secret next.
+    }
+  }
+
+  if (testWebhookSecret) {
+    try {
+      return {
+        event: stripe.webhooks.constructEvent(
+          body,
+          signature,
+          testWebhookSecret
+        ),
+        mode: "test" as const,
+      };
+    } catch {
+      // Neither signing secret matched.
+    }
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
-  if (!stripeSecretKey || !webhookSecret) {
+  if (!stripeSecretKey) {
     console.error(
-      "Stripe environment variables are missing."
+      "STRIPE_SECRET_KEY is missing."
     );
 
     return NextResponse.json(
@@ -66,7 +107,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const stripe = new Stripe(stripeSecretKey);
+  if (!liveWebhookSecret && !testWebhookSecret) {
+    console.error(
+      "Stripe webhook secrets are missing."
+    );
+
+    return NextResponse.json(
+      { error: "Stripe webhooks are not configured." },
+      { status: 500 }
+    );
+  }
+
   const signature = request.headers.get(
     "stripe-signature"
   );
@@ -78,26 +129,36 @@ export async function POST(request: Request) {
     );
   }
 
-  let event: Stripe.Event;
+  const stripe = new Stripe(stripeSecretKey);
+  const body = await request.text();
 
-  try {
-    const body = await request.text();
+  const verified = verifyWebhook(
+    stripe,
+    body,
+    signature
+  );
 
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      webhookSecret
-    );
-  } catch (error) {
+  if (!verified) {
     console.error(
-      "Stripe webhook signature error:",
-      error
+      "Stripe webhook signature verification failed."
     );
 
     return NextResponse.json(
       { error: "Invalid Stripe webhook." },
       { status: 400 }
     );
+  }
+
+  const { event, mode } = verified;
+
+  // Sandbox events confirm that the webhook works,
+  // but they must not change the production database.
+  if (mode === "test") {
+    return NextResponse.json({
+      received: true,
+      mode: "test",
+      eventType: event.type,
+    });
   }
 
   try {
@@ -179,9 +240,7 @@ export async function POST(request: Request) {
       `;
     }
 
-    if (
-      event.type === "invoice.payment_failed"
-    ) {
+    if (event.type === "invoice.payment_failed") {
       const invoice =
         event.data.object as Stripe.Invoice;
 
@@ -209,6 +268,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       received: true,
+      mode: "live",
     });
   } catch (error) {
     console.error(
