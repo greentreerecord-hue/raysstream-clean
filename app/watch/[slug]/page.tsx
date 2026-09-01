@@ -67,9 +67,8 @@ export default function WatchPage() {
               (comment: { videoId: number }) =>
                 Number(comment.videoId) === video.id
             )
-            .map(
-              (comment: { text: string }) =>
-                String(comment.text)
+            .map((comment: { text: string }) =>
+              String(comment.text)
             );
 
           setComments(videoComments);
@@ -157,7 +156,7 @@ export default function WatchPage() {
     }
   }
 
-  async function shareVideo() {
+  async function copyVideoLink() {
     const url = window.location.href;
 
     try {
@@ -166,6 +165,115 @@ export default function WatchPage() {
     } catch {
       window.prompt("Copy this video link:", url);
     }
+  }
+
+  async function shareToApps() {
+    if (!video) {
+      return;
+    }
+
+    const url = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: video.title,
+          text: `Watch ${video.title} on Ray'sStream`,
+          url,
+        });
+      } catch {
+        // The user closed the share menu.
+      }
+    } else {
+      await copyVideoLink();
+    }
+  }
+
+  function shareFacebook() {
+    const url = encodeURIComponent(window.location.href);
+
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareX() {
+    if (!video) {
+      return;
+    }
+
+    const url = encodeURIComponent(window.location.href);
+    const text = encodeURIComponent(
+      `Watch ${video.title} on Ray'sStream`
+    );
+
+    window.open(
+      `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareWhatsApp() {
+    if (!video) {
+      return;
+    }
+
+    const message = encodeURIComponent(
+      `Watch ${video.title} on Ray'sStream: ${window.location.href}`
+    );
+
+    window.open(
+      `https://wa.me/?text=${message}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareReddit() {
+    if (!video) {
+      return;
+    }
+
+    const url = encodeURIComponent(window.location.href);
+    const title = encodeURIComponent(
+      `Watch ${video.title} on Ray'sStream`
+    );
+
+    window.open(
+      `https://www.reddit.com/submit?url=${url}&title=${title}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareLinkedIn() {
+    const url = encodeURIComponent(window.location.href);
+
+    window.open(
+      `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareEmail() {
+    if (!video) {
+      return;
+    }
+
+    const subject = encodeURIComponent(
+      `Watch ${video.title} on Ray'sStream`
+    );
+
+    const body = encodeURIComponent(
+      `Watch this video on Ray'sStream:\n\n${window.location.href}`
+    );
+
+    window.location.href =
+      `mailto:?subject=${subject}&body=${body}`;
   }
 
   if (!video) {
@@ -269,22 +377,68 @@ export default function WatchPage() {
           👁 {views} views &nbsp; 💬 {comments.length} comments
         </p>
 
-        <div
+        <section
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "10px",
             marginBottom: "28px",
           }}
         >
-          <button onClick={shareVideo} style={buttonStyle}>
-            Copy Video Link
-          </button>
+          <h3>Share This Video</h3>
 
-          <a href="/" style={linkStyle}>
-            Back to Home
-          </a>
-        </div>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
+          >
+            <button onClick={shareToApps} style={buttonStyle}>
+              📱 Share to Apps
+            </button>
+
+            <button onClick={shareFacebook} style={buttonStyle}>
+              Facebook
+            </button>
+
+            <button onClick={shareX} style={buttonStyle}>
+              X
+            </button>
+
+            <button onClick={shareWhatsApp} style={buttonStyle}>
+              WhatsApp
+            </button>
+
+            <button onClick={shareReddit} style={buttonStyle}>
+              Reddit
+            </button>
+
+            <button onClick={shareLinkedIn} style={buttonStyle}>
+              LinkedIn
+            </button>
+
+            <button onClick={shareEmail} style={buttonStyle}>
+              Email
+            </button>
+
+            <button onClick={copyVideoLink} style={buttonStyle}>
+              Copy Link
+            </button>
+
+            <a href="/" style={linkStyle}>
+              Back to Home
+            </a>
+          </div>
+
+          <p
+            style={{
+              color: "#aaa",
+              fontSize: "14px",
+              marginTop: "12px",
+            }}
+          >
+            For Instagram, TikTok, Messenger, and other apps,
+            use Share to Apps or Copy Link.
+          </p>
+        </section>
 
         <section>
           <h3>Comments</h3>
