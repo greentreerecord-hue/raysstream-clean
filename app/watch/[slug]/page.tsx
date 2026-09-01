@@ -670,20 +670,21 @@ export default function WatchPage() {
             padding: "20px",
           }}
         >
-          <div
+          <video
+            src={`${upNext.src}#t=1`}
+            muted
+            playsInline
+            preload="metadata"
             style={{
+              width: "100%",
               aspectRatio: "16 / 7",
-              display: "grid",
-              placeItems: "center",
-              background:
-                "linear-gradient(135deg, #111, #333)",
+              objectFit: "cover",
+              background: "black",
               borderRadius: "12px",
-              fontSize: "50px",
               marginBottom: "14px",
+              pointerEvents: "none",
             }}
-          >
-            ▶
-          </div>
+          />
 
           <strong
             style={{
@@ -726,9 +727,19 @@ export default function WatchPage() {
               href={`/watch/${item.slug}`}
               style={recommendationCardStyle}
             >
-              <div style={staticThumbnailStyle}>
-                ▶
-              </div>
+              <video
+                src={`${item.src}#t=1`}
+                muted
+                playsInline
+                preload="metadata"
+                style={{
+                  width: "100%",
+                  aspectRatio: "16 / 9",
+                  objectFit: "cover",
+                  background: "black",
+                  pointerEvents: "none",
+                }}
+              />
 
               <div style={{ padding: "14px" }}>
                 <strong>{item.title}</strong>
