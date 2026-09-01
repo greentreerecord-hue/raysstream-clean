@@ -1,896 +1,875 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-
-import {
-  useParams,
-  useRouter,
-} from "next/navigation";
+import type { CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 
 type CreatorVideo = {
-  id: string | number;
-  title: string;
-  description?: string;
-  creatorName?: string;
+  id: string;
   url: string;
-  blob_url?: string;
-  thumbnailUrl?: string;
+  title: string;
+  description: string;
+  creatorName: string;
+  creatorProfilePictureUrl: string;
+  thumbnailUrl: string;
+  channelId: string;
 };
 
 type Comment = {
   id: number;
   text: string;
-  createdAt?: string;
+  createdAt: string;
 };
 
 export default function CreatorWatchPage() {
   const params = useParams();
-  const router = useRouter();
 
-  const idValue = Array.isArray(
-    params.id
-  )
+  const idValue = Array.isArray(params.id)
     ? params.id[0]
     : params.id;
 
-  const id = String(idValue || "");
+  const videoId = String(idValue || "");
 
   const [video, setVideo] =
     useState<CreatorVideo | null>(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [moreVideos, setMoreVideos] = useState<
+    CreatorVideo[]
+  >([]);
 
-  const [message, setMessage] =
-    useState("");
-
-  const [views, setViews] =
-    useState(0);
-
-  const [likes, setLikes] =
-    useState(0);
-
-  const [shares, setShares] =
-    useState(0);
-
-  const [comments, setComments] =
-    useState<Comment[]>([]);
-
-  const [
-    commentInput,
-    setCommentInput,
-  ] = useState("");
-
-  const [liked, setLiked] =
+  const [views, setViews] = useState(0);
+  const [likes, setLikes] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [liking, setLiking] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentInput, setCommentInput] = useState("");
+  const [postingComment, setPostingComment] =
     useState(false);
 
-  const [
-    showShareButtons,
-    setShowShareButtons,
-  ] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const viewed = useRef(false);
 
   useEffect(() => {
-    async function loadPage() {
+    if (!videoId) {
+      return;
+    }
+
+    viewed.current = false;
+
+    const alreadyLiked =
+      localStorage.getItem(
+        `raysstream-creator-liked-${videoId}`
+      ) === "true";
+
+    setLiked(alreadyLiked);
+
+    async function loadVideo() {
       try {
-        const [
-          videoResponse,
-          activityResponse,
-        ] = await Promise.all([
-          fetch("/api/feed", {
-            cache: "no-store",
-          }),
-          fetch(
-            `/api/creator-interactions?videoId=${encodeURIComponent(
-              id
-            )}`,
-            {
-              cache: "no-store",
-            }
-          ),
-        ]);
+        setLoading(true);
+        setErrorMessage("");
 
-        const videoData =
-          await videoResponse.json();
+        const response = await fetch("/api/feed", {
+          cache: "no-store",
+        });
 
-        if (!videoResponse.ok) {
-          throw new Error(
-            videoData.error ||
-              "Could not load creator videos."
-          );
-        }
+        const data = await response.json();
 
-        const videoList:
-          CreatorVideo[] =
-          Array.isArray(videoData)
-            ? videoData
-            : videoData.videos || [];
-
-        const selectedVideo =
-          videoList.find(
-            (item) =>
-              String(item.id) === id
-          );
-
-        if (!selectedVideo) {
-          setMessage(
-            "Video not found."
+        if (!response.ok) {
+          setErrorMessage(
+            data.error || "Unable to load video."
           );
           return;
         }
 
-        setVideo({
-          ...selectedVideo,
-          url:
-            selectedVideo.url ||
-            selectedVideo.blob_url ||
-            "",
-        });
+        const normalizedVideos: CreatorVideo[] = (
+          data.videos || []
+        ).map(
+          (item: {
+            id?: string;
+            url?: string;
+            blob_url?: string;
+            title?: string;
+            description?: string;
+            creatorName?: string;
+            creator_name?: string;
+            creatorProfilePictureUrl?: string;
+            creator_profile_picture_url?: string;
+            thumbnailUrl?: string;
+            thumbnail_url?: string;
+            channelId?: string;
+            channel_id?: string;
+          }) => ({
+            id: String(item.id || ""),
+            url: String(item.url || item.blob_url || ""),
+            title: String(item.title || "Creator Video"),
+            description: String(item.description || ""),
+            creatorName: String(
+              item.creatorName ||
+                item.creator_name ||
+                "Ray'sStream Creator"
+            ),
+            creatorProfilePictureUrl: String(
+              item.creatorProfilePictureUrl ||
+                item.creator_profile_picture_url ||
+                ""
+            ),
+            thumbnailUrl: String(
+              item.thumbnailUrl ||
+                item.thumbnail_url ||
+                ""
+            ),
+            channelId: String(
+              item.channelId ||
+                item.channel_id ||
+                ""
+            ),
+          })
+        );
 
-        if (
-          activityResponse.ok
-        ) {
-          const activityData =
-            await activityResponse.json();
+        const selectedVideo = normalizedVideos.find(
+          (item) => item.id === videoId
+        );
 
-          setViews(
-            Number(
-              activityData.views || 0
-            )
-          );
-
-          setLikes(
-            Number(
-              activityData.likes || 0
-            )
-          );
-
-          setShares(
-            Number(
-              activityData.shares || 0
-            )
-          );
-
-          setComments(
-            Array.isArray(
-              activityData.comments
-            )
-              ? activityData.comments
-              : []
-          );
+        if (!selectedVideo) {
+          setErrorMessage("Creator video not found.");
+          return;
         }
 
-        setLiked(
-          localStorage.getItem(
-            `raysstream-liked-creator-${id}`
-          ) === "yes"
+        setVideo(selectedVideo);
+
+        setMoreVideos(
+          normalizedVideos
+            .filter(
+              (item) =>
+                item.id !== selectedVideo.id &&
+                item.channelId === selectedVideo.channelId
+            )
+            .slice(0, 6)
         );
       } catch (error) {
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to load this video."
+        console.error(
+          "Unable to load creator video:",
+          error
+        );
+
+        setErrorMessage(
+          "Unable to connect to the creator feed."
         );
       } finally {
         setLoading(false);
       }
     }
 
-    if (id) {
-      loadPage();
-    }
-  }, [id]);
+    async function loadEngagement() {
+      try {
+        const response = await fetch(
+          `/api/creator-engagement?videoId=${encodeURIComponent(
+            videoId
+          )}`,
+          {
+            cache: "no-store",
+          }
+        );
 
-  async function saveAction(
-    action:
-      | "view"
-      | "like"
-      | "share"
-      | "comment",
-    text?: string
-  ) {
-    const response = await fetch(
-      "/api/creator-interactions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          videoId: id,
-          action,
-          text,
-        }),
+        const data = await response.json();
+
+        if (response.ok) {
+          setViews(Number(data.views || 0));
+          setLikes(Number(data.likes || 0));
+          setComments(data.comments || []);
+        }
+      } catch (error) {
+        console.error(
+          "Unable to load creator engagement:",
+          error
+        );
       }
-    );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-          "Unable to save video activity."
-      );
     }
 
-    return data;
-  }
+    loadVideo();
+    loadEngagement();
+  }, [videoId]);
 
   async function addView() {
-    if (
-      !id ||
-      viewed.current
-    ) {
+    if (!video || viewed.current) {
       return;
     }
 
     viewed.current = true;
 
     try {
-      const data =
-        await saveAction("view");
-
-      setViews(
-        Number(data.views || 0)
+      const response = await fetch(
+        "/api/creator-engagement",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            videoId: video.id,
+            action: "view",
+          }),
+        }
       );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        viewed.current = false;
+        return;
+      }
+
+      setViews(Number(data.count || 0));
     } catch (error) {
       viewed.current = false;
 
       console.error(
-        "Unable to save view:",
+        "Unable to save creator video view:",
         error
       );
     }
   }
 
   async function likeVideo() {
-    if (liked) {
-      alert(
-        "You already liked this video."
-      );
+    if (!video || liked || liking) {
       return;
     }
 
     try {
-      const data =
-        await saveAction("like");
+      setLiking(true);
 
-      setLikes(
-        Number(data.likes || 0)
+      const response = await fetch(
+        "/api/creator-engagement",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            videoId: video.id,
+            action: "like",
+          }),
+        }
       );
 
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Unable to save like.");
+        return;
+      }
+
+      setLikes(Number(data.count || 0));
       setLiked(true);
 
       localStorage.setItem(
-        `raysstream-liked-creator-${id}`,
-        "yes"
+        `raysstream-creator-liked-${video.id}`,
+        "true"
       );
     } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Unable to like this video."
-      );
+      console.error("Unable to save like:", error);
+      alert("Unable to connect to the likes database.");
+    } finally {
+      setLiking(false);
     }
-  }
-
-  async function recordShare() {
-    try {
-      const data =
-        await saveAction("share");
-
-      setShares(
-        Number(data.shares || 0)
-      );
-    } catch (error) {
-      console.error(
-        "Unable to save share:",
-        error
-      );
-    }
-  }
-
-  async function copyWatchLink() {
-    const watchUrl =
-      window.location.href;
-
-    try {
-      await navigator.clipboard.writeText(
-        watchUrl
-      );
-
-      alert(
-        "Ray'sStream watch link copied!"
-      );
-    } catch {
-      window.prompt(
-        "Copy this Ray'sStream watch link:",
-        watchUrl
-      );
-    }
-
-    await recordShare();
-  }
-
-  async function shareToFacebook() {
-    const watchUrl =
-      encodeURIComponent(
-        window.location.href
-      );
-
-    window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${watchUrl}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
-
-    await recordShare();
-  }
-
-  async function shareToX() {
-    const watchUrl =
-      encodeURIComponent(
-        window.location.href
-      );
-
-    const text =
-      encodeURIComponent(
-        `Watch ${
-          video?.title ||
-          "this video"
-        } by ${
-          video?.creatorName ||
-          "a Ray'sStream creator"
-        } on Ray'sStream`
-      );
-
-    window.open(
-      `https://twitter.com/intent/tweet?text=${text}&url=${watchUrl}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
-
-    await recordShare();
-  }
-
-  async function shareToTikTok() {
-    const watchUrl =
-      window.location.href;
-
-    try {
-      await navigator.clipboard.writeText(
-        watchUrl
-      );
-    } catch {
-      window.prompt(
-        "Copy this Ray'sStream watch link:",
-        watchUrl
-      );
-    }
-
-    window.open(
-      "https://www.tiktok.com/",
-      "_blank",
-      "noopener,noreferrer"
-    );
-
-    alert(
-      "Video link copied. Paste it into TikTok."
-    );
-
-    await recordShare();
-  }
-
-  async function shareToInstagram() {
-    const watchUrl =
-      window.location.href;
-
-    try {
-      await navigator.clipboard.writeText(
-        watchUrl
-      );
-    } catch {
-      window.prompt(
-        "Copy this Ray'sStream watch link:",
-        watchUrl
-      );
-    }
-
-    window.open(
-      "https://www.instagram.com/",
-      "_blank",
-      "noopener,noreferrer"
-    );
-
-    alert(
-      "Video link copied. Paste it into Instagram."
-    );
-
-    await recordShare();
   }
 
   async function postComment() {
-    const text =
-      commentInput.trim();
+    if (!video || postingComment) {
+      return;
+    }
+
+    const text = commentInput.trim();
 
     if (!text) {
       return;
     }
 
     try {
-      const data =
-        await saveAction(
-          "comment",
-          text
-        );
+      setPostingComment(true);
 
-      setComments(
-        (current) => [
-          ...current,
-          data.comment,
-        ]
+      const response = await fetch(
+        "/api/creator-engagement",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            videoId: video.id,
+            action: "comment",
+            text,
+          }),
+        }
       );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Unable to save comment.");
+        return;
+      }
+
+      setComments((current) => [
+        ...current,
+        data.comment,
+      ]);
 
       setCommentInput("");
     } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Unable to post comment."
+      console.error(
+        "Unable to save creator comment:",
+        error
       );
+
+      alert(
+        "Unable to connect to the comments database."
+      );
+    } finally {
+      setPostingComment(false);
     }
+  }
+
+  async function copyVideoLink() {
+    const url = window.location.href;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Video link copied!");
+    } catch {
+      window.prompt("Copy this video link:", url);
+    }
+  }
+
+  async function shareToApps() {
+    if (!video) {
+      return;
+    }
+
+    const url = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: video.title,
+          text: `Watch ${video.title} on Ray'sStream`,
+          url,
+        });
+      } catch {
+        // The user closed the share menu.
+      }
+    } else {
+      await copyVideoLink();
+    }
+  }
+
+  function shareFacebook() {
+    const url = encodeURIComponent(window.location.href);
+
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareX() {
+    if (!video) {
+      return;
+    }
+
+    const url = encodeURIComponent(window.location.href);
+
+    const text = encodeURIComponent(
+      `Watch ${video.title} on Ray'sStream`
+    );
+
+    window.open(
+      `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareWhatsApp() {
+    if (!video) {
+      return;
+    }
+
+    const message = encodeURIComponent(
+      `Watch ${video.title} on Ray'sStream: ${window.location.href}`
+    );
+
+    window.open(
+      `https://wa.me/?text=${message}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareReddit() {
+    if (!video) {
+      return;
+    }
+
+    const url = encodeURIComponent(window.location.href);
+
+    const title = encodeURIComponent(
+      `Watch ${video.title} on Ray'sStream`
+    );
+
+    window.open(
+      `https://www.reddit.com/submit?url=${url}&title=${title}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareLinkedIn() {
+    const url = encodeURIComponent(window.location.href);
+
+    window.open(
+      `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  function shareEmail() {
+    if (!video) {
+      return;
+    }
+
+    const subject = encodeURIComponent(
+      `Watch ${video.title} on Ray'sStream`
+    );
+
+    const body = encodeURIComponent(
+      `Watch this video on Ray'sStream:\n\n${window.location.href}`
+    );
+
+    window.location.href =
+      `mailto:?subject=${subject}&body=${body}`;
   }
 
   if (loading) {
     return (
-      <main style={styles.page}>
-        <p style={styles.message}>
-          Loading video...
-        </p>
+      <main style={messagePageStyle}>
+        <h1>Ray&apos;sStream</h1>
+        <p>Loading creator video...</p>
       </main>
     );
   }
 
-  if (!video) {
+  if (!video || errorMessage) {
     return (
-      <main style={styles.page}>
-        <p style={styles.message}>
-          {message ||
-            "Video not found."}
+      <main style={messagePageStyle}>
+        <h1>Creator video not found</h1>
+
+        <p style={{ color: "#bbb" }}>
+          {errorMessage ||
+            "This creator video does not exist."}
         </p>
 
-        <button
-          style={styles.button}
-          onClick={() =>
-            router.push("/")
-          }
-        >
-          More Videos
-        </button>
+        <a href="/" style={linkStyle}>
+          Return Home
+        </a>
       </main>
     );
   }
 
   return (
-    <main style={styles.page}>
-      <section style={styles.card}>
-        <h1 style={styles.logo}>
-          Ray&apos;sStream
-        </h1>
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#050505",
+        color: "white",
+        fontFamily: "Arial, sans-serif",
+        paddingBottom: "60px",
+      }}
+    >
+      <header
+        style={{
+          padding: "24px",
+          textAlign: "center",
+          borderBottom: "2px solid black",
+        }}
+      >
+        <a
+          href="/"
+          style={{
+            color: "white",
+            textDecoration: "none",
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "40px",
+              margin: "0 0 10px",
+            }}
+          >
+            Ray&apos;sStream
+          </h1>
+        </a>
 
-        <h2 style={styles.title}>
-          {video.title}
-        </h2>
-
-        <p style={styles.creatorName}>
-          👤{" "}
-          {video.creatorName ||
-            "Ray'sStream Creator"}
+        <p style={{ color: "#bbb" }}>
+          Creator Video
         </p>
+      </header>
+
+      <article
+        style={{
+          width: "min(1000px, 94%)",
+          margin: "30px auto",
+          padding: "20px",
+          boxSizing: "border-box",
+          background: "#121212",
+          border: "2px solid black",
+          borderRadius: "18px",
+        }}
+      >
+        <h2>{video.title}</h2>
 
         <video
-          style={styles.video}
           src={video.url}
-          poster={
-            video.thumbnailUrl ||
-            undefined
-          }
+          poster={video.thumbnailUrl || undefined}
           controls
-          autoPlay
           playsInline
           preload="metadata"
           onPlay={addView}
+          style={{
+            width: "100%",
+            maxHeight: "650px",
+            background: "black",
+            border: "2px solid black",
+            borderRadius: "14px",
+          }}
         />
 
-        {video.description && (
-          <div
-            style={styles.description}
-          >
-            <h3
-              style={
-                styles.descriptionHeading
-              }
+        <section
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "12px",
+            marginTop: "18px",
+          }}
+        >
+          {video.creatorProfilePictureUrl ? (
+            <img
+              src={video.creatorProfilePictureUrl}
+              alt={video.creatorName}
+              style={{
+                width: "54px",
+                height: "54px",
+                borderRadius: "50%",
+                objectFit: "cover",
+                border: "2px solid black",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "54px",
+                height: "54px",
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                background: "#333",
+                border: "2px solid black",
+                fontSize: "24px",
+                fontWeight: "bold",
+              }}
             >
-              Description
-            </h3>
+              {video.creatorName
+                .charAt(0)
+                .toUpperCase()}
+            </div>
+          )}
 
-            <p
-              style={
-                styles.descriptionText
-              }
+          <div>
+            <strong
+              style={{
+                display: "block",
+                fontSize: "18px",
+              }}
             >
-              {video.description}
-            </p>
+              {video.creatorName}
+            </strong>
+
+            {video.channelId && (
+              <a
+                href={`/creator/channel/${encodeURIComponent(
+                  video.channelId
+                )}`}
+                style={{
+                  color: "#bbb",
+                }}
+              >
+                View Creator Channel
+              </a>
+            )}
           </div>
+        </section>
+
+        {video.description && (
+          <p
+            style={{
+              color: "#ccc",
+              lineHeight: 1.6,
+            }}
+          >
+            {video.description}
+          </p>
         )}
 
-        <div style={styles.stats}>
-          <span>
-            👁 {views} views
-          </span>
+        <p
+          style={{
+            color: "#ccc",
+            fontSize: "18px",
+          }}
+        >
+          👁 {views} views &nbsp;
+          👍 {likes} likes &nbsp;
+          💬 {comments.length} comments
+        </p>
 
-          <span>
-            👍 {likes} likes
-          </span>
+        <button
+          onClick={likeVideo}
+          disabled={liked || liking}
+          style={{
+            ...buttonStyle,
+            marginBottom: "24px",
+            opacity: liked || liking ? 0.65 : 1,
+          }}
+        >
+          {liking
+            ? "Saving Like..."
+            : liked
+              ? "✓ Liked"
+              : "👍 Like Video"}
+        </button>
 
-          <span>
-            💬 {comments.length}{" "}
-            comments
-          </span>
+        <section
+          style={{
+            marginBottom: "28px",
+          }}
+        >
+          <h3>Share This Video</h3>
 
-          <span>
-            ↗ {shares} shares
-          </span>
-        </div>
-
-        <div style={styles.buttons}>
-          <button
-            style={{
-              ...styles.button,
-              background: liked
-                ? "#166534"
-                : "#22c55e",
-              color: liked
-                ? "white"
-                : "black",
-            }}
-            onClick={likeVideo}
-          >
-            {liked
-              ? "Liked"
-              : "Like Video"}
-          </button>
-
-          <button
-            style={styles.button}
-            onClick={() =>
-              setShowShareButtons(
-                (current) => !current
-              )
-            }
-          >
-            Share Video
-          </button>
-
-          <button
-            style={styles.button}
-            onClick={() =>
-              router.push("/")
-            }
-          >
-            More Videos
-          </button>
-        </div>
-
-        {showShareButtons && (
           <div
-            style={
-              styles.sharePanel
-            }
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
           >
-            <button
-              style={
-                styles.shareButton
-              }
-              onClick={
-                shareToFacebook
-              }
-            >
+            <button onClick={shareToApps} style={buttonStyle}>
+              📱 Share to Apps
+            </button>
+
+            <button onClick={shareFacebook} style={buttonStyle}>
               Facebook
             </button>
 
-            <button
-              style={
-                styles.shareButton
-              }
-              onClick={shareToX}
-            >
+            <button onClick={shareX} style={buttonStyle}>
               X
             </button>
 
-            <button
-              style={
-                styles.shareButton
-              }
-              onClick={shareToTikTok}
-            >
-              TikTok
+            <button onClick={shareWhatsApp} style={buttonStyle}>
+              WhatsApp
             </button>
 
-            <button
-              style={
-                styles.shareButton
-              }
-              onClick={
-                shareToInstagram
-              }
-            >
-              Instagram
+            <button onClick={shareReddit} style={buttonStyle}>
+              Reddit
             </button>
 
-            <button
-              style={
-                styles.shareButton
-              }
-              onClick={copyWatchLink}
-            >
+            <button onClick={shareLinkedIn} style={buttonStyle}>
+              LinkedIn
+            </button>
+
+            <button onClick={shareEmail} style={buttonStyle}>
+              Email
+            </button>
+
+            <button onClick={copyVideoLink} style={buttonStyle}>
               Copy Link
             </button>
-          </div>
-        )}
 
-        <section
-          style={
-            styles.commentSection
-          }
-        >
-          <h3
-            style={
-              styles.commentHeading
-            }
+            <a href="/" style={linkStyle}>
+              Back to Home
+            </a>
+          </div>
+
+          <p
+            style={{
+              color: "#aaa",
+              fontSize: "14px",
+              marginTop: "12px",
+            }}
           >
-            Comments
-          </h3>
+            For Instagram, TikTok, Messenger, and other apps,
+            use Share to Apps or Copy Link.
+          </p>
+        </section>
+
+        <section>
+          <h3>Comments</h3>
 
           <div
-            style={
-              styles.commentForm
-            }
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
           >
             <input
               value={commentInput}
               onChange={(event) =>
-                setCommentInput(
-                  event.target.value
-                )
+                setCommentInput(event.target.value)
               }
               onKeyDown={(event) => {
-                if (
-                  event.key === "Enter"
-                ) {
+                if (event.key === "Enter") {
                   postComment();
                 }
               }}
               placeholder="Add a comment..."
               maxLength={1000}
-              style={styles.input}
+              style={{
+                flex: "1 1 300px",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "2px solid black",
+                background: "#1b1b1b",
+                color: "white",
+              }}
             />
 
             <button
-              style={styles.button}
               onClick={postComment}
+              disabled={postingComment}
+              style={{
+                ...buttonStyle,
+                opacity: postingComment ? 0.65 : 1,
+              }}
             >
-              Post
+              {postingComment ? "Posting..." : "Post"}
             </button>
           </div>
 
-          {comments.length === 0 && (
-            <p
-              style={
-                styles.emptyComments
-              }
+          {comments.map((comment) => (
+            <div
+              key={comment.id}
+              style={{
+                background: "#1b1b1b",
+                marginTop: "10px",
+                padding: "12px",
+                border: "2px solid black",
+                borderRadius: "10px",
+              }}
             >
-              Be the first to
-              comment.
-            </p>
-          )}
-
-          {comments.map(
-            (comment) => (
-              <div
-                key={comment.id}
-                style={
-                  styles.comment
-                }
-              >
-                <strong>
-                  Ray&apos;sStream User
-                </strong>
-
-                <div
-                  style={
-                    styles.commentText
-                  }
-                >
-                  {comment.text}
-                </div>
-              </div>
-            )
-          )}
+              <strong>Ray&apos;sStream User</strong>
+              <div>{comment.text}</div>
+            </div>
+          ))}
         </section>
-      </section>
+      </article>
 
-      <footer
-        style={styles.footer}
-      >
-        © 2026 Ray&apos;sStream
-      </footer>
+      {moreVideos.length > 0 && (
+        <section
+          style={{
+            width: "min(1000px, 94%)",
+            margin: "0 auto",
+          }}
+        >
+          <h2>More From {video.creatorName}</h2>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: "16px",
+            }}
+          >
+            {moreVideos.map((item) => (
+              <a
+                key={item.id}
+                href={`/watch/creator/${item.id}`}
+                style={{
+                  color: "white",
+                  textDecoration: "none",
+                  background: "#121212",
+                  border: "2px solid black",
+                  borderRadius: "14px",
+                  overflow: "hidden",
+                }}
+              >
+                {item.thumbnailUrl ? (
+                  <img
+                    src={item.thumbnailUrl}
+                    alt={item.title}
+                    style={{
+                      width: "100%",
+                      aspectRatio: "16 / 9",
+                      objectFit: "cover",
+                      background: "black",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      aspectRatio: "16 / 9",
+                      display: "grid",
+                      placeItems: "center",
+                      background: "black",
+                    }}
+                  >
+                    ▶
+                  </div>
+                )}
+
+                <div style={{ padding: "14px" }}>
+                  <strong>{item.title}</strong>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }
 
-const styles: Record<
-  string,
-  React.CSSProperties
-> = {
-  page: {
-    minHeight: "100vh",
-    background: "#050505",
-    color: "white",
-    padding: "30px 16px",
-    textAlign: "center",
-    fontFamily:
-      "Arial, sans-serif",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "800px",
-    margin: "0 auto",
-  },
-  logo: {
-    color: "#22c55e",
-    fontSize: "38px",
-    marginBottom: "24px",
-  },
-  title: {
-    fontSize: "28px",
-    marginBottom: "8px",
-  },
-  creatorName: {
-    color: "#22c55e",
-    fontSize: "19px",
-    fontWeight: "bold",
-    margin: "0 0 18px",
-  },
-  video: {
-    display: "block",
-    width: "100%",
-    maxHeight: "650px",
-    margin: "0 auto",
-    background: "black",
-    border: "3px solid white",
-    borderRadius: "12px",
-  },
-  description: {
-    background: "#171717",
-    border: "2px solid black",
-    borderRadius: "12px",
-    padding: "18px",
-    marginTop: "20px",
-    textAlign: "left",
-  },
-  descriptionHeading: {
-    fontSize: "22px",
-    margin: "0 0 10px",
-  },
-  descriptionText: {
-    color: "#e5e7eb",
-    fontSize: "17px",
-    lineHeight: 1.6,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-    margin: 0,
-  },
-  stats: {
-    display: "flex",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: "18px",
-    color: "#e5e7eb",
-    fontSize: "17px",
-    marginTop: "20px",
-  },
-  buttons: {
-    display: "flex",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: "14px",
-    marginTop: "24px",
-  },
-  button: {
-    background: "#22c55e",
-    color: "black",
-    border: "2px solid white",
-    borderRadius: "9px",
-    padding: "12px 22px",
-    fontSize: "17px",
-    fontWeight: "bold",
-    cursor: "pointer",
-  },
-  sharePanel: {
-    display: "flex",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: "10px",
-    background: "#171717",
-    border: "2px solid black",
-    borderRadius: "12px",
-    padding: "16px",
-    marginTop: "16px",
-  },
-  shareButton: {
-    background: "#262626",
-    color: "white",
-    border: "2px solid white",
-    borderRadius: "20px",
-    padding: "10px 18px",
-    fontWeight: "bold",
-    cursor: "pointer",
-  },
-  commentSection: {
-    background: "#171717",
-    border: "2px solid black",
-    borderRadius: "14px",
-    marginTop: "34px",
-    padding: "20px",
-    textAlign: "left",
-  },
-  commentHeading: {
-    fontSize: "25px",
-    marginTop: 0,
-  },
-  commentForm: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "10px",
-  },
-  input: {
-    flex: "1 1 300px",
-    background: "#262626",
-    color: "white",
-    border: "2px solid black",
-    borderRadius: "9px",
-    padding: "12px",
-    fontSize: "16px",
-  },
-  emptyComments: {
-    color: "#a3a3a3",
-    marginTop: "22px",
-  },
-  comment: {
-    background: "#262626",
-    border: "2px solid black",
-    borderRadius: "10px",
-    padding: "12px",
-    marginTop: "12px",
-  },
-  commentText: {
-    marginTop: "5px",
-    overflowWrap: "anywhere",
-  },
-  message: {
-    fontSize: "22px",
-    marginBottom: "24px",
-  },
-  footer: {
-    color: "#9ca3af",
-    marginTop: "70px",
-  },
+const messagePageStyle: CSSProperties = {
+  minHeight: "100vh",
+  background: "#050505",
+  color: "white",
+  fontFamily: "Arial, sans-serif",
+  textAlign: "center",
+  padding: "60px 20px",
+};
+
+const buttonStyle: CSSProperties = {
+  background: "#2b2b2b",
+  color: "white",
+  border: "2px solid black",
+  padding: "10px 16px",
+  borderRadius: "20px",
+  cursor: "pointer",
+  fontWeight: "bold",
+};
+
+const linkStyle: CSSProperties = {
+  display: "inline-block",
+  background: "#222",
+  color: "white",
+  textDecoration: "none",
+  border: "2px solid black",
+  borderRadius: "20px",
+  padding: "10px 16px",
+  fontWeight: "bold",
 }; 
