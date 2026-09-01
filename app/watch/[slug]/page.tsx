@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
@@ -24,6 +25,13 @@ const videos = [
   },
 ];
 
+type CreatorVideo = {
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+  creatorName: string;
+};
+
 export default function WatchPage() {
   const params = useParams();
 
@@ -31,7 +39,9 @@ export default function WatchPage() {
     ? params.slug[0]
     : params.slug;
 
-  const video = videos.find((item) => item.slug === slugValue);
+  const video = videos.find(
+    (item) => item.slug === slugValue
+  );
 
   const [views, setViews] = useState(0);
   const [likes, setLikes] = useState(0);
@@ -39,12 +49,18 @@ export default function WatchPage() {
   const [liking, setLiking] = useState(false);
   const [comments, setComments] = useState<string[]>([]);
   const [commentInput, setCommentInput] = useState("");
+  const [creatorVideos, setCreatorVideos] = useState<
+    CreatorVideo[]
+  >([]);
+
   const viewed = useRef(false);
 
   useEffect(() => {
     if (!video) {
       return;
     }
+
+    viewed.current = false;
 
     async function loadViews() {
       try {
@@ -94,15 +110,64 @@ export default function WatchPage() {
       }
     }
 
+    async function loadCreatorVideos() {
+      try {
+        const response = await fetch("/api/feed", {
+          cache: "no-store",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return;
+        }
+
+        const normalizedVideos: CreatorVideo[] = (
+          data.videos || []
+        ).map(
+          (item: {
+            id?: string;
+            title?: string;
+            thumbnailUrl?: string;
+            thumbnail_url?: string;
+            creatorName?: string;
+            creator_name?: string;
+          }) => ({
+            id: String(item.id || ""),
+            title: String(item.title || "Creator Video"),
+            thumbnailUrl: String(
+              item.thumbnailUrl ||
+                item.thumbnail_url ||
+                ""
+            ),
+            creatorName: String(
+              item.creatorName ||
+                item.creator_name ||
+                "Ray'sStream Creator"
+            ),
+          })
+        );
+
+        setCreatorVideos(normalizedVideos.slice(0, 6));
+      } catch (error) {
+        console.error(
+          "Unable to load creator recommendations:",
+          error
+        );
+      }
+    }
+
     const alreadyLiked =
-      localStorage.getItem(`raysstream-liked-${video.id}`) ===
-      "true";
+      localStorage.getItem(
+        `raysstream-liked-${video.id}`
+      ) === "true";
 
     setLiked(alreadyLiked);
 
     loadViews();
     loadLikes();
     loadComments();
+    loadCreatorVideos();
   }, [video]);
 
   async function addView() {
@@ -268,6 +333,7 @@ export default function WatchPage() {
     }
 
     const url = encodeURIComponent(window.location.href);
+
     const text = encodeURIComponent(
       `Watch ${video.title} on Ray'sStream`
     );
@@ -301,6 +367,7 @@ export default function WatchPage() {
     }
 
     const url = encodeURIComponent(window.location.href);
+
     const title = encodeURIComponent(
       `Watch ${video.title} on Ray'sStream`
     );
@@ -341,16 +408,7 @@ export default function WatchPage() {
 
   if (!video) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          background: "#050505",
-          color: "white",
-          fontFamily: "Arial, sans-serif",
-          textAlign: "center",
-          padding: "60px 20px",
-        }}
-      >
+      <main style={messagePageStyle}>
         <h1>Video not found</h1>
 
         <p style={{ color: "#bbb" }}>
@@ -363,6 +421,17 @@ export default function WatchPage() {
       </main>
     );
   }
+
+  const currentIndex = videos.findIndex(
+    (item) => item.id === video.id
+  );
+
+  const upNext =
+    videos[(currentIndex + 1) % videos.length];
+
+  const otherStaticVideos = videos.filter(
+    (item) => item.id !== video.id
+  );
 
   return (
     <main
@@ -575,11 +644,160 @@ export default function WatchPage() {
           ))}
         </section>
       </article>
+
+      <section
+        style={{
+          width: "min(1000px, 94%)",
+          margin: "0 auto 30px",
+          padding: "20px",
+          boxSizing: "border-box",
+          background: "#121212",
+          border: "2px solid black",
+          borderRadius: "18px",
+        }}
+      >
+        <h2>Up Next</h2>
+
+        <a
+          href={`/watch/${upNext.slug}`}
+          style={{
+            display: "block",
+            color: "white",
+            textDecoration: "none",
+            background: "#1b1b1b",
+            border: "2px solid black",
+            borderRadius: "14px",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              aspectRatio: "16 / 7",
+              display: "grid",
+              placeItems: "center",
+              background:
+                "linear-gradient(135deg, #111, #333)",
+              borderRadius: "12px",
+              fontSize: "50px",
+              marginBottom: "14px",
+            }}
+          >
+            ▶
+          </div>
+
+          <strong
+            style={{
+              fontSize: "20px",
+            }}
+          >
+            {upNext.title}
+          </strong>
+
+          <p
+            style={{
+              color: "#bbb",
+              marginBottom: 0,
+            }}
+          >
+            Watch the next Ray&apos;sStream video
+          </p>
+        </a>
+      </section>
+
+      <section
+        style={{
+          width: "min(1000px, 94%)",
+          margin: "0 auto",
+        }}
+      >
+        <h2>More Videos</h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: "16px",
+          }}
+        >
+          {otherStaticVideos.map((item) => (
+            <a
+              key={item.id}
+              href={`/watch/${item.slug}`}
+              style={recommendationCardStyle}
+            >
+              <div style={staticThumbnailStyle}>
+                ▶
+              </div>
+
+              <div style={{ padding: "14px" }}>
+                <strong>{item.title}</strong>
+
+                <p
+                  style={{
+                    color: "#bbb",
+                    margin: "6px 0 0",
+                  }}
+                >
+                  Ray&apos;sStream
+                </p>
+              </div>
+            </a>
+          ))}
+
+          {creatorVideos.map((item) => (
+            <a
+              key={item.id}
+              href={`/watch/creator/${item.id}`}
+              style={recommendationCardStyle}
+            >
+              {item.thumbnailUrl ? (
+                <img
+                  src={item.thumbnailUrl}
+                  alt={item.title}
+                  style={{
+                    width: "100%",
+                    aspectRatio: "16 / 9",
+                    objectFit: "cover",
+                    background: "black",
+                  }}
+                />
+              ) : (
+                <div style={staticThumbnailStyle}>
+                  ▶
+                </div>
+              )}
+
+              <div style={{ padding: "14px" }}>
+                <strong>{item.title}</strong>
+
+                <p
+                  style={{
+                    color: "#bbb",
+                    margin: "6px 0 0",
+                  }}
+                >
+                  {item.creatorName}
+                </p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }
 
-const buttonStyle = {
+const messagePageStyle: CSSProperties = {
+  minHeight: "100vh",
+  background: "#050505",
+  color: "white",
+  fontFamily: "Arial, sans-serif",
+  textAlign: "center",
+  padding: "60px 20px",
+};
+
+const buttonStyle: CSSProperties = {
   background: "#2b2b2b",
   color: "white",
   border: "2px solid black",
@@ -589,7 +807,7 @@ const buttonStyle = {
   fontWeight: "bold",
 };
 
-const linkStyle = {
+const linkStyle: CSSProperties = {
   display: "inline-block",
   background: "#222",
   color: "white",
@@ -598,4 +816,22 @@ const linkStyle = {
   borderRadius: "20px",
   padding: "10px 16px",
   fontWeight: "bold",
+};
+
+const recommendationCardStyle: CSSProperties = {
+  color: "white",
+  textDecoration: "none",
+  background: "#121212",
+  border: "2px solid black",
+  borderRadius: "14px",
+  overflow: "hidden",
+};
+
+const staticThumbnailStyle: CSSProperties = {
+  width: "100%",
+  aspectRatio: "16 / 9",
+  display: "grid",
+  placeItems: "center",
+  background: "linear-gradient(135deg, #111, #333)",
+  fontSize: "40px",
 }; 
