@@ -34,6 +34,9 @@ export default function WatchPage() {
   const video = videos.find((item) => item.slug === slugValue);
 
   const [views, setViews] = useState(0);
+  const [likes, setLikes] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [liking, setLiking] = useState(false);
   const [comments, setComments] = useState<string[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const viewed = useRef(false);
@@ -53,6 +56,19 @@ export default function WatchPage() {
         }
       } catch (error) {
         console.error("Unable to load views:", error);
+      }
+    }
+
+    async function loadLikes() {
+      try {
+        const response = await fetch("/api/likes");
+        const data = await response.json();
+
+        if (response.ok && video) {
+          setLikes(Number(data.likes?.[video.id] || 0));
+        }
+      } catch (error) {
+        console.error("Unable to load likes:", error);
       }
     }
 
@@ -78,7 +94,14 @@ export default function WatchPage() {
       }
     }
 
+    const alreadyLiked =
+      localStorage.getItem(`raysstream-liked-${video.id}`) ===
+      "true";
+
+    setLiked(alreadyLiked);
+
     loadViews();
+    loadLikes();
     loadComments();
   }, [video]);
 
@@ -111,6 +134,46 @@ export default function WatchPage() {
     } catch (error) {
       viewed.current = false;
       console.error("Unable to save view:", error);
+    }
+  }
+
+  async function likeVideo() {
+    if (!video || liked || liking) {
+      return;
+    }
+
+    try {
+      setLiking(true);
+
+      const response = await fetch("/api/likes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          videoId: video.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Unable to save like.");
+        return;
+      }
+
+      setLikes(Number(data.count || 0));
+      setLiked(true);
+
+      localStorage.setItem(
+        `raysstream-liked-${video.id}`,
+        "true"
+      );
+    } catch (error) {
+      console.error("Unable to save like:", error);
+      alert("Unable to connect to the likes database.");
+    } finally {
+      setLiking(false);
     }
   }
 
@@ -374,8 +437,26 @@ export default function WatchPage() {
             fontSize: "18px",
           }}
         >
-          👁 {views} views &nbsp; 💬 {comments.length} comments
+          👁 {views} views &nbsp;
+          👍 {likes} likes &nbsp;
+          💬 {comments.length} comments
         </p>
+
+        <button
+          onClick={likeVideo}
+          disabled={liked || liking}
+          style={{
+            ...buttonStyle,
+            marginBottom: "24px",
+            opacity: liked || liking ? 0.65 : 1,
+          }}
+        >
+          {liking
+            ? "Saving Like..."
+            : liked
+              ? "✓ Liked"
+              : "👍 Like Video"}
+        </button>
 
         <section
           style={{

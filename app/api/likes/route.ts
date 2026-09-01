@@ -1,89 +1,126 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
 
-const connectionString = process.env.RAYSSTREAM_DB_DATABASE_URL;
+export const dynamic = "force-dynamic";
+
+const connectionString =
+  process.env.RAYSSTREAM_DB_DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error("RAYSSTREAM_DB_DATABASE_URL is missing");
+  throw new Error(
+    "RAYSSTREAM_DB_DATABASE_URL is missing"
+  );
 }
 
 const sql = postgres(connectionString, {
   ssl: "require",
 });
 
-async function createLikesTable() {
+async function ensureLikesTable() {
   await sql`
     CREATE TABLE IF NOT EXISTS video_likes (
-      video_id TEXT PRIMARY KEY,
-      likes INTEGER NOT NULL DEFAULT 0
+      video_id INTEGER PRIMARY KEY,
+      like_count INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `;
+
+  await sql`
+    ALTER TABLE video_likes
+    ADD COLUMN IF NOT EXISTS like_count
+    INTEGER NOT NULL DEFAULT 0
+  `;
+
+  await sql`
+    ALTER TABLE video_likes
+    ADD COLUMN IF NOT EXISTS updated_at
+    TIMESTAMPTZ NOT NULL DEFAULT NOW()
   `;
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    await createLikesTable();
-
-    const { searchParams } = new URL(request.url);
-    const videoId = searchParams.get("videoId");
-
-    if (!videoId) {
-      return NextResponse.json(
-        { error: "Video ID is required." },
-        { status: 400 }
-      );
-    }
+    await ensureLikesTable();
 
     const rows = await sql`
-      SELECT likes
+      SELECT video_id, like_count
       FROM video_likes
-      WHERE video_id = ${videoId}
+      ORDER BY video_id
     `;
 
+    const likes: Record<number, number> = {};
+
+    for (const row of rows) {
+      likes[Number(row.video_id)] =
+        Number(row.like_count);
+    }
+
     return NextResponse.json({
-      likes: rows[0]?.likes ?? 0,
+      likes,
     });
   } catch (error) {
-    console.error("Get likes error:", error);
+    console.error("Unable to load likes:", error);
 
     return NextResponse.json(
-      { error: "Could not load likes." },
-      { status: 500 }
+      {
+        error: "Unable to load likes.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    await createLikesTable();
+    await ensureLikesTable();
 
     const body = await request.json();
-    const videoId = body.videoId;
+    const videoId = Number(body.videoId);
 
-    if (!videoId) {
+    if (!Number.isInteger(videoId) || videoId < 1) {
       return NextResponse.json(
-        { error: "Video ID is required." },
-        { status: 400 }
+        {
+          error: "A valid video ID is required.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     const rows = await sql`
-      INSERT INTO video_likes (video_id, likes)
-      VALUES (${videoId}, 1)
+      INSERT INTO video_likes (
+        video_id,
+        like_count,
+        updated_at
+      )
+      VALUES (
+        ${videoId},
+        1,
+        NOW()
+      )
       ON CONFLICT (video_id)
-      DO UPDATE SET likes = video_likes.likes + 1
-      RETURNING likes
+      DO UPDATE SET
+        like_count = video_likes.like_count + 1,
+        updated_at = NOW()
+      RETURNING like_count
     `;
 
     return NextResponse.json({
-      likes: rows[0].likes,
+      count: Number(rows[0].like_count),
     });
   } catch (error) {
-    console.error("Add like error:", error);
+    console.error("Unable to save like:", error);
 
     return NextResponse.json(
-      { error: "Could not add like." },
-      { status: 500 }
+      {
+        error: "Unable to save like.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 } 
