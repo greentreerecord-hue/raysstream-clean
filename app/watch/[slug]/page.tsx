@@ -32,6 +32,13 @@ type CreatorVideo = {
   creatorName: string;
 };
 
+type VideoComment = {
+  id: number;
+  text: string;
+  viewerName: string;
+  viewerUsername: string | null;
+};
+
 export default function WatchPage() {
   const params = useParams();
 
@@ -47,8 +54,13 @@ export default function WatchPage() {
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
-  const [comments, setComments] = useState<string[]>([]);
+
+  const [comments, setComments] = useState<
+    VideoComment[]
+  >([]);
+
   const [commentInput, setCommentInput] = useState("");
+
   const [creatorVideos, setCreatorVideos] = useState<
     CreatorVideo[]
   >([]);
@@ -68,7 +80,9 @@ export default function WatchPage() {
         const data = await response.json();
 
         if (response.ok && video) {
-          setViews(Number(data.views?.[video.id] || 0));
+          setViews(
+            Number(data.views?.[video.id] || 0)
+          );
         }
       } catch (error) {
         console.error("Unable to load views:", error);
@@ -77,11 +91,32 @@ export default function WatchPage() {
 
     async function loadLikes() {
       try {
-        const response = await fetch("/api/likes");
+        const viewerId =
+          localStorage.getItem("raysstreamViewerId");
+
+        const likesUrl = viewerId
+          ? `/api/likes?viewerId=${encodeURIComponent(
+              viewerId
+            )}`
+          : "/api/likes";
+
+        const response = await fetch(likesUrl);
         const data = await response.json();
 
         if (response.ok && video) {
-          setLikes(Number(data.likes?.[video.id] || 0));
+          setLikes(
+            Number(data.likes?.[video.id] || 0)
+          );
+
+          const likedVideoIds = (
+            data.likedVideoIds || []
+          ).map((videoId: number | string) =>
+            Number(videoId)
+          );
+
+          setLiked(
+            likedVideoIds.includes(video.id)
+          );
         }
       } catch (error) {
         console.error("Unable to load likes:", error);
@@ -94,19 +129,37 @@ export default function WatchPage() {
         const data = await response.json();
 
         if (response.ok && video) {
-          const videoComments = (data.comments || [])
+          const videoComments: VideoComment[] = (
+            data.comments || []
+          )
             .filter(
               (comment: { videoId: number }) =>
                 Number(comment.videoId) === video.id
             )
-            .map((comment: { text: string }) =>
-              String(comment.text)
+            .map(
+              (comment: {
+                id: number;
+                text: string;
+                viewerName?: string;
+                viewerUsername?: string | null;
+              }) => ({
+                id: Number(comment.id),
+                text: String(comment.text),
+                viewerName:
+                  comment.viewerName ||
+                  "Ray'sStream User",
+                viewerUsername:
+                  comment.viewerUsername || null,
+              })
             );
 
           setComments(videoComments);
         }
       } catch (error) {
-        console.error("Unable to load comments:", error);
+        console.error(
+          "Unable to load comments:",
+          error
+        );
       }
     }
 
@@ -134,7 +187,9 @@ export default function WatchPage() {
             creator_name?: string;
           }) => ({
             id: String(item.id || ""),
-            title: String(item.title || "Creator Video"),
+            title: String(
+              item.title || "Creator Video"
+            ),
             thumbnailUrl: String(
               item.thumbnailUrl ||
                 item.thumbnail_url ||
@@ -148,7 +203,9 @@ export default function WatchPage() {
           })
         );
 
-        setCreatorVideos(normalizedVideos.slice(0, 6));
+        setCreatorVideos(
+          normalizedVideos.slice(0, 6)
+        );
       } catch (error) {
         console.error(
           "Unable to load creator recommendations:",
@@ -157,18 +214,21 @@ export default function WatchPage() {
       }
     }
 
-    const alreadyLiked =
-      localStorage.getItem(
-        `raysstream-liked-${video.id}`
-      ) === "true";
-
-    setLiked(alreadyLiked);
-
     loadViews();
     loadLikes();
     loadComments();
     loadCreatorVideos();
   }, [video]);
+
+  function clearViewerLogin() {
+    localStorage.removeItem("raysstreamViewer");
+    localStorage.removeItem("raysstreamViewerId");
+    localStorage.removeItem("raysstreamViewerName");
+    localStorage.removeItem(
+      "raysstreamViewerUsername"
+    );
+    localStorage.removeItem("raysstreamViewerEmail");
+  }
 
   async function addView() {
     if (!video || viewed.current) {
@@ -207,6 +267,34 @@ export default function WatchPage() {
       return;
     }
 
+    const viewerIdValue =
+      localStorage.getItem("raysstreamViewerId");
+
+    if (!viewerIdValue) {
+      const shouldLogin = window.confirm(
+        "Please sign in to your viewer account to like videos. Go to Viewer Login now?"
+      );
+
+      if (shouldLogin) {
+        window.location.href = "/viewer/login";
+      }
+
+      return;
+    }
+
+    const viewerId = Number(viewerIdValue);
+
+    if (!Number.isInteger(viewerId) || viewerId < 1) {
+      clearViewerLogin();
+
+      alert(
+        "Your viewer login has expired. Please log in again."
+      );
+
+      window.location.href = "/viewer/login";
+      return;
+    }
+
     try {
       setLiking(true);
 
@@ -217,6 +305,7 @@ export default function WatchPage() {
         },
         body: JSON.stringify({
           videoId: video.id,
+          viewerId,
         }),
       });
 
@@ -230,13 +319,15 @@ export default function WatchPage() {
       setLikes(Number(data.count || 0));
       setLiked(true);
 
-      localStorage.setItem(
-        `raysstream-liked-${video.id}`,
-        "true"
-      );
+      if (data.alreadyLiked) {
+        alert("You already liked this video.");
+      }
     } catch (error) {
       console.error("Unable to save like:", error);
-      alert("Unable to connect to the likes database.");
+
+      alert(
+        "Unable to connect to the likes database."
+      );
     } finally {
       setLiking(false);
     }
@@ -253,6 +344,34 @@ export default function WatchPage() {
       return;
     }
 
+    const viewerIdValue =
+      localStorage.getItem("raysstreamViewerId");
+
+    if (!viewerIdValue) {
+      const shouldLogin = window.confirm(
+        "Please sign in to your viewer account to comment. Go to Viewer Login now?"
+      );
+
+      if (shouldLogin) {
+        window.location.href = "/viewer/login";
+      }
+
+      return;
+    }
+
+    const viewerId = Number(viewerIdValue);
+
+    if (!Number.isInteger(viewerId) || viewerId < 1) {
+      clearViewerLogin();
+
+      alert(
+        "Your viewer login has expired. Please log in again."
+      );
+
+      window.location.href = "/viewer/login";
+      return;
+    }
+
     try {
       const response = await fetch("/api/comments", {
         method: "POST",
@@ -262,25 +381,42 @@ export default function WatchPage() {
         body: JSON.stringify({
           videoId: video.id,
           text,
+          viewerId,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Unable to save comment.");
+        alert(
+          data.error || "Unable to save comment."
+        );
         return;
       }
 
       setComments((current) => [
         ...current,
-        data.comment.text,
+        {
+          id: Number(data.comment.id),
+          text: String(data.comment.text),
+          viewerName:
+            data.comment.viewerName ||
+            "Ray'sStream User",
+          viewerUsername:
+            data.comment.viewerUsername || null,
+        },
       ]);
 
       setCommentInput("");
     } catch (error) {
-      console.error("Unable to save comment:", error);
-      alert("Unable to connect to the comments database.");
+      console.error(
+        "Unable to save comment:",
+        error
+      );
+
+      alert(
+        "Unable to connect to the comments database."
+      );
     }
   }
 
@@ -306,7 +442,8 @@ export default function WatchPage() {
       try {
         await navigator.share({
           title: video.title,
-          text: `Watch ${video.title} on Ray'sStream`,
+          text:
+            `Watch ${video.title} on Ray'sStream`,
           url,
         });
       } catch {
@@ -318,7 +455,9 @@ export default function WatchPage() {
   }
 
   function shareFacebook() {
-    const url = encodeURIComponent(window.location.href);
+    const url = encodeURIComponent(
+      window.location.href
+    );
 
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${url}`,
@@ -332,7 +471,9 @@ export default function WatchPage() {
       return;
     }
 
-    const url = encodeURIComponent(window.location.href);
+    const url = encodeURIComponent(
+      window.location.href
+    );
 
     const text = encodeURIComponent(
       `Watch ${video.title} on Ray'sStream`
@@ -366,7 +507,9 @@ export default function WatchPage() {
       return;
     }
 
-    const url = encodeURIComponent(window.location.href);
+    const url = encodeURIComponent(
+      window.location.href
+    );
 
     const title = encodeURIComponent(
       `Watch ${video.title} on Ray'sStream`
@@ -380,7 +523,9 @@ export default function WatchPage() {
   }
 
   function shareLinkedIn() {
-    const url = encodeURIComponent(window.location.href);
+    const url = encodeURIComponent(
+      window.location.href
+    );
 
     window.open(
       `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
@@ -404,9 +549,8 @@ export default function WatchPage() {
 
     window.location.href =
       `mailto:?subject=${subject}&body=${body}`;
-  }
-
-  if (!video) {
+  } 
+if (!video) {
     return (
       <main style={messagePageStyle}>
         <h1>Video not found</h1>
@@ -527,11 +671,7 @@ export default function WatchPage() {
               : "👍 Like Video"}
         </button>
 
-        <section
-          style={{
-            marginBottom: "28px",
-          }}
-        >
+        <section style={{ marginBottom: "28px" }}>
           <h3>Share This Video</h3>
 
           <div
@@ -541,35 +681,59 @@ export default function WatchPage() {
               gap: "10px",
             }}
           >
-            <button onClick={shareToApps} style={buttonStyle}>
+            <button
+              onClick={shareToApps}
+              style={buttonStyle}
+            >
               📱 Share to Apps
             </button>
 
-            <button onClick={shareFacebook} style={buttonStyle}>
+            <button
+              onClick={shareFacebook}
+              style={buttonStyle}
+            >
               Facebook
             </button>
 
-            <button onClick={shareX} style={buttonStyle}>
+            <button
+              onClick={shareX}
+              style={buttonStyle}
+            >
               X
             </button>
 
-            <button onClick={shareWhatsApp} style={buttonStyle}>
+            <button
+              onClick={shareWhatsApp}
+              style={buttonStyle}
+            >
               WhatsApp
             </button>
 
-            <button onClick={shareReddit} style={buttonStyle}>
+            <button
+              onClick={shareReddit}
+              style={buttonStyle}
+            >
               Reddit
             </button>
 
-            <button onClick={shareLinkedIn} style={buttonStyle}>
+            <button
+              onClick={shareLinkedIn}
+              style={buttonStyle}
+            >
               LinkedIn
             </button>
 
-            <button onClick={shareEmail} style={buttonStyle}>
+            <button
+              onClick={shareEmail}
+              style={buttonStyle}
+            >
               Email
             </button>
 
-            <button onClick={copyVideoLink} style={buttonStyle}>
+            <button
+              onClick={copyVideoLink}
+              style={buttonStyle}
+            >
               Copy Link
             </button>
 
@@ -585,8 +749,8 @@ export default function WatchPage() {
               marginTop: "12px",
             }}
           >
-            For Instagram, TikTok, Messenger, and other apps,
-            use Share to Apps or Copy Link.
+            For Instagram, TikTok, Messenger, and
+            other apps, use Share to Apps or Copy Link.
           </p>
         </section>
 
@@ -622,14 +786,17 @@ export default function WatchPage() {
               }}
             />
 
-            <button onClick={postComment} style={buttonStyle}>
+            <button
+              onClick={postComment}
+              style={buttonStyle}
+            >
               Post
             </button>
           </div>
 
-          {comments.map((comment, index) => (
+          {comments.map((comment) => (
             <div
-              key={index}
+              key={comment.id}
               style={{
                 background: "#1b1b1b",
                 marginTop: "10px",
@@ -638,8 +805,22 @@ export default function WatchPage() {
                 borderRadius: "10px",
               }}
             >
-              <strong>Ray&apos;sStream User</strong>
-              <div>{comment}</div>
+              <strong>{comment.viewerName}</strong>
+
+              {comment.viewerUsername && (
+                <span
+                  style={{
+                    marginLeft: "8px",
+                    color: "#aaa",
+                  }}
+                >
+                  @{comment.viewerUsername}
+                </span>
+              )}
+
+              <div style={{ marginTop: "5px" }}>
+                {comment.text}
+              </div>
             </div>
           ))}
         </section>
@@ -686,11 +867,7 @@ export default function WatchPage() {
             }}
           />
 
-          <strong
-            style={{
-              fontSize: "20px",
-            }}
-          >
+          <strong style={{ fontSize: "20px" }}>
             {upNext.title}
           </strong>
 
