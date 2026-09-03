@@ -18,6 +18,8 @@ type CreatorVideo = {
 type Comment = {
   id: number;
   text: string;
+  viewerName: string;
+  viewerUsername: string | null;
   createdAt: string;
 };
 
@@ -41,13 +43,21 @@ export default function CreatorWatchPage() {
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [commentInput, setCommentInput] = useState("");
+
+  const [comments, setComments] = useState<
+    Comment[]
+  >([]);
+
+  const [commentInput, setCommentInput] =
+    useState("");
+
   const [postingComment, setPostingComment] =
     useState(false);
 
   const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
 
   const viewed = useRef(false);
 
@@ -57,13 +67,6 @@ export default function CreatorWatchPage() {
     }
 
     viewed.current = false;
-
-    const alreadyLiked =
-      localStorage.getItem(
-        `raysstream-creator-liked-${videoId}`
-      ) === "true";
-
-    setLiked(alreadyLiked);
 
     async function loadVideo() {
       try {
@@ -102,9 +105,15 @@ export default function CreatorWatchPage() {
             channel_id?: string;
           }) => ({
             id: String(item.id || ""),
-            url: String(item.url || item.blob_url || ""),
-            title: String(item.title || "Creator Video"),
-            description: String(item.description || ""),
+            url: String(
+              item.url || item.blob_url || ""
+            ),
+            title: String(
+              item.title || "Creator Video"
+            ),
+            description: String(
+              item.description || ""
+            ),
             creatorName: String(
               item.creatorName ||
                 item.creator_name ||
@@ -128,12 +137,15 @@ export default function CreatorWatchPage() {
           })
         );
 
-        const selectedVideo = normalizedVideos.find(
-          (item) => item.id === videoId
-        );
+        const selectedVideo =
+          normalizedVideos.find(
+            (item) => item.id === videoId
+          );
 
         if (!selectedVideo) {
-          setErrorMessage("Creator video not found.");
+          setErrorMessage(
+            "Creator video not found."
+          );
           return;
         }
 
@@ -144,7 +156,8 @@ export default function CreatorWatchPage() {
             .filter(
               (item) =>
                 item.id !== selectedVideo.id &&
-                item.channelId === selectedVideo.channelId
+                item.channelId ===
+                  selectedVideo.channelId
             )
             .slice(0, 6)
         );
@@ -164,9 +177,16 @@ export default function CreatorWatchPage() {
 
     async function loadEngagement() {
       try {
+        const viewerId =
+          localStorage.getItem(
+            "raysstreamViewerId"
+          ) || "";
+
         const response = await fetch(
           `/api/creator-engagement?videoId=${encodeURIComponent(
             videoId
+          )}&viewerId=${encodeURIComponent(
+            viewerId
           )}`,
           {
             cache: "no-store",
@@ -178,6 +198,7 @@ export default function CreatorWatchPage() {
         if (response.ok) {
           setViews(Number(data.views || 0));
           setLikes(Number(data.likes || 0));
+          setLiked(Boolean(data.liked));
           setComments(data.comments || []);
         }
       } catch (error) {
@@ -191,6 +212,20 @@ export default function CreatorWatchPage() {
     loadVideo();
     loadEngagement();
   }, [videoId]);
+
+  function getViewerId() {
+    return localStorage.getItem(
+      "raysstreamViewerId"
+    );
+  }
+
+  function requireViewerLogin() {
+    alert(
+      "Please log in to your viewer account first."
+    );
+
+    window.location.href = "/viewer/login";
+  }
 
   async function addView() {
     if (!video || viewed.current) {
@@ -237,6 +272,13 @@ export default function CreatorWatchPage() {
       return;
     }
 
+    const viewerId = getViewerId();
+
+    if (!viewerId) {
+      requireViewerLogin();
+      return;
+    }
+
     try {
       setLiking(true);
 
@@ -250,6 +292,7 @@ export default function CreatorWatchPage() {
           body: JSON.stringify({
             videoId: video.id,
             action: "like",
+            viewerId: Number(viewerId),
           }),
         }
       );
@@ -257,20 +300,26 @@ export default function CreatorWatchPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 401) {
+          requireViewerLogin();
+          return;
+        }
+
         alert(data.error || "Unable to save like.");
         return;
       }
 
       setLikes(Number(data.count || 0));
       setLiked(true);
-
-      localStorage.setItem(
-        `raysstream-creator-liked-${video.id}`,
-        "true"
-      );
     } catch (error) {
-      console.error("Unable to save like:", error);
-      alert("Unable to connect to the likes database.");
+      console.error(
+        "Unable to save like:",
+        error
+      );
+
+      alert(
+        "Unable to connect to the likes database."
+      );
     } finally {
       setLiking(false);
     }
@@ -278,6 +327,13 @@ export default function CreatorWatchPage() {
 
   async function postComment() {
     if (!video || postingComment) {
+      return;
+    }
+
+    const viewerId = getViewerId();
+
+    if (!viewerId) {
+      requireViewerLogin();
       return;
     }
 
@@ -300,6 +356,7 @@ export default function CreatorWatchPage() {
           body: JSON.stringify({
             videoId: video.id,
             action: "comment",
+            viewerId: Number(viewerId),
             text,
           }),
         }
@@ -308,7 +365,14 @@ export default function CreatorWatchPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Unable to save comment.");
+        if (response.status === 401) {
+          requireViewerLogin();
+          return;
+        }
+
+        alert(
+          data.error || "Unable to save comment."
+        );
         return;
       }
 
@@ -354,7 +418,8 @@ export default function CreatorWatchPage() {
       try {
         await navigator.share({
           title: video.title,
-          text: `Watch ${video.title} on Ray'sStream`,
+          text:
+            `Watch ${video.title} on Ray'sStream`,
           url,
         });
       } catch {
@@ -366,7 +431,9 @@ export default function CreatorWatchPage() {
   }
 
   function shareFacebook() {
-    const url = encodeURIComponent(window.location.href);
+    const url = encodeURIComponent(
+      window.location.href
+    );
 
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${url}`,
@@ -380,7 +447,9 @@ export default function CreatorWatchPage() {
       return;
     }
 
-    const url = encodeURIComponent(window.location.href);
+    const url = encodeURIComponent(
+      window.location.href
+    );
 
     const text = encodeURIComponent(
       `Watch ${video.title} on Ray'sStream`
@@ -414,7 +483,9 @@ export default function CreatorWatchPage() {
       return;
     }
 
-    const url = encodeURIComponent(window.location.href);
+    const url = encodeURIComponent(
+      window.location.href
+    );
 
     const title = encodeURIComponent(
       `Watch ${video.title} on Ray'sStream`
@@ -428,7 +499,9 @@ export default function CreatorWatchPage() {
   }
 
   function shareLinkedIn() {
-    const url = encodeURIComponent(window.location.href);
+    const url = encodeURIComponent(
+      window.location.href
+    );
 
     window.open(
       `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
@@ -452,9 +525,8 @@ export default function CreatorWatchPage() {
 
     window.location.href =
       `mailto:?subject=${subject}&body=${body}`;
-  }
-
-  if (loading) {
+  } 
+if (loading) {
     return (
       <main style={messagePageStyle}>
         <h1>Ray&apos;sStream</h1>
@@ -534,7 +606,9 @@ export default function CreatorWatchPage() {
 
         <video
           src={video.url}
-          poster={video.thumbnailUrl || undefined}
+          poster={
+            video.thumbnailUrl || undefined
+          }
           controls
           playsInline
           preload="metadata"
@@ -559,7 +633,9 @@ export default function CreatorWatchPage() {
         >
           {video.creatorProfilePictureUrl ? (
             <img
-              src={video.creatorProfilePictureUrl}
+              src={
+                video.creatorProfilePictureUrl
+              }
               alt={video.creatorName}
               style={{
                 width: "54px",
@@ -642,7 +718,8 @@ export default function CreatorWatchPage() {
           style={{
             ...buttonStyle,
             marginBottom: "24px",
-            opacity: liked || liking ? 0.65 : 1,
+            opacity:
+              liked || liking ? 0.65 : 1,
           }}
         >
           {liking
@@ -652,11 +729,7 @@ export default function CreatorWatchPage() {
               : "👍 Like Video"}
         </button>
 
-        <section
-          style={{
-            marginBottom: "28px",
-          }}
-        >
+        <section style={{ marginBottom: "28px" }}>
           <h3>Share This Video</h3>
 
           <div
@@ -666,35 +739,59 @@ export default function CreatorWatchPage() {
               gap: "10px",
             }}
           >
-            <button onClick={shareToApps} style={buttonStyle}>
+            <button
+              onClick={shareToApps}
+              style={buttonStyle}
+            >
               📱 Share to Apps
             </button>
 
-            <button onClick={shareFacebook} style={buttonStyle}>
+            <button
+              onClick={shareFacebook}
+              style={buttonStyle}
+            >
               Facebook
             </button>
 
-            <button onClick={shareX} style={buttonStyle}>
+            <button
+              onClick={shareX}
+              style={buttonStyle}
+            >
               X
             </button>
 
-            <button onClick={shareWhatsApp} style={buttonStyle}>
+            <button
+              onClick={shareWhatsApp}
+              style={buttonStyle}
+            >
               WhatsApp
             </button>
 
-            <button onClick={shareReddit} style={buttonStyle}>
+            <button
+              onClick={shareReddit}
+              style={buttonStyle}
+            >
               Reddit
             </button>
 
-            <button onClick={shareLinkedIn} style={buttonStyle}>
+            <button
+              onClick={shareLinkedIn}
+              style={buttonStyle}
+            >
               LinkedIn
             </button>
 
-            <button onClick={shareEmail} style={buttonStyle}>
+            <button
+              onClick={shareEmail}
+              style={buttonStyle}
+            >
               Email
             </button>
 
-            <button onClick={copyVideoLink} style={buttonStyle}>
+            <button
+              onClick={copyVideoLink}
+              style={buttonStyle}
+            >
               Copy Link
             </button>
 
@@ -710,8 +807,9 @@ export default function CreatorWatchPage() {
               marginTop: "12px",
             }}
           >
-            For Instagram, TikTok, Messenger, and other apps,
-            use Share to Apps or Copy Link.
+            For Instagram, TikTok, Messenger, and
+            other apps, use Share to Apps or Copy
+            Link.
           </p>
         </section>
 
@@ -728,7 +826,9 @@ export default function CreatorWatchPage() {
             <input
               value={commentInput}
               onChange={(event) =>
-                setCommentInput(event.target.value)
+                setCommentInput(
+                  event.target.value
+                )
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -752,10 +852,14 @@ export default function CreatorWatchPage() {
               disabled={postingComment}
               style={{
                 ...buttonStyle,
-                opacity: postingComment ? 0.65 : 1,
+                opacity: postingComment
+                  ? 0.65
+                  : 1,
               }}
             >
-              {postingComment ? "Posting..." : "Post"}
+              {postingComment
+                ? "Posting..."
+                : "Post"}
             </button>
           </div>
 
@@ -770,7 +874,22 @@ export default function CreatorWatchPage() {
                 borderRadius: "10px",
               }}
             >
-              <strong>Ray&apos;sStream User</strong>
+              <strong>
+                {comment.viewerName ||
+                  "Ray'sStream User"}
+
+                {comment.viewerUsername && (
+                  <span
+                    style={{
+                      color: "#9dc5ff",
+                      marginLeft: "8px",
+                    }}
+                  >
+                    @{comment.viewerUsername}
+                  </span>
+                )}
+              </strong>
+
               <div>{comment.text}</div>
             </div>
           ))}
@@ -784,7 +903,9 @@ export default function CreatorWatchPage() {
             margin: "0 auto",
           }}
         >
-          <h2>More From {video.creatorName}</h2>
+          <h2>
+            More From {video.creatorName}
+          </h2>
 
           <div
             style={{
@@ -798,36 +919,16 @@ export default function CreatorWatchPage() {
               <a
                 key={item.id}
                 href={`/watch/creator/${item.id}`}
-                style={{
-                  color: "white",
-                  textDecoration: "none",
-                  background: "#121212",
-                  border: "2px solid black",
-                  borderRadius: "14px",
-                  overflow: "hidden",
-                }}
+                style={videoCardStyle}
               >
                 {item.thumbnailUrl ? (
                   <img
                     src={item.thumbnailUrl}
                     alt={item.title}
-                    style={{
-                      width: "100%",
-                      aspectRatio: "16 / 9",
-                      objectFit: "cover",
-                      background: "black",
-                    }}
+                    style={thumbnailStyle}
                   />
                 ) : (
-                  <div
-                    style={{
-                      width: "100%",
-                      aspectRatio: "16 / 9",
-                      display: "grid",
-                      placeItems: "center",
-                      background: "black",
-                    }}
-                  >
+                  <div style={emptyThumbnailStyle}>
                     ▶
                   </div>
                 )}
@@ -872,4 +973,28 @@ const linkStyle: CSSProperties = {
   borderRadius: "20px",
   padding: "10px 16px",
   fontWeight: "bold",
+};
+
+const videoCardStyle: CSSProperties = {
+  color: "white",
+  textDecoration: "none",
+  background: "#121212",
+  border: "2px solid black",
+  borderRadius: "14px",
+  overflow: "hidden",
+};
+
+const thumbnailStyle: CSSProperties = {
+  width: "100%",
+  aspectRatio: "16 / 9",
+  objectFit: "cover",
+  background: "black",
+};
+
+const emptyThumbnailStyle: CSSProperties = {
+  width: "100%",
+  aspectRatio: "16 / 9",
+  display: "grid",
+  placeItems: "center",
+  background: "black",
 }; 

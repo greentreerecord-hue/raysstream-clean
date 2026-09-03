@@ -21,6 +21,7 @@ export async function PUT(request: Request) {
     const body = await request.json();
 
     const viewerId = Number(body.viewerId);
+
     const fullName = String(
       body.fullName || ""
     ).trim();
@@ -86,6 +87,12 @@ export async function PUT(request: Request) {
 
     await sql`
       UPDATE video_comments
+      SET viewer_name = ${fullName}
+      WHERE viewer_id = ${viewerId}
+    `;
+
+    await sql`
+      UPDATE creator_video_comments
       SET viewer_name = ${fullName}
       WHERE viewer_id = ${viewerId}
     `;
