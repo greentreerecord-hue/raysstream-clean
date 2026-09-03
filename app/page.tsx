@@ -8,6 +8,7 @@ type VideoComment = {
   text: string;
   viewerName: string;
   viewerUsername: string | null;
+  viewerProfilePictureUrl: string | null;
 };
 
 const videos = [
@@ -32,30 +33,34 @@ const videos = [
 ];
 
 export default function Home() {
-  const [views, setViews] = useState<number[]>([0, 0, 0]);
-  const [likes, setLikes] = useState<number[]>([0, 0, 0]);
+  const [views, setViews] = useState<number[]>([
+    0, 0, 0,
+  ]);
+
+  const [likes, setLikes] = useState<number[]>([
+    0, 0, 0,
+  ]);
+
   const [likedVideoIds, setLikedVideoIds] =
     useState<Set<number>>(new Set());
 
   const [subscribers, setSubscribers] = useState(0);
-  const [subscriberEmail, setSubscriberEmail] = useState("");
+  const [subscriberEmail, setSubscriberEmail] =
+    useState("");
+
   const [subscriptionMessage, setSubscriptionMessage] =
     useState("");
-  const [subscribing, setSubscribing] = useState(false);
+
+  const [subscribing, setSubscribing] =
+    useState(false);
 
   const viewedVideos = useRef<Set<number>>(new Set());
 
-  const [comments, setComments] = useState<VideoComment[][]>([
-    [],
-    [],
-    [],
-  ]);
+  const [comments, setComments] =
+    useState<VideoComment[][]>([[], [], []]);
 
-  const [commentInputs, setCommentInputs] = useState<string[]>([
-    "",
-    "",
-    "",
-  ]);
+  const [commentInputs, setCommentInputs] =
+    useState<string[]>(["", "", ""]);
 
   useEffect(() => {
     async function loadSubscriberCount() {
@@ -67,7 +72,10 @@ export default function Home() {
           setSubscribers(Number(data.count || 0));
         }
       } catch (error) {
-        console.error("Unable to load subscribers:", error);
+        console.error(
+          "Unable to load subscribers:",
+          error
+        );
       }
     }
 
@@ -84,14 +92,18 @@ export default function Home() {
           );
         }
       } catch (error) {
-        console.error("Unable to load video views:", error);
+        console.error(
+          "Unable to load video views:",
+          error
+        );
       }
     }
 
     async function loadVideoLikes() {
       try {
-        const viewerId =
-          localStorage.getItem("raysstreamViewerId");
+        const viewerId = localStorage.getItem(
+          "raysstreamViewerId"
+        );
 
         const likesUrl = viewerId
           ? `/api/likes?viewerId=${encodeURIComponent(
@@ -119,13 +131,19 @@ export default function Home() {
           );
         }
       } catch (error) {
-        console.error("Unable to load video likes:", error);
+        console.error(
+          "Unable to load video likes:",
+          error
+        );
       }
     }
 
     async function loadVideoComments() {
       try {
-        const response = await fetch("/api/comments");
+        const response = await fetch("/api/comments", {
+          cache: "no-store",
+        });
+
         const data = await response.json();
 
         if (!response.ok) {
@@ -145,17 +163,27 @@ export default function Home() {
             groupedComments[videoIndex].push({
               id: Number(comment.id),
               text: String(comment.text),
+
               viewerName:
-                comment.viewerName || "Ray'sStream User",
+                comment.viewerName ||
+                "Ray'sStream User",
+
               viewerUsername:
                 comment.viewerUsername || null,
+
+              viewerProfilePictureUrl:
+                comment.viewerProfilePictureUrl ||
+                null,
             });
           }
         }
 
         setComments(groupedComments);
       } catch (error) {
-        console.error("Unable to load comments:", error);
+        console.error(
+          "Unable to load comments:",
+          error
+        );
       }
     }
 
@@ -169,11 +197,18 @@ export default function Home() {
     localStorage.removeItem("raysstreamViewer");
     localStorage.removeItem("raysstreamViewerId");
     localStorage.removeItem("raysstreamViewerName");
-    localStorage.removeItem("raysstreamViewerUsername");
+
+    localStorage.removeItem(
+      "raysstreamViewerUsername"
+    );
+
     localStorage.removeItem("raysstreamViewerEmail");
   }
 
-  async function addView(index: number, videoId: number) {
+  async function addView(
+    index: number,
+    videoId: number
+  ) {
     if (viewedVideos.current.has(videoId)) {
       return;
     }
@@ -203,13 +238,21 @@ export default function Home() {
       });
     } catch (error) {
       viewedVideos.current.delete(videoId);
-      console.error("Unable to save video view:", error);
+
+      console.error(
+        "Unable to save video view:",
+        error
+      );
     }
   }
 
-  async function likeVideo(index: number, videoId: number) {
-    const viewerIdValue =
-      localStorage.getItem("raysstreamViewerId");
+  async function likeVideo(
+    index: number,
+    videoId: number
+  ) {
+    const viewerIdValue = localStorage.getItem(
+      "raysstreamViewerId"
+    );
 
     if (!viewerIdValue) {
       const shouldLogin = window.confirm(
@@ -225,7 +268,10 @@ export default function Home() {
 
     const viewerId = Number(viewerIdValue);
 
-    if (!Number.isInteger(viewerId) || viewerId < 1) {
+    if (
+      !Number.isInteger(viewerId) ||
+      viewerId < 1
+    ) {
       clearViewerLogin();
       window.location.href = "/viewer/login";
       return;
@@ -272,11 +318,17 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Unable to save like:", error);
-      alert("Unable to connect to the likes database.");
+
+      alert(
+        "Unable to connect to the likes database."
+      );
     }
   }
 
-  function updateComment(index: number, value: string) {
+  function updateComment(
+    index: number,
+    value: string
+  ) {
     setCommentInputs((current) => {
       const updated = [...current];
       updated[index] = value;
@@ -284,15 +336,20 @@ export default function Home() {
     });
   }
 
-  async function postComment(index: number, videoId: number) {
-    const commentText = commentInputs[index]?.trim();
+  async function postComment(
+    index: number,
+    videoId: number
+  ) {
+    const commentText =
+      commentInputs[index]?.trim();
 
     if (!commentText) {
       return;
     }
 
-    const viewerIdValue =
-      localStorage.getItem("raysstreamViewerId");
+    const viewerIdValue = localStorage.getItem(
+      "raysstreamViewerId"
+    );
 
     if (!viewerIdValue) {
       const shouldLogin = window.confirm(
@@ -308,7 +365,10 @@ export default function Home() {
 
     const viewerId = Number(viewerIdValue);
 
-    if (!Number.isInteger(viewerId) || viewerId < 1) {
+    if (
+      !Number.isInteger(viewerId) ||
+      viewerId < 1
+    ) {
       clearViewerLogin();
 
       alert(
@@ -335,22 +395,31 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Unable to save comment.");
+        alert(
+          data.error || "Unable to save comment."
+        );
         return;
       }
 
       setComments((current) => {
-        const updated = current.map((videoComments) => [
-          ...videoComments,
-        ]);
+        const updated = current.map(
+          (videoComments) => [...videoComments]
+        );
 
         updated[index].push({
           id: Number(data.comment.id),
           text: String(data.comment.text),
+
           viewerName:
-            data.comment.viewerName || "Ray'sStream User",
+            data.comment.viewerName ||
+            "Ray'sStream User",
+
           viewerUsername:
             data.comment.viewerUsername || null,
+
+          viewerProfilePictureUrl:
+            data.comment.viewerProfilePictureUrl ||
+            null,
         });
 
         return updated;
@@ -362,8 +431,14 @@ export default function Home() {
         return updated;
       });
     } catch (error) {
-      console.error("Unable to save comment:", error);
-      alert("Unable to connect to the comments database.");
+      console.error(
+        "Unable to save comment:",
+        error
+      );
+
+      alert(
+        "Unable to connect to the comments database."
+      );
     }
   }
 
@@ -371,13 +446,18 @@ export default function Home() {
     const email = subscriberEmail.trim();
 
     if (!email) {
-      setSubscriptionMessage("Please enter your email.");
+      setSubscriptionMessage(
+        "Please enter your email."
+      );
       return;
     }
 
     try {
       setSubscribing(true);
-      setSubscriptionMessage("Saving subscription...");
+
+      setSubscriptionMessage(
+        "Saving subscription..."
+      );
 
       const response = await fetch("/api/subscribe", {
         method: "POST",
@@ -391,7 +471,8 @@ export default function Home() {
 
       if (!response.ok) {
         setSubscriptionMessage(
-          data.error || "Unable to complete subscription."
+          data.error ||
+            "Unable to complete subscription."
         );
         return;
       }
@@ -400,7 +481,11 @@ export default function Home() {
       setSubscriptionMessage(data.message);
       setSubscriberEmail("");
     } catch (error) {
-      console.error("Subscription error:", error);
+      console.error(
+        "Subscription error:",
+        error
+      );
+
       setSubscriptionMessage(
         "Unable to connect to the database."
       );
@@ -431,9 +516,15 @@ export default function Home() {
     } else {
       try {
         await navigator.clipboard.writeText(url);
-        alert("Ray'sStream video link copied!");
+
+        alert(
+          "Ray'sStream video link copied!"
+        );
       } catch {
-        window.prompt("Copy this video link:", url);
+        window.prompt(
+          "Copy this video link:",
+          url
+        );
       }
     }
   }
@@ -466,18 +557,27 @@ export default function Home() {
     );
   }
 
-  async function copyForTikTokInstagram(videoId: number) {
+  async function copyForTikTokInstagram(
+    videoId: number
+  ) {
     const url =
       `${window.location.origin}/watch/video-${videoId}`;
 
     try {
       await navigator.clipboard.writeText(url);
-      alert("Ray'sStream video link copied!");
+
+      alert(
+        "Ray'sStream video link copied!"
+      );
     } catch {
-      window.prompt("Copy this video link:", url);
+      window.prompt(
+        "Copy this video link:",
+        url
+      );
     }
-  } 
-return (
+  }
+
+  return (
     <main
       style={{
         minHeight: "100vh",
@@ -493,11 +593,21 @@ return (
           textAlign: "center",
         }}
       >
-        <h1 style={{ fontSize: "42px", margin: "0 0 10px" }}>
+        <h1
+          style={{
+            fontSize: "42px",
+            margin: "0 0 10px",
+          }}
+        >
           Ray&apos;sStream
         </h1>
 
-        <p style={{ color: "#bbb", fontSize: "18px" }}>
+        <p
+          style={{
+            color: "#bbb",
+            fontSize: "18px",
+          }}
+        >
           Watch • Like • Comment • Subscribe • Share
         </p>
 
@@ -528,19 +638,31 @@ return (
             Viewer Login
           </a>
 
-          <a href="/viewer/dashboard" style={linkStyle}>
+          <a
+            href="/viewer/dashboard"
+            style={linkStyle}
+          >
             Viewer Dashboard
           </a>
 
-          <a href="/creator/signup" style={linkStyle}>
+          <a
+            href="/creator/signup"
+            style={linkStyle}
+          >
             Creator Sign Up
           </a>
 
-          <a href="/creator/login" style={linkStyle}>
+          <a
+            href="/creator/login"
+            style={linkStyle}
+          >
             Creator Login
           </a>
 
-          <a href="/creator/dashboard" style={linkStyle}>
+          <a
+            href="/creator/dashboard"
+            style={linkStyle}
+          >
             Creator Dashboard
           </a>
 
@@ -597,7 +719,9 @@ return (
               type="email"
               value={subscriberEmail}
               onChange={(event) =>
-                setSubscriberEmail(event.target.value)
+                setSubscriberEmail(
+                  event.target.value
+                )
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -623,7 +747,9 @@ return (
                 opacity: subscribing ? 0.6 : 1,
               }}
             >
-              {subscribing ? "Saving..." : "Subscribe"}
+              {subscribing
+                ? "Saving..."
+                : "Subscribe"}
             </button>
           </div>
 
@@ -641,7 +767,12 @@ return (
           padding: "30px 20px 10px",
         }}
       >
-        <h2 style={{ fontSize: "34px", marginBottom: "8px" }}>
+        <h2
+          style={{
+            fontSize: "34px",
+            marginBottom: "8px",
+          }}
+        >
           Welcome to Ray&apos;sStream
         </h2>
 
@@ -676,7 +807,9 @@ return (
               loop
               playsInline
               preload="metadata"
-              onPlay={() => addView(index, video.id)}
+              onPlay={() =>
+                addView(index, video.id)
+              }
               style={{
                 width: "100%",
                 background: "black",
@@ -689,7 +822,8 @@ return (
             <p>
               👁 {views[index] || 0} views &nbsp;
               👍 {likes[index] || 0} likes &nbsp;
-              💬 {comments[index]?.length || 0} comments
+              💬 {comments[index]?.length || 0}{" "}
+              comments
             </p>
 
             <div
@@ -707,11 +841,17 @@ return (
               </a>
 
               <button
-                onClick={() => likeVideo(index, video.id)}
-                disabled={likedVideoIds.has(video.id)}
+                onClick={() =>
+                  likeVideo(index, video.id)
+                }
+                disabled={likedVideoIds.has(
+                  video.id
+                )}
                 style={{
                   ...buttonStyle,
-                  opacity: likedVideoIds.has(video.id)
+                  opacity: likedVideoIds.has(
+                    video.id
+                  )
                     ? 0.7
                     : 1,
                 }}
@@ -729,7 +869,9 @@ return (
               </button>
 
               <button
-                onClick={() => shareFacebook(video.id)}
+                onClick={() =>
+                  shareFacebook(video.id)
+                }
                 style={buttonStyle}
               >
                 Facebook
@@ -744,7 +886,9 @@ return (
 
               <button
                 onClick={() =>
-                  copyForTikTokInstagram(video.id)
+                  copyForTikTokInstagram(
+                    video.id
+                  )
                 }
                 style={buttonStyle}
               >
@@ -753,7 +897,9 @@ return (
 
               <button
                 onClick={() =>
-                  copyForTikTokInstagram(video.id)
+                  copyForTikTokInstagram(
+                    video.id
+                  )
                 }
                 style={buttonStyle}
               >
@@ -772,13 +918,21 @@ return (
                 }}
               >
                 <input
-                  value={commentInputs[index] || ""}
+                  value={
+                    commentInputs[index] || ""
+                  }
                   onChange={(event) =>
-                    updateComment(index, event.target.value)
+                    updateComment(
+                      index,
+                      event.target.value
+                    )
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
-                      postComment(index, video.id);
+                      postComment(
+                        index,
+                        video.id
+                      );
                     }
                   }}
                   placeholder="Add a comment..."
@@ -794,42 +948,110 @@ return (
                 />
 
                 <button
-                  onClick={() => postComment(index, video.id)}
+                  onClick={() =>
+                    postComment(index, video.id)
+                  }
                   style={buttonStyle}
                 >
                   Post
                 </button>
               </div>
 
-              {comments[index]?.map((comment) => (
-                <div
-                  key={comment.id}
-                  style={{
-                    background: "#1b1b1b",
-                    marginTop: "8px",
-                    padding: "12px",
-                    border: "2px solid black",
-                    borderRadius: "10px",
-                  }}
-                >
-                  <strong>{comment.viewerName}</strong>
+              {comments[index]?.map(
+                (comment) => (
+                  <div
+                    key={comment.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                      background: "#1b1b1b",
+                      marginTop: "8px",
+                      padding: "12px",
+                      border: "2px solid black",
+                      borderRadius: "10px",
+                    }}
+                  >
+                    {comment.viewerProfilePictureUrl ? (
+                      <img
+                        src={
+                          comment.viewerProfilePictureUrl
+                        }
+                        alt={
+                          comment.viewerName
+                        }
+                        style={{
+                          width: "48px",
+                          height: "48px",
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          flexShrink: 0,
+                          border:
+                            "2px solid black",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "48px",
+                          height: "48px",
+                          borderRadius: "50%",
+                          display: "grid",
+                          placeItems: "center",
+                          flexShrink: 0,
+                          background:
+                            "linear-gradient(135deg, #ff5577, #ff7a00)",
+                          border:
+                            "2px solid black",
+                          fontSize: "20px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {comment.viewerName
+                          .charAt(0)
+                          .toUpperCase() || "V"}
+                      </div>
+                    )}
 
-                  {comment.viewerUsername && (
-                    <span
+                    <div
                       style={{
-                        marginLeft: "8px",
-                        color: "#aaa",
+                        flex: 1,
+                        minWidth: 0,
                       }}
                     >
-                      @{comment.viewerUsername}
-                    </span>
-                  )}
+                      <div>
+                        <strong>
+                          {comment.viewerName}
+                        </strong>
 
-                  <div style={{ marginTop: "5px" }}>
-                    {comment.text}
+                        {comment.viewerUsername && (
+                          <span
+                            style={{
+                              marginLeft: "8px",
+                              color: "#aaa",
+                            }}
+                          >
+                            @
+                            {
+                              comment.viewerUsername
+                            }
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: "5px",
+                          overflowWrap:
+                            "anywhere",
+                        }}
+                      >
+                        {comment.text}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              )}
             </div>
           </article>
         ))}
@@ -852,14 +1074,21 @@ return (
         <h2>🎬 Creator Uploads</h2>
 
         <p style={{ color: "#bbb" }}>
-          Upload your own videos and watch creator uploads.
+          Upload your own videos and watch creator
+          uploads.
         </p>
 
-        <a href="/creator/signup" style={creatorButton}>
+        <a
+          href="/creator/signup"
+          style={creatorButton}
+        >
           ✨ Creator Sign Up
         </a>
 
-        <a href="/creator/login" style={creatorButton}>
+        <a
+          href="/creator/login"
+          style={creatorButton}
+        >
           🔐 Creator Login
         </a>
 

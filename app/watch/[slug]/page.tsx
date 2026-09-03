@@ -37,6 +37,7 @@ type VideoComment = {
   text: string;
   viewerName: string;
   viewerUsername: string | null;
+  viewerProfilePictureUrl: string | null;
 };
 
 export default function WatchPage() {
@@ -59,11 +60,11 @@ export default function WatchPage() {
     VideoComment[]
   >([]);
 
-  const [commentInput, setCommentInput] = useState("");
+  const [commentInput, setCommentInput] =
+    useState("");
 
-  const [creatorVideos, setCreatorVideos] = useState<
-    CreatorVideo[]
-  >([]);
+  const [creatorVideos, setCreatorVideos] =
+    useState<CreatorVideo[]>([]);
 
   const viewed = useRef(false);
 
@@ -85,14 +86,18 @@ export default function WatchPage() {
           );
         }
       } catch (error) {
-        console.error("Unable to load views:", error);
+        console.error(
+          "Unable to load views:",
+          error
+        );
       }
     }
 
     async function loadLikes() {
       try {
-        const viewerId =
-          localStorage.getItem("raysstreamViewerId");
+        const viewerId = localStorage.getItem(
+          "raysstreamViewerId"
+        );
 
         const likesUrl = viewerId
           ? `/api/likes?viewerId=${encodeURIComponent(
@@ -119,13 +124,22 @@ export default function WatchPage() {
           );
         }
       } catch (error) {
-        console.error("Unable to load likes:", error);
+        console.error(
+          "Unable to load likes:",
+          error
+        );
       }
     }
 
     async function loadComments() {
       try {
-        const response = await fetch("/api/comments");
+        const response = await fetch(
+          "/api/comments",
+          {
+            cache: "no-store",
+          }
+        );
+
         const data = await response.json();
 
         if (response.ok && video) {
@@ -142,14 +156,23 @@ export default function WatchPage() {
                 text: string;
                 viewerName?: string;
                 viewerUsername?: string | null;
+                viewerProfilePictureUrl?:
+                  | string
+                  | null;
               }) => ({
                 id: Number(comment.id),
                 text: String(comment.text),
+
                 viewerName:
                   comment.viewerName ||
                   "Ray'sStream User",
+
                 viewerUsername:
                   comment.viewerUsername || null,
+
+                viewerProfilePictureUrl:
+                  comment.viewerProfilePictureUrl ||
+                  null,
               })
             );
 
@@ -187,14 +210,17 @@ export default function WatchPage() {
             creator_name?: string;
           }) => ({
             id: String(item.id || ""),
+
             title: String(
               item.title || "Creator Video"
             ),
+
             thumbnailUrl: String(
               item.thumbnailUrl ||
                 item.thumbnail_url ||
                 ""
             ),
+
             creatorName: String(
               item.creatorName ||
                 item.creator_name ||
@@ -224,10 +250,14 @@ export default function WatchPage() {
     localStorage.removeItem("raysstreamViewer");
     localStorage.removeItem("raysstreamViewerId");
     localStorage.removeItem("raysstreamViewerName");
+
     localStorage.removeItem(
       "raysstreamViewerUsername"
     );
-    localStorage.removeItem("raysstreamViewerEmail");
+
+    localStorage.removeItem(
+      "raysstreamViewerEmail"
+    );
   }
 
   async function addView() {
@@ -258,7 +288,11 @@ export default function WatchPage() {
       setViews(Number(data.count || 0));
     } catch (error) {
       viewed.current = false;
-      console.error("Unable to save view:", error);
+
+      console.error(
+        "Unable to save view:",
+        error
+      );
     }
   }
 
@@ -267,8 +301,9 @@ export default function WatchPage() {
       return;
     }
 
-    const viewerIdValue =
-      localStorage.getItem("raysstreamViewerId");
+    const viewerIdValue = localStorage.getItem(
+      "raysstreamViewerId"
+    );
 
     if (!viewerIdValue) {
       const shouldLogin = window.confirm(
@@ -284,7 +319,10 @@ export default function WatchPage() {
 
     const viewerId = Number(viewerIdValue);
 
-    if (!Number.isInteger(viewerId) || viewerId < 1) {
+    if (
+      !Number.isInteger(viewerId) ||
+      viewerId < 1
+    ) {
       clearViewerLogin();
 
       alert(
@@ -312,7 +350,9 @@ export default function WatchPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Unable to save like.");
+        alert(
+          data.error || "Unable to save like."
+        );
         return;
       }
 
@@ -323,7 +363,10 @@ export default function WatchPage() {
         alert("You already liked this video.");
       }
     } catch (error) {
-      console.error("Unable to save like:", error);
+      console.error(
+        "Unable to save like:",
+        error
+      );
 
       alert(
         "Unable to connect to the likes database."
@@ -344,8 +387,9 @@ export default function WatchPage() {
       return;
     }
 
-    const viewerIdValue =
-      localStorage.getItem("raysstreamViewerId");
+    const viewerIdValue = localStorage.getItem(
+      "raysstreamViewerId"
+    );
 
     if (!viewerIdValue) {
       const shouldLogin = window.confirm(
@@ -361,7 +405,10 @@ export default function WatchPage() {
 
     const viewerId = Number(viewerIdValue);
 
-    if (!Number.isInteger(viewerId) || viewerId < 1) {
+    if (
+      !Number.isInteger(viewerId) ||
+      viewerId < 1
+    ) {
       clearViewerLogin();
 
       alert(
@@ -399,11 +446,17 @@ export default function WatchPage() {
         {
           id: Number(data.comment.id),
           text: String(data.comment.text),
+
           viewerName:
             data.comment.viewerName ||
             "Ray'sStream User",
+
           viewerUsername:
             data.comment.viewerUsername || null,
+
+          viewerProfilePictureUrl:
+            data.comment.viewerProfilePictureUrl ||
+            null,
         },
       ]);
 
@@ -427,7 +480,10 @@ export default function WatchPage() {
       await navigator.clipboard.writeText(url);
       alert("Video link copied!");
     } catch {
-      window.prompt("Copy this video link:", url);
+      window.prompt(
+        "Copy this video link:",
+        url
+      );
     }
   }
 
@@ -549,8 +605,9 @@ export default function WatchPage() {
 
     window.location.href =
       `mailto:?subject=${subject}&body=${body}`;
-  } 
-if (!video) {
+  }
+
+  if (!video) {
     return (
       <main style={messagePageStyle}>
         <h1>Video not found</h1>
@@ -661,7 +718,8 @@ if (!video) {
           style={{
             ...buttonStyle,
             marginBottom: "24px",
-            opacity: liked || liking ? 0.65 : 1,
+            opacity:
+              liked || liking ? 0.65 : 1,
           }}
         >
           {liking
@@ -750,7 +808,8 @@ if (!video) {
             }}
           >
             For Instagram, TikTok, Messenger, and
-            other apps, use Share to Apps or Copy Link.
+            other apps, use Share to Apps or Copy
+            Link.
           </p>
         </section>
 
@@ -767,7 +826,9 @@ if (!video) {
             <input
               value={commentInput}
               onChange={(event) =>
-                setCommentInput(event.target.value)
+                setCommentInput(
+                  event.target.value
+                )
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -798,6 +859,9 @@ if (!video) {
             <div
               key={comment.id}
               style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "12px",
                 background: "#1b1b1b",
                 marginTop: "10px",
                 padding: "12px",
@@ -805,21 +869,74 @@ if (!video) {
                 borderRadius: "10px",
               }}
             >
-              <strong>{comment.viewerName}</strong>
-
-              {comment.viewerUsername && (
-                <span
+              {comment.viewerProfilePictureUrl ? (
+                <img
+                  src={
+                    comment.viewerProfilePictureUrl
+                  }
+                  alt={comment.viewerName}
                   style={{
-                    marginLeft: "8px",
-                    color: "#aaa",
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    flexShrink: 0,
+                    border: "2px solid black",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                    flexShrink: 0,
+                    background:
+                      "linear-gradient(135deg, #ff5577, #ff7a00)",
+                    border: "2px solid black",
+                    fontSize: "20px",
+                    fontWeight: "bold",
                   }}
                 >
-                  @{comment.viewerUsername}
-                </span>
+                  {comment.viewerName
+                    .charAt(0)
+                    .toUpperCase() || "V"}
+                </div>
               )}
 
-              <div style={{ marginTop: "5px" }}>
-                {comment.text}
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <div>
+                  <strong>
+                    {comment.viewerName}
+                  </strong>
+
+                  {comment.viewerUsername && (
+                    <span
+                      style={{
+                        marginLeft: "8px",
+                        color: "#aaa",
+                      }}
+                    >
+                      @{comment.viewerUsername}
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "5px",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {comment.text}
+                </div>
               </div>
             </div>
           ))}
@@ -1020,6 +1137,7 @@ const staticThumbnailStyle: CSSProperties = {
   aspectRatio: "16 / 9",
   display: "grid",
   placeItems: "center",
-  background: "linear-gradient(135deg, #111, #333)",
+  background:
+    "linear-gradient(135deg, #111, #333)",
   fontSize: "40px",
 }; 

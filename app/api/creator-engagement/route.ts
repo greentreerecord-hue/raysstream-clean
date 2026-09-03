@@ -51,6 +51,11 @@ async function ensureCreatorEngagementTables() {
   `;
 
   await sql`
+    ALTER TABLE viewers
+    ADD COLUMN IF NOT EXISTS profile_picture_url TEXT
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS creator_viewer_likes (
       id SERIAL PRIMARY KEY,
       video_id TEXT NOT NULL,
@@ -70,7 +75,11 @@ async function findViewer(viewerId: number) {
   }
 
   const rows = await sql`
-    SELECT id, name, username
+    SELECT
+      id,
+      name,
+      username,
+      profile_picture_url
     FROM viewers
     WHERE id = ${viewerId}
     LIMIT 1
@@ -84,6 +93,11 @@ async function findViewer(viewerId: number) {
     id: Number(rows[0].id),
     name: String(rows[0].name),
     username: String(rows[0].username),
+
+    profilePictureUrl:
+      rows[0].profile_picture_url
+        ? String(rows[0].profile_picture_url)
+        : null,
   };
 }
 
@@ -121,15 +135,18 @@ export async function GET(request: Request) {
 
     const commentRows = await sql`
       SELECT
-        id,
-        comment_text,
-        viewer_id,
-        viewer_name,
-        viewer_username,
-        created_at
-      FROM creator_video_comments
-      WHERE video_id = ${videoId}
-      ORDER BY created_at ASC
+        comments.id,
+        comments.comment_text,
+        comments.viewer_id,
+        comments.viewer_name,
+        comments.viewer_username,
+        comments.created_at,
+        viewers.profile_picture_url
+      FROM creator_video_comments AS comments
+      LEFT JOIN viewers
+        ON viewers.id = comments.viewer_id
+      WHERE comments.video_id = ${videoId}
+      ORDER BY comments.created_at ASC
     `;
 
     let liked = false;
@@ -153,21 +170,32 @@ export async function GET(request: Request) {
       views: Number(
         engagementRows[0]?.view_count || 0
       ),
+
       likes: Number(
         engagementRows[0]?.like_count || 0
       ),
+
       liked,
+
       comments: commentRows.map((row) => ({
         id: Number(row.id),
         text: String(row.comment_text),
-        viewerId: row.viewer_id
-          ? Number(row.viewer_id)
-          : null,
+
+        viewerId:
+          row.viewer_id === null
+            ? null
+            : Number(row.viewer_id),
+
         viewerName:
           row.viewer_name ||
           "Ray'sStream User",
+
         viewerUsername:
           row.viewer_username || null,
+
+        viewerProfilePictureUrl:
+          row.profile_picture_url || null,
+
         createdAt: row.created_at,
       })),
     });
@@ -179,14 +207,16 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Unable to load creator engagement.",
+        error:
+          "Unable to load creator engagement.",
       },
       {
         status: 500,
       }
     );
   }
-} 
+}
+
 export async function POST(request: Request) {
   try {
     await ensureCreatorEngagementTables();
@@ -388,18 +418,26 @@ export async function POST(request: Request) {
       return NextResponse.json({
         comment: {
           id: Number(rows[0].id),
+
           text: String(
             rows[0].comment_text
           ),
+
           viewerId: Number(
             rows[0].viewer_id
           ),
+
           viewerName: String(
             rows[0].viewer_name
           ),
+
           viewerUsername: String(
             rows[0].viewer_username
           ),
+
+          viewerProfilePictureUrl:
+            viewer.profilePictureUrl,
+
           createdAt: rows[0].created_at,
         },
       });
@@ -421,7 +459,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Unable to save creator engagement.",
+        error:
+          "Unable to save creator engagement.",
       },
       {
         status: 500,

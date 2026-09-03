@@ -16,14 +16,106 @@ const sql = postgres(connectionString, {
   ssl: "require",
 });
 
+async function ensureViewerProfileColumn() {
+  await sql`
+    ALTER TABLE viewers
+    ADD COLUMN IF NOT EXISTS
+    profile_picture_url TEXT
+  `;
+}
+
+export async function GET(request: Request) {
+  try {
+    await ensureViewerProfileColumn();
+
+    const { searchParams } =
+      new URL(request.url);
+
+    const viewerId = Number(
+      searchParams.get("viewerId")
+    );
+
+    if (
+      !Number.isInteger(viewerId) ||
+      viewerId < 1
+    ) {
+      return NextResponse.json(
+        {
+          error: "A valid viewer ID is required.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const rows = await sql`
+      SELECT
+        id,
+        name,
+        username,
+        email,
+        profile_picture_url
+      FROM viewers
+      WHERE id = ${viewerId}
+      LIMIT 1
+    `;
+
+    if (rows.length === 0) {
+      return NextResponse.json(
+        {
+          error: "Viewer account not found.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    const viewer = rows[0];
+
+    return NextResponse.json({
+      viewer: {
+        id: Number(viewer.id),
+        fullName: String(viewer.name),
+        username: String(viewer.username),
+        email: String(viewer.email),
+        profilePictureUrl: String(
+          viewer.profile_picture_url || ""
+        ),
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Unable to load viewer profile:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error: "Unable to load viewer profile.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
 export async function PUT(request: Request) {
   try {
+    await ensureViewerProfileColumn();
+
     const body = await request.json();
 
     const viewerId = Number(body.viewerId);
 
     const fullName = String(
       body.fullName || ""
+    ).trim();
+
+    const profilePictureUrl = String(
+      body.profilePictureUrl || ""
     ).trim();
 
     if (
@@ -65,13 +157,17 @@ export async function PUT(request: Request) {
 
     const rows = await sql`
       UPDATE viewers
-      SET name = ${fullName}
+      SET
+        name = ${fullName},
+        profile_picture_url =
+          ${profilePictureUrl}
       WHERE id = ${viewerId}
       RETURNING
         id,
         name,
         username,
-        email
+        email,
+        profile_picture_url
     `;
 
     if (rows.length === 0) {
@@ -106,6 +202,9 @@ export async function PUT(request: Request) {
         fullName: String(viewer.name),
         username: String(viewer.username),
         email: String(viewer.email),
+        profilePictureUrl: String(
+          viewer.profile_picture_url || ""
+        ),
       },
     });
   } catch (error) {

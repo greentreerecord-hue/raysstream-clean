@@ -43,6 +43,11 @@ async function ensureCommentsTable() {
     ALTER TABLE video_comments
     ADD COLUMN IF NOT EXISTS viewer_username TEXT
   `;
+
+  await sql`
+    ALTER TABLE viewers
+    ADD COLUMN IF NOT EXISTS profile_picture_url TEXT
+  `;
 }
 
 export async function GET() {
@@ -51,15 +56,18 @@ export async function GET() {
 
     const rows = await sql`
       SELECT
-        id,
-        video_id,
-        comment_text,
-        viewer_id,
-        viewer_name,
-        viewer_username,
-        created_at
-      FROM video_comments
-      ORDER BY created_at ASC
+        comments.id,
+        comments.video_id,
+        comments.comment_text,
+        comments.viewer_id,
+        comments.viewer_name,
+        comments.viewer_username,
+        comments.created_at,
+        viewers.profile_picture_url
+      FROM video_comments AS comments
+      LEFT JOIN viewers
+        ON viewers.id = comments.viewer_id
+      ORDER BY comments.created_at ASC
     `;
 
     return NextResponse.json({
@@ -67,14 +75,21 @@ export async function GET() {
         id: Number(row.id),
         videoId: Number(row.video_id),
         text: String(row.comment_text),
+
         viewerId:
           row.viewer_id === null
             ? null
             : Number(row.viewer_id),
+
         viewerName:
           row.viewer_name || "Ray'sStream User",
+
         viewerUsername:
           row.viewer_username || null,
+
+        viewerProfilePictureUrl:
+          row.profile_picture_url || null,
+
         createdAt: row.created_at,
       })),
     });
@@ -150,6 +165,8 @@ export async function POST(request: Request) {
 
     let viewerName = "Ray'sStream User";
     let viewerUsername: string | null = null;
+    let viewerProfilePictureUrl: string | null =
+      null;
 
     if (viewerId !== null) {
       if (
@@ -168,7 +185,11 @@ export async function POST(request: Request) {
       }
 
       const viewerRows = await sql`
-        SELECT id, name, username
+        SELECT
+          id,
+          name,
+          username,
+          profile_picture_url
         FROM viewers
         WHERE id = ${viewerId}
         LIMIT 1
@@ -187,9 +208,13 @@ export async function POST(request: Request) {
       }
 
       viewerName = String(viewerRows[0].name);
+
       viewerUsername = String(
         viewerRows[0].username
       );
+
+      viewerProfilePictureUrl =
+        viewerRows[0].profile_picture_url || null;
     }
 
     const result = await sql`
@@ -224,14 +249,21 @@ export async function POST(request: Request) {
         id: Number(comment.id),
         videoId: Number(comment.video_id),
         text: String(comment.comment_text),
+
         viewerId:
           comment.viewer_id === null
             ? null
             : Number(comment.viewer_id),
+
         viewerName:
-          comment.viewer_name || "Ray'sStream User",
+          comment.viewer_name ||
+          "Ray'sStream User",
+
         viewerUsername:
           comment.viewer_username || null,
+
+        viewerProfilePictureUrl,
+
         createdAt: comment.created_at,
       },
     });

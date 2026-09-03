@@ -20,6 +20,7 @@ type Comment = {
   text: string;
   viewerName: string;
   viewerUsername: string | null;
+  viewerProfilePictureUrl: string | null;
   createdAt: string;
 };
 
@@ -35,18 +36,16 @@ export default function CreatorWatchPage() {
   const [video, setVideo] =
     useState<CreatorVideo | null>(null);
 
-  const [moreVideos, setMoreVideos] = useState<
-    CreatorVideo[]
-  >([]);
+  const [moreVideos, setMoreVideos] =
+    useState<CreatorVideo[]>([]);
 
   const [views, setViews] = useState(0);
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
 
-  const [comments, setComments] = useState<
-    Comment[]
-  >([]);
+  const [comments, setComments] =
+    useState<Comment[]>([]);
 
   const [commentInput, setCommentInput] =
     useState("");
@@ -105,30 +104,37 @@ export default function CreatorWatchPage() {
             channel_id?: string;
           }) => ({
             id: String(item.id || ""),
+
             url: String(
               item.url || item.blob_url || ""
             ),
+
             title: String(
               item.title || "Creator Video"
             ),
+
             description: String(
               item.description || ""
             ),
+
             creatorName: String(
               item.creatorName ||
                 item.creator_name ||
                 "Ray'sStream Creator"
             ),
+
             creatorProfilePictureUrl: String(
               item.creatorProfilePictureUrl ||
                 item.creator_profile_picture_url ||
                 ""
             ),
+
             thumbnailUrl: String(
               item.thumbnailUrl ||
                 item.thumbnail_url ||
                 ""
             ),
+
             channelId: String(
               item.channelId ||
                 item.channel_id ||
@@ -173,9 +179,8 @@ export default function CreatorWatchPage() {
       } finally {
         setLoading(false);
       }
-    }
-
-    async function loadEngagement() {
+    } 
+async function loadEngagement() {
       try {
         const viewerId =
           localStorage.getItem(
@@ -195,12 +200,46 @@ export default function CreatorWatchPage() {
 
         const data = await response.json();
 
-        if (response.ok) {
-          setViews(Number(data.views || 0));
-          setLikes(Number(data.likes || 0));
-          setLiked(Boolean(data.liked));
-          setComments(data.comments || []);
+        if (!response.ok) {
+          return;
         }
+
+        setViews(Number(data.views || 0));
+        setLikes(Number(data.likes || 0));
+        setLiked(Boolean(data.liked));
+
+        setComments(
+          (data.comments || []).map(
+            (comment: {
+              id?: number;
+              text?: string;
+              viewerName?: string;
+              viewerUsername?: string | null;
+              viewerProfilePictureUrl?:
+                | string
+                | null;
+              createdAt?: string;
+            }) => ({
+              id: Number(comment.id),
+              text: String(comment.text || ""),
+
+              viewerName:
+                comment.viewerName ||
+                "Ray'sStream User",
+
+              viewerUsername:
+                comment.viewerUsername || null,
+
+              viewerProfilePictureUrl:
+                comment.viewerProfilePictureUrl ||
+                null,
+
+              createdAt: String(
+                comment.createdAt || ""
+              ),
+            })
+          )
+        );
       } catch (error) {
         console.error(
           "Unable to load creator engagement:",
@@ -305,7 +344,9 @@ export default function CreatorWatchPage() {
           return;
         }
 
-        alert(data.error || "Unable to save like.");
+        alert(
+          data.error || "Unable to save like."
+        );
         return;
       }
 
@@ -378,7 +419,25 @@ export default function CreatorWatchPage() {
 
       setComments((current) => [
         ...current,
-        data.comment,
+        {
+          id: Number(data.comment.id),
+          text: String(data.comment.text),
+
+          viewerName:
+            data.comment.viewerName ||
+            "Ray'sStream User",
+
+          viewerUsername:
+            data.comment.viewerUsername || null,
+
+          viewerProfilePictureUrl:
+            data.comment.viewerProfilePictureUrl ||
+            null,
+
+          createdAt: String(
+            data.comment.createdAt || ""
+          ),
+        },
       ]);
 
       setCommentInput("");
@@ -394,16 +453,18 @@ export default function CreatorWatchPage() {
     } finally {
       setPostingComment(false);
     }
-  }
-
-  async function copyVideoLink() {
+  } 
+ async function copyVideoLink() {
     const url = window.location.href;
 
     try {
       await navigator.clipboard.writeText(url);
       alert("Video link copied!");
     } catch {
-      window.prompt("Copy this video link:", url);
+      window.prompt(
+        "Copy this video link:",
+        url
+      );
     }
   }
 
@@ -525,8 +586,9 @@ export default function CreatorWatchPage() {
 
     window.location.href =
       `mailto:?subject=${subject}&body=${body}`;
-  } 
-if (loading) {
+  }
+
+  if (loading) {
     return (
       <main style={messagePageStyle}>
         <h1>Ray&apos;sStream</h1>
@@ -680,9 +742,7 @@ if (loading) {
                 href={`/creator/channel/${encodeURIComponent(
                   video.channelId
                 )}`}
-                style={{
-                  color: "#bbb",
-                }}
+                style={{ color: "#bbb" }}
               >
                 View Creator Channel
               </a>
@@ -811,9 +871,8 @@ if (loading) {
             other apps, use Share to Apps or Copy
             Link.
           </p>
-        </section>
-
-        <section>
+        </section> 
+<section>
           <h3>Comments</h3>
 
           <div
@@ -867,6 +926,9 @@ if (loading) {
             <div
               key={comment.id}
               style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "12px",
                 background: "#1b1b1b",
                 marginTop: "10px",
                 padding: "12px",
@@ -874,23 +936,77 @@ if (loading) {
                 borderRadius: "10px",
               }}
             >
-              <strong>
-                {comment.viewerName ||
-                  "Ray'sStream User"}
+              {comment.viewerProfilePictureUrl ? (
+                <img
+                  src={
+                    comment.viewerProfilePictureUrl
+                  }
+                  alt={comment.viewerName}
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    flexShrink: 0,
+                    border: "2px solid black",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                    flexShrink: 0,
+                    background:
+                      "linear-gradient(135deg, #ff5577, #ff7a00)",
+                    border: "2px solid black",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {(comment.viewerName ||
+                    "Ray'sStream User")
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+              )}
 
-                {comment.viewerUsername && (
-                  <span
-                    style={{
-                      color: "#9dc5ff",
-                      marginLeft: "8px",
-                    }}
-                  >
-                    @{comment.viewerUsername}
-                  </span>
-                )}
-              </strong>
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <div>
+                  <strong>
+                    {comment.viewerName ||
+                      "Ray'sStream User"}
+                  </strong>
 
-              <div>{comment.text}</div>
+                  {comment.viewerUsername && (
+                    <span
+                      style={{
+                        color: "#9dc5ff",
+                        marginLeft: "8px",
+                      }}
+                    >
+                      @{comment.viewerUsername}
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "5px",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {comment.text}
+                </div>
+              </div>
             </div>
           ))}
         </section>
