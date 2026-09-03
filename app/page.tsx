@@ -27,9 +27,14 @@ const videos = [
 export default function Home() {
   const [views, setViews] = useState<number[]>([0, 0, 0]);
   const [likes, setLikes] = useState<number[]>([0, 0, 0]);
+  const [likedVideoIds, setLikedVideoIds] = useState<
+    Set<number>
+  >(new Set());
+
   const [subscribers, setSubscribers] = useState(0);
   const [subscriberEmail, setSubscriberEmail] = useState("");
-  const [subscriptionMessage, setSubscriptionMessage] = useState("");
+  const [subscriptionMessage, setSubscriptionMessage] =
+    useState("");
   const [subscribing, setSubscribing] = useState(false);
 
   const viewedVideos = useRef<Set<number>>(new Set());
@@ -79,23 +84,33 @@ export default function Home() {
 
     async function loadVideoLikes() {
       try {
-        const response = await fetch("/api/likes");
+        const viewerId =
+          localStorage.getItem("raysstreamViewerId");
+
+        const likesUrl = viewerId
+          ? `/api/likes?viewerId=${encodeURIComponent(
+              viewerId
+            )}`
+          : "/api/likes";
+
+        const response = await fetch(likesUrl);
         const data = await response.json();
 
         if (response.ok) {
-          const savedLikes = videos.map((video) =>
-            Number(data.likes?.[video.id] || 0)
+          setLikes(
+            videos.map((video) =>
+              Number(data.likes?.[video.id] || 0)
+            )
           );
 
-          setLikes(savedLikes);
-
-          videos.forEach((video, index) => {
-            if (savedLikes[index] === 0) {
-              localStorage.removeItem(
-                `raysstream-liked-${video.id}`
-              );
-            }
-          });
+          setLikedVideoIds(
+            new Set(
+              (data.likedVideoIds || []).map(
+                (videoId: number | string) =>
+                  Number(videoId)
+              )
+            )
+          );
         }
       } catch (error) {
         console.error("Unable to load video likes:", error);
@@ -111,11 +126,13 @@ export default function Home() {
           return;
         }
 
-        const groupedComments: string[][] = videos.map(() => []);
+        const groupedComments: string[][] =
+          videos.map(() => []);
 
         for (const comment of data.comments || []) {
           const videoIndex = videos.findIndex(
-            (video) => video.id === Number(comment.videoId)
+            (video) =>
+              video.id === Number(comment.videoId)
           );
 
           if (videoIndex >= 0) {
@@ -137,7 +154,10 @@ export default function Home() {
     loadVideoComments();
   }, []);
 
-  async function addView(index: number, videoId: number) {
+  async function addView(
+    index: number,
+    videoId: number
+  ) {
     if (viewedVideos.current.has(videoId)) {
       return;
     }
@@ -173,10 +193,43 @@ export default function Home() {
     }
   }
 
-  async function likeVideo(index: number, videoId: number) {
-    const storageKey = `raysstream-liked-${videoId}`;
+  async function likeVideo(
+    index: number,
+    videoId: number
+  ) {
+    const viewerIdValue =
+      localStorage.getItem("raysstreamViewerId");
 
-    if (localStorage.getItem(storageKey) === "true") {
+    if (!viewerIdValue) {
+      const shouldLogin = window.confirm(
+        "Please sign in to your viewer account to like videos. Go to Viewer Login now?"
+      );
+
+      if (shouldLogin) {
+        window.location.href = "/viewer/login";
+      }
+
+      return;
+    }
+
+    const viewerId = Number(viewerIdValue);
+
+    if (!Number.isInteger(viewerId) || viewerId < 1) {
+      alert(
+        "Your viewer login has expired. Please log in again."
+      );
+
+      localStorage.removeItem("raysstreamViewer");
+      localStorage.removeItem("raysstreamViewerId");
+      localStorage.removeItem("raysstreamViewerName");
+      localStorage.removeItem("raysstreamViewerUsername");
+      localStorage.removeItem("raysstreamViewerEmail");
+
+      window.location.href = "/viewer/login";
+      return;
+    }
+
+    if (likedVideoIds.has(videoId)) {
       alert("You already liked this video.");
       return;
     }
@@ -189,6 +242,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           videoId,
+          viewerId,
         }),
       });
 
@@ -205,14 +259,25 @@ export default function Home() {
         return updated;
       });
 
-      localStorage.setItem(storageKey, "true");
+      setLikedVideoIds((current) => {
+        const updated = new Set(current);
+        updated.add(videoId);
+        return updated;
+      });
+
+      if (data.alreadyLiked) {
+        alert("You already liked this video.");
+      }
     } catch (error) {
       console.error("Unable to save like:", error);
       alert("Unable to connect to the likes database.");
     }
   }
 
-  function updateComment(index: number, value: string) {
+  function updateComment(
+    index: number,
+    value: string
+  ) {
     setCommentInputs((current) => {
       const updated = [...current];
       updated[index] = value;
@@ -220,8 +285,12 @@ export default function Home() {
     });
   }
 
-  async function postComment(index: number, videoId: number) {
-    const commentText = commentInputs[index]?.trim();
+  async function postComment(
+    index: number,
+    videoId: number
+  ) {
+    const commentText =
+      commentInputs[index]?.trim();
 
     if (!commentText) {
       return;
@@ -242,14 +311,16 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Unable to save comment.");
+        alert(
+          data.error || "Unable to save comment."
+        );
         return;
       }
 
       setComments((current) => {
-        const updated = current.map((videoComments) => [
-          ...videoComments,
-        ]);
+        const updated = current.map(
+          (videoComments) => [...videoComments]
+        );
 
         updated[index].push(data.comment.text);
         return updated;
@@ -261,8 +332,14 @@ export default function Home() {
         return updated;
       });
     } catch (error) {
-      console.error("Unable to save comment:", error);
-      alert("Unable to connect to the comments database.");
+      console.error(
+        "Unable to save comment:",
+        error
+      );
+
+      alert(
+        "Unable to connect to the comments database."
+      );
     }
   }
 
@@ -270,29 +347,37 @@ export default function Home() {
     const email = subscriberEmail.trim();
 
     if (!email) {
-      setSubscriptionMessage("Please enter your email.");
+      setSubscriptionMessage(
+        "Please enter your email."
+      );
       return;
     }
 
     try {
       setSubscribing(true);
-      setSubscriptionMessage("Saving subscription...");
+      setSubscriptionMessage(
+        "Saving subscription..."
+      );
 
-      const response = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-        }),
-      });
+      const response = await fetch(
+        "/api/subscribe",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         setSubscriptionMessage(
-          data.error || "Unable to complete subscription."
+          data.error ||
+            "Unable to complete subscription."
         );
         return;
       }
@@ -301,7 +386,11 @@ export default function Home() {
       setSubscriptionMessage(data.message);
       setSubscriberEmail("");
     } catch (error) {
-      console.error("Subscription error:", error);
+      console.error(
+        "Subscription error:",
+        error
+      );
+
       setSubscriptionMessage(
         "Unable to connect to the database."
       );
@@ -316,13 +405,15 @@ export default function Home() {
     slug: string;
     src: string;
   }) {
-    const url = `${window.location.origin}/watch/${video.slug}`;
+    const url =
+      `${window.location.origin}/watch/${video.slug}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: video.title,
-          text: `Watch ${video.title} on Ray'sStream`,
+          text:
+            `Watch ${video.title} on Ray'sStream`,
           url,
         });
       } catch {
@@ -333,7 +424,10 @@ export default function Home() {
         await navigator.clipboard.writeText(url);
         alert("Ray'sStream video link copied!");
       } catch {
-        window.prompt("Copy this video link:", url);
+        window.prompt(
+          "Copy this video link:",
+          url
+        );
       }
     }
   }
@@ -366,7 +460,9 @@ export default function Home() {
     );
   }
 
-  async function copyForTikTokInstagram(videoId: number) {
+  async function copyForTikTokInstagram(
+    videoId: number
+  ) {
     const url =
       `${window.location.origin}/watch/video-${videoId}`;
 
@@ -374,7 +470,10 @@ export default function Home() {
       await navigator.clipboard.writeText(url);
       alert("Ray'sStream video link copied!");
     } catch {
-      window.prompt("Copy this video link:", url);
+      window.prompt(
+        "Copy this video link:",
+        url
+      );
     }
   }
 
@@ -439,7 +538,10 @@ export default function Home() {
             Viewer Login
           </a>
 
-          <a href="/viewer/dashboard" style={linkStyle}>
+          <a
+            href="/viewer/dashboard"
+            style={linkStyle}
+          >
             Viewer Dashboard
           </a>
 
@@ -451,7 +553,10 @@ export default function Home() {
             Creator Login
           </a>
 
-          <a href="/creator/dashboard" style={linkStyle}>
+          <a
+            href="/creator/dashboard"
+            style={linkStyle}
+          >
             Creator Dashboard
           </a>
 
@@ -508,7 +613,9 @@ export default function Home() {
               type="email"
               value={subscriberEmail}
               onChange={(event) =>
-                setSubscriberEmail(event.target.value)
+                setSubscriberEmail(
+                  event.target.value
+                )
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -534,7 +641,9 @@ export default function Home() {
                 opacity: subscribing ? 0.6 : 1,
               }}
             >
-              {subscribing ? "Saving..." : "Subscribe"}
+              {subscribing
+                ? "Saving..."
+                : "Subscribe"}
             </button>
           </div>
 
@@ -592,7 +701,9 @@ export default function Home() {
               loop
               playsInline
               preload="metadata"
-              onPlay={() => addView(index, video.id)}
+              onPlay={() =>
+                addView(index, video.id)
+              }
               style={{
                 width: "100%",
                 background: "black",
@@ -605,7 +716,8 @@ export default function Home() {
             <p>
               👁 {views[index] || 0} views &nbsp;
               👍 {likes[index] || 0} likes &nbsp;
-              💬 {comments[index]?.length || 0} comments
+              💬 {comments[index]?.length || 0}{" "}
+              comments
             </p>
 
             <div
@@ -623,10 +735,20 @@ export default function Home() {
               </a>
 
               <button
-                onClick={() => likeVideo(index, video.id)}
-                style={buttonStyle}
+                onClick={() =>
+                  likeVideo(index, video.id)
+                }
+                disabled={likedVideoIds.has(video.id)}
+                style={{
+                  ...buttonStyle,
+                  opacity: likedVideoIds.has(video.id)
+                    ? 0.7
+                    : 1,
+                }}
               >
-                👍 Like
+                {likedVideoIds.has(video.id)
+                  ? "✓ Liked"
+                  : "👍 Like"}
               </button>
 
               <button
@@ -637,7 +759,9 @@ export default function Home() {
               </button>
 
               <button
-                onClick={() => shareFacebook(video.id)}
+                onClick={() =>
+                  shareFacebook(video.id)
+                }
                 style={buttonStyle}
               >
                 Facebook
@@ -680,13 +804,21 @@ export default function Home() {
                 }}
               >
                 <input
-                  value={commentInputs[index] || ""}
+                  value={
+                    commentInputs[index] || ""
+                  }
                   onChange={(event) =>
-                    updateComment(index, event.target.value)
+                    updateComment(
+                      index,
+                      event.target.value
+                    )
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
-                      postComment(index, video.id);
+                      postComment(
+                        index,
+                        video.id
+                      );
                     }
                   }}
                   placeholder="Add a comment..."
@@ -753,14 +885,21 @@ export default function Home() {
         <h2>🎬 Creator Uploads</h2>
 
         <p style={{ color: "#bbb" }}>
-          Upload your own videos and watch creator uploads.
+          Upload your own videos and watch creator
+          uploads.
         </p>
 
-        <a href="/creator/signup" style={creatorButton}>
+        <a
+          href="/creator/signup"
+          style={creatorButton}
+        >
           ✨ Creator Sign Up
         </a>
 
-        <a href="/creator/login" style={creatorButton}>
+        <a
+          href="/creator/login"
+          style={creatorButton}
+        >
           🔐 Creator Login
         </a>
 
