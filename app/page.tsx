@@ -25,12 +25,25 @@ const videos = [
 ];
 
 export default function Home() {
-  const [views, setViews] = useState<number[]>([0, 0, 0]);
-  const [likes, setLikes] = useState<number[]>([0, 0, 0]);
+  const [views, setViews] = useState<number[]>([
+    0,
+    0,
+    0,
+  ]);
+
+  const [likes, setLikes] = useState<number[]>([
+    0,
+    0,
+    0,
+  ]);
+
   const [subscribers, setSubscribers] = useState(0);
-  const [subscriberEmail, setSubscriberEmail] = useState("");
+  const [subscriberEmail, setSubscriberEmail] =
+    useState("");
+
   const [subscriptionMessage, setSubscriptionMessage] =
     useState("");
+
   const [subscribing, setSubscribing] = useState(false);
 
   const viewedVideos = useRef<Set<number>>(new Set());
@@ -52,7 +65,7 @@ export default function Home() {
         const data = await response.json();
 
         if (response.ok) {
-          setSubscribers(data.count || 0);
+          setSubscribers(Number(data.count || 0));
         }
       } catch (error) {
         console.error(
@@ -84,23 +97,24 @@ export default function Home() {
 
     async function loadVideoLikes() {
       try {
-        const likeCounts = await Promise.all(
-          videos.map(async (video) => {
-            const response = await fetch(
-              `/api/likes?videoId=${video.id}`
-            );
+        const response = await fetch("/api/likes");
+        const data = await response.json();
 
-            const data = await response.json();
+        if (response.ok) {
+          const savedLikes = videos.map((video) =>
+            Number(data.likes?.[video.id] || 0)
+          );
 
-            if (!response.ok) {
-              return 0;
+          setLikes(savedLikes);
+
+          videos.forEach((video, index) => {
+            if (savedLikes[index] === 0) {
+              localStorage.removeItem(
+                `raysstream-liked-${video.id}`
+              );
             }
-
-            return Number(data.likes || 0);
-          })
-        );
-
-        setLikes(likeCounts);
+          });
+        }
       } catch (error) {
         console.error(
           "Unable to load video likes:",
@@ -165,7 +179,9 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ videoId }),
+        body: JSON.stringify({
+          videoId,
+        }),
       });
 
       const data = await response.json();
@@ -182,6 +198,7 @@ export default function Home() {
       });
     } catch (error) {
       viewedVideos.current.delete(videoId);
+
       console.error(
         "Unable to save video view:",
         error
@@ -193,9 +210,12 @@ export default function Home() {
     index: number,
     videoId: number
   ) {
-    const likeKey = `raysstream-liked-${videoId}`;
+    const storageKey =
+      `raysstream-liked-${videoId}`;
 
-    if (localStorage.getItem(likeKey) === "true") {
+    if (
+      localStorage.getItem(storageKey) === "true"
+    ) {
       alert("You already liked this video.");
       return;
     }
@@ -206,7 +226,9 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ videoId }),
+        body: JSON.stringify({
+          videoId,
+        }),
       });
 
       const data = await response.json();
@@ -216,15 +238,16 @@ export default function Home() {
         return;
       }
 
-      localStorage.setItem(likeKey, "true");
-
       setLikes((current) => {
         const updated = [...current];
-        updated[index] = Number(data.likes || 0);
+        updated[index] = Number(data.count || 0);
         return updated;
       });
+
+      localStorage.setItem(storageKey, "true");
     } catch (error) {
       console.error("Unable to save like:", error);
+
       alert(
         "Unable to connect to the likes database."
       );
@@ -293,6 +316,7 @@ export default function Home() {
         "Unable to save comment:",
         error
       );
+
       alert(
         "Unable to connect to the comments database."
       );
@@ -315,13 +339,18 @@ export default function Home() {
         "Saving subscription..."
       );
 
-      const response = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+      const response = await fetch(
+        "/api/subscribe",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -333,11 +362,15 @@ export default function Home() {
         return;
       }
 
-      setSubscribers(data.count || 0);
+      setSubscribers(Number(data.count || 0));
       setSubscriptionMessage(data.message);
       setSubscriberEmail("");
     } catch (error) {
-      console.error("Subscription error:", error);
+      console.error(
+        "Subscription error:",
+        error
+      );
+
       setSubscriptionMessage(
         "Unable to connect to the database."
       );
@@ -349,24 +382,33 @@ export default function Home() {
   async function shareVideo(video: {
     id: number;
     title: string;
+    slug: string;
     src: string;
   }) {
     const url =
-      `${window.location.origin}/watch/video-${video.id}`;
+      `${window.location.origin}/watch/${video.slug}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: video.title,
-          text: `Watch ${video.title} on Ray'sStream`,
+          text:
+            `Watch ${video.title} on Ray'sStream`,
           url,
         });
       } catch {
-        // User cancelled sharing.
+        // The user closed the share menu.
       }
     } else {
-      await navigator.clipboard.writeText(url);
-      alert("Ray'sStream video link copied!");
+      try {
+        await navigator.clipboard.writeText(url);
+        alert("Ray'sStream video link copied!");
+      } catch {
+        window.prompt(
+          "Copy this video link:",
+          url
+        );
+      }
     }
   }
 
@@ -377,7 +419,8 @@ export default function Home() {
 
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${url}`,
-      "_blank"
+      "_blank",
+      "noopener,noreferrer"
     );
   }
 
@@ -392,7 +435,8 @@ export default function Home() {
 
     window.open(
       `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
-      "_blank"
+      "_blank",
+      "noopener,noreferrer"
     );
   }
 
@@ -402,8 +446,15 @@ export default function Home() {
     const url =
       `${window.location.origin}/watch/video-${videoId}`;
 
-    await navigator.clipboard.writeText(url);
-    alert("Ray'sStream video link copied!");
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Ray'sStream video link copied!");
+    } catch {
+      window.prompt(
+        "Copy this video link:",
+        url
+      );
+    }
   }
 
   return (
@@ -450,14 +501,13 @@ export default function Home() {
           }}
         >
           <a
-            href="/live"
+            href="/watch/video-1"
             style={{
               ...linkStyle,
-              background: "#dc2626",
-              border: "2px solid white",
+              background: "#e54421",
             }}
           >
-            ● Watch Live
+            Watch Live
           </a>
 
           <a href="/creator/signup" style={linkStyle}>
@@ -475,7 +525,7 @@ export default function Home() {
             Creator Dashboard
           </a>
 
-          <a href="/admin" style={linkStyle}>
+          <a href="/admin/login" style={linkStyle}>
             Admin Dashboard
           </a>
 
@@ -594,7 +644,7 @@ export default function Home() {
         style={{
           width: "min(1000px, 94%)",
           margin: "auto",
-          paddingBottom: "60px",
+          paddingBottom: "40px",
         }}
       >
         {videos.map((video, index) => (
@@ -706,21 +756,32 @@ export default function Home() {
               <div
                 style={{
                   display: "flex",
+                  flexWrap: "wrap",
                   gap: "8px",
                 }}
               >
                 <input
-                  value={commentInputs[index] || ""}
+                  value={
+                    commentInputs[index] || ""
+                  }
                   onChange={(event) =>
                     updateComment(
                       index,
                       event.target.value
                     )
                   }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      postComment(
+                        index,
+                        video.id
+                      );
+                    }
+                  }}
                   placeholder="Add a comment..."
                   maxLength={1000}
                   style={{
-                    flex: 1,
+                    flex: "1 1 300px",
                     padding: "12px",
                     borderRadius: "10px",
                     border: "2px solid black",
@@ -754,6 +815,7 @@ export default function Home() {
                     <strong>
                       Ray&apos;sStream User
                     </strong>
+
                     <div>{comment}</div>
                   </div>
                 )
@@ -768,7 +830,7 @@ export default function Home() {
       <section
         style={{
           width: "min(1000px, 94%)",
-          margin: "0 auto 50px",
+          margin: "40px auto 50px",
           padding: "30px",
           textAlign: "center",
           background: "#121212",
