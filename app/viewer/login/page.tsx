@@ -1,82 +1,75 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+type Viewer = {
+  id: number;
+  name: string;
+  username: string;
+  email: string;
+};
+
 export default function ViewerLoginPage() {
+  const router = useRouter();
+
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  async function logIn(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!login.trim() || !password) {
+      setMessage("Please enter your username or email and password.");
+      return;
+    }
 
     try {
       setLoggingIn(true);
-      setMessage("Logging in...");
+      setSuccess(false);
+      setMessage("Signing in...");
 
-      const response = await fetch(
-        "/api/viewer-login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            login,
-            password,
-          }),
-        }
-      );
+      const response = await fetch("/api/viewer-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          login: login.trim(),
+          password,
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(
-          data.error || "Unable to log in."
-        );
-        return;
+        throw new Error(data.error || "Unable to sign in.");
       }
 
-      localStorage.setItem(
-        "raysstreamViewer",
-        JSON.stringify(data.viewer)
-      );
+      const viewer = data.viewer as Viewer;
 
-      localStorage.setItem(
-        "raysstreamViewerId",
-        String(data.viewer.id)
-      );
+      localStorage.setItem("raysstreamViewer", JSON.stringify(viewer));
+      localStorage.setItem("raysstreamViewerId", String(viewer.id));
+      localStorage.setItem("raysstreamViewerName", viewer.name);
+      localStorage.setItem("raysstreamViewerUsername", viewer.username);
+      localStorage.setItem("raysstreamViewerEmail", viewer.email);
 
-      localStorage.setItem(
-        "raysstreamViewerName",
-        String(data.viewer.name)
-      );
-
-      localStorage.setItem(
-        "raysstreamViewerUsername",
-        String(data.viewer.username)
-      );
-
-      localStorage.setItem(
-        "raysstreamViewerEmail",
-        String(data.viewer.email)
-      );
-
-      setMessage(
-        `Welcome to Ray'sStream, ${data.viewer.name}!`
-      );
+      setSuccess(true);
+      setMessage(`Welcome back, ${viewer.name}!`);
 
       window.setTimeout(() => {
-        window.location.href = "/";
+        router.push("/viewer/dashboard");
       }, 1000);
     } catch (error) {
-      console.error("Viewer login error:", error);
-
+      setSuccess(false);
       setMessage(
-        "Unable to connect to the login system."
+        error instanceof Error
+          ? error.message
+          : "Unable to sign in. Please try again."
       );
     } finally {
       setLoggingIn(false);
@@ -84,194 +77,195 @@ export default function ViewerLoginPage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#050505",
-        color: "white",
-        fontFamily: "Arial, sans-serif",
-        padding: "40px 20px",
-        boxSizing: "border-box",
-      }}
-    >
-      <section
-        style={{
-          width: "min(520px, 100%)",
-          margin: "0 auto",
-          padding: "28px",
-          boxSizing: "border-box",
-          background: "#121212",
-          border: "2px solid black",
-          borderRadius: "18px",
-        }}
-      >
-        <a
-          href="/"
-          style={{
-            color: "white",
-            textDecoration: "none",
-          }}
-        >
-          <h1
-            style={{
-              textAlign: "center",
-              fontSize: "38px",
-              margin: "0 0 8px",
-            }}
-          >
-            Ray&apos;sStream
-          </h1>
-        </a>
+    <main style={styles.page}>
+      <section style={styles.card}>
+        <Link href="/" style={styles.logoLink}>
+          Ray&apos;sStream
+        </Link>
 
-        <h2
-          style={{
-            textAlign: "center",
-            marginBottom: "8px",
-          }}
-        >
-          Viewer Login
-        </h2>
+        <h1 style={styles.heading}>Viewer Login</h1>
 
-        <p
-          style={{
-            color: "#bbb",
-            textAlign: "center",
-            marginBottom: "26px",
-          }}
-        >
-          Log in with your username or email.
+        <p style={styles.description}>
+          Sign in to like, comment, and personalize your Ray&apos;sStream
+          experience.
         </p>
 
-        <form onSubmit={logIn}>
-          <label style={labelStyle}>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <label style={styles.label}>
             Username or Email
+            <input
+              type="text"
+              value={login}
+              onChange={(event) => setLogin(event.target.value)}
+              placeholder="Enter your username or email"
+              autoComplete="username"
+              required
+              style={styles.input}
+            />
           </label>
 
-          <input
-            type="text"
-            value={login}
-            onChange={(event) =>
-              setLogin(event.target.value)
-            }
-            placeholder="Enter username or email"
-            required
-            autoCapitalize="none"
-            style={inputStyle}
-          />
-
-          <label style={labelStyle}>
+          <label style={styles.label}>
             Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              required
+              style={styles.input}
+            />
           </label>
-
-          <input
-            type="password"
-            value={password}
-            onChange={(event) =>
-              setPassword(event.target.value)
-            }
-            placeholder="Enter your password"
-            required
-            style={inputStyle}
-          />
 
           <button
             type="submit"
             disabled={loggingIn}
             style={{
-              ...buttonStyle,
-              width: "100%",
-              marginTop: "8px",
+              ...styles.button,
               opacity: loggingIn ? 0.65 : 1,
+              cursor: loggingIn ? "not-allowed" : "pointer",
             }}
           >
-            {loggingIn
-              ? "Logging In..."
-              : "Viewer Login"}
+            {loggingIn ? "Signing In..." : "Viewer Login"}
           </button>
         </form>
 
         {message && (
           <div
             style={{
-              marginTop: "18px",
-              padding: "12px",
-              textAlign: "center",
-              background: "#1b1b1b",
-              border: "2px solid black",
-              borderRadius: "10px",
+              ...styles.message,
+              background: success
+                ? "rgba(20, 184, 166, 0.22)"
+                : "rgba(239, 68, 68, 0.18)",
+              borderColor: success ? "#2dd4bf" : "#fb7185",
             }}
           >
             {message}
           </div>
         )}
 
-        <div
-          style={{
-            marginTop: "22px",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "#bbb" }}>
-            Don&apos;t have a viewer account?
-          </p>
+        <p style={styles.signupText}>
+          Don&apos;t have a viewer account?{" "}
+          <Link href="/viewer/signup" style={styles.signupLink}>
+            Create one
+          </Link>
+        </p>
 
-          <a
-            href="/viewer/signup"
-            style={{
-              ...buttonStyle,
-              display: "inline-block",
-              textDecoration: "none",
-            }}
-          >
-            Create Viewer Account
-          </a>
-        </div>
-
-        <div
-          style={{
-            marginTop: "22px",
-            textAlign: "center",
-          }}
-        >
-          <a href="/" style={homeLinkStyle}>
-            ← Back to Home
-          </a>
-        </div>
+        <Link href="/" style={styles.backLink}>
+          ← Back to Home
+        </Link>
       </section>
     </main>
   );
 }
 
-const labelStyle = {
-  display: "block",
-  marginBottom: "7px",
-  fontWeight: "bold",
-};
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    padding: "40px 20px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background:
+      "radial-gradient(circle at top, #273353 0%, #111827 42%, #05070d 100%)",
+    color: "#ffffff",
+    fontFamily: "Arial, Helvetica, sans-serif",
+  },
 
-const inputStyle = {
-  width: "100%",
-  padding: "12px",
-  marginBottom: "16px",
-  boxSizing: "border-box" as const,
-  borderRadius: "10px",
-  border: "2px solid black",
-  background: "#1b1b1b",
-  color: "white",
-  fontSize: "16px",
-};
+  card: {
+    width: "100%",
+    maxWidth: "620px",
+    padding: "38px",
+    borderRadius: "24px",
+    border: "2px solid #000000",
+    background: "rgba(28, 37, 61, 0.96)",
+    boxShadow: "0 22px 60px rgba(0, 0, 0, 0.45)",
+    textAlign: "center",
+  },
 
-const buttonStyle = {
-  background: "#2b2b2b",
-  color: "white",
-  border: "2px solid black",
-  padding: "12px 18px",
-  borderRadius: "20px",
-  cursor: "pointer",
-  fontWeight: "bold",
-};
+  logoLink: {
+    display: "inline-block",
+    marginBottom: "26px",
+    color: "#ffffff",
+    fontSize: "42px",
+    fontWeight: 800,
+    textDecoration: "none",
+  },
 
-const homeLinkStyle = {
-  color: "#bbb",
-  textDecoration: "none",
-  fontWeight: "bold",
+  heading: {
+    margin: "0 0 12px",
+    fontSize: "34px",
+  },
+
+  description: {
+    margin: "0 auto 28px",
+    maxWidth: "500px",
+    color: "#cbd5e1",
+    fontSize: "17px",
+    lineHeight: 1.5,
+  },
+
+  form: {
+    display: "grid",
+    gap: "20px",
+    textAlign: "left",
+  },
+
+  label: {
+    display: "grid",
+    gap: "9px",
+    color: "#ffffff",
+    fontSize: "17px",
+    fontWeight: 800,
+  },
+
+  input: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "15px 17px",
+    borderRadius: "13px",
+    border: "2px solid #000000",
+    outline: "none",
+    background: "#e5e7eb",
+    color: "#111827",
+    fontSize: "16px",
+  },
+
+  button: {
+    width: "100%",
+    padding: "16px 20px",
+    marginTop: "4px",
+    borderRadius: "999px",
+    border: "2px solid #000000",
+    background: "linear-gradient(135deg, #fb7185, #f97316)",
+    color: "#ffffff",
+    fontSize: "17px",
+    fontWeight: 800,
+  },
+
+  message: {
+    marginTop: "22px",
+    padding: "14px 16px",
+    border: "2px solid",
+    borderRadius: "13px",
+    color: "#ffffff",
+    fontWeight: 700,
+  },
+
+  signupText: {
+    margin: "24px 0 18px",
+    color: "#cbd5e1",
+  },
+
+  signupLink: {
+    color: "#fb7185",
+    fontWeight: 800,
+    textDecoration: "none",
+  },
+
+  backLink: {
+    color: "#cbd5e1",
+    fontWeight: 700,
+    textDecoration: "none",
+  },
 }; 

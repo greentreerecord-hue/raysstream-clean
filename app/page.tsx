@@ -25,25 +25,11 @@ const videos = [
 ];
 
 export default function Home() {
-  const [views, setViews] = useState<number[]>([
-    0,
-    0,
-    0,
-  ]);
-
-  const [likes, setLikes] = useState<number[]>([
-    0,
-    0,
-    0,
-  ]);
-
+  const [views, setViews] = useState<number[]>([0, 0, 0]);
+  const [likes, setLikes] = useState<number[]>([0, 0, 0]);
   const [subscribers, setSubscribers] = useState(0);
-  const [subscriberEmail, setSubscriberEmail] =
-    useState("");
-
-  const [subscriptionMessage, setSubscriptionMessage] =
-    useState("");
-
+  const [subscriberEmail, setSubscriberEmail] = useState("");
+  const [subscriptionMessage, setSubscriptionMessage] = useState("");
   const [subscribing, setSubscribing] = useState(false);
 
   const viewedVideos = useRef<Set<number>>(new Set());
@@ -54,9 +40,11 @@ export default function Home() {
     [],
   ]);
 
-  const [commentInputs, setCommentInputs] = useState<
-    string[]
-  >(["", "", ""]);
+  const [commentInputs, setCommentInputs] = useState<string[]>([
+    "",
+    "",
+    "",
+  ]);
 
   useEffect(() => {
     async function loadSubscriberCount() {
@@ -68,10 +56,7 @@ export default function Home() {
           setSubscribers(Number(data.count || 0));
         }
       } catch (error) {
-        console.error(
-          "Unable to load subscribers:",
-          error
-        );
+        console.error("Unable to load subscribers:", error);
       }
     }
 
@@ -88,10 +73,7 @@ export default function Home() {
           );
         }
       } catch (error) {
-        console.error(
-          "Unable to load video views:",
-          error
-        );
+        console.error("Unable to load video views:", error);
       }
     }
 
@@ -116,10 +98,7 @@ export default function Home() {
           });
         }
       } catch (error) {
-        console.error(
-          "Unable to load video likes:",
-          error
-        );
+        console.error("Unable to load video likes:", error);
       }
     }
 
@@ -132,13 +111,11 @@ export default function Home() {
           return;
         }
 
-        const groupedComments: string[][] =
-          videos.map(() => []);
+        const groupedComments: string[][] = videos.map(() => []);
 
         for (const comment of data.comments || []) {
           const videoIndex = videos.findIndex(
-            (video) =>
-              video.id === Number(comment.videoId)
+            (video) => video.id === Number(comment.videoId)
           );
 
           if (videoIndex >= 0) {
@@ -150,10 +127,7 @@ export default function Home() {
 
         setComments(groupedComments);
       } catch (error) {
-        console.error(
-          "Unable to load comments:",
-          error
-        );
+        console.error("Unable to load comments:", error);
       }
     }
 
@@ -163,10 +137,7 @@ export default function Home() {
     loadVideoComments();
   }, []);
 
-  async function addView(
-    index: number,
-    videoId: number
-  ) {
+  async function addView(index: number, videoId: number) {
     if (viewedVideos.current.has(videoId)) {
       return;
     }
@@ -198,24 +169,14 @@ export default function Home() {
       });
     } catch (error) {
       viewedVideos.current.delete(videoId);
-
-      console.error(
-        "Unable to save video view:",
-        error
-      );
+      console.error("Unable to save video view:", error);
     }
   }
 
-  async function likeVideo(
-    index: number,
-    videoId: number
-  ) {
-    const storageKey =
-      `raysstream-liked-${videoId}`;
+  async function likeVideo(index: number, videoId: number) {
+    const storageKey = `raysstream-liked-${videoId}`;
 
-    if (
-      localStorage.getItem(storageKey) === "true"
-    ) {
+    if (localStorage.getItem(storageKey) === "true") {
       alert("You already liked this video.");
       return;
     }
@@ -247,17 +208,11 @@ export default function Home() {
       localStorage.setItem(storageKey, "true");
     } catch (error) {
       console.error("Unable to save like:", error);
-
-      alert(
-        "Unable to connect to the likes database."
-      );
+      alert("Unable to connect to the likes database.");
     }
   }
 
-  function updateComment(
-    index: number,
-    value: string
-  ) {
+  function updateComment(index: number, value: string) {
     setCommentInputs((current) => {
       const updated = [...current];
       updated[index] = value;
@@ -265,12 +220,8 @@ export default function Home() {
     });
   }
 
-  async function postComment(
-    index: number,
-    videoId: number
-  ) {
-    const commentText =
-      commentInputs[index]?.trim();
+  async function postComment(index: number, videoId: number) {
+    const commentText = commentInputs[index]?.trim();
 
     if (!commentText) {
       return;
@@ -291,16 +242,14 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(
-          data.error || "Unable to save comment."
-        );
+        alert(data.error || "Unable to save comment.");
         return;
       }
 
       setComments((current) => {
-        const updated = current.map(
-          (videoComments) => [...videoComments]
-        );
+        const updated = current.map((videoComments) => [
+          ...videoComments,
+        ]);
 
         updated[index].push(data.comment.text);
         return updated;
@@ -312,14 +261,8 @@ export default function Home() {
         return updated;
       });
     } catch (error) {
-      console.error(
-        "Unable to save comment:",
-        error
-      );
-
-      alert(
-        "Unable to connect to the comments database."
-      );
+      console.error("Unable to save comment:", error);
+      alert("Unable to connect to the comments database.");
     }
   }
 
@@ -327,37 +270,29 @@ export default function Home() {
     const email = subscriberEmail.trim();
 
     if (!email) {
-      setSubscriptionMessage(
-        "Please enter your email."
-      );
+      setSubscriptionMessage("Please enter your email.");
       return;
     }
 
     try {
       setSubscribing(true);
-      setSubscriptionMessage(
-        "Saving subscription..."
-      );
+      setSubscriptionMessage("Saving subscription...");
 
-      const response = await fetch(
-        "/api/subscribe",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-          }),
-        }
-      );
+      const response = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         setSubscriptionMessage(
-          data.error ||
-            "Unable to complete subscription."
+          data.error || "Unable to complete subscription."
         );
         return;
       }
@@ -366,11 +301,7 @@ export default function Home() {
       setSubscriptionMessage(data.message);
       setSubscriberEmail("");
     } catch (error) {
-      console.error(
-        "Subscription error:",
-        error
-      );
-
+      console.error("Subscription error:", error);
       setSubscriptionMessage(
         "Unable to connect to the database."
       );
@@ -385,15 +316,13 @@ export default function Home() {
     slug: string;
     src: string;
   }) {
-    const url =
-      `${window.location.origin}/watch/${video.slug}`;
+    const url = `${window.location.origin}/watch/${video.slug}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: video.title,
-          text:
-            `Watch ${video.title} on Ray'sStream`,
+          text: `Watch ${video.title} on Ray'sStream`,
           url,
         });
       } catch {
@@ -404,10 +333,7 @@ export default function Home() {
         await navigator.clipboard.writeText(url);
         alert("Ray'sStream video link copied!");
       } catch {
-        window.prompt(
-          "Copy this video link:",
-          url
-        );
+        window.prompt("Copy this video link:", url);
       }
     }
   }
@@ -440,9 +366,7 @@ export default function Home() {
     );
   }
 
-  async function copyForTikTokInstagram(
-    videoId: number
-  ) {
+  async function copyForTikTokInstagram(videoId: number) {
     const url =
       `${window.location.origin}/watch/video-${videoId}`;
 
@@ -450,10 +374,7 @@ export default function Home() {
       await navigator.clipboard.writeText(url);
       alert("Ray'sStream video link copied!");
     } catch {
-      window.prompt(
-        "Copy this video link:",
-        url
-      );
+      window.prompt("Copy this video link:", url);
     }
   }
 
@@ -518,6 +439,10 @@ export default function Home() {
             Viewer Login
           </a>
 
+          <a href="/viewer/dashboard" style={linkStyle}>
+            Viewer Dashboard
+          </a>
+
           <a href="/creator/signup" style={linkStyle}>
             Creator Sign Up
           </a>
@@ -526,10 +451,7 @@ export default function Home() {
             Creator Login
           </a>
 
-          <a
-            href="/creator/dashboard"
-            style={linkStyle}
-          >
+          <a href="/creator/dashboard" style={linkStyle}>
             Creator Dashboard
           </a>
 
@@ -586,9 +508,7 @@ export default function Home() {
               type="email"
               value={subscriberEmail}
               onChange={(event) =>
-                setSubscriberEmail(
-                  event.target.value
-                )
+                setSubscriberEmail(event.target.value)
               }
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -614,9 +534,7 @@ export default function Home() {
                 opacity: subscribing ? 0.6 : 1,
               }}
             >
-              {subscribing
-                ? "Saving..."
-                : "Subscribe"}
+              {subscribing ? "Saving..." : "Subscribe"}
             </button>
           </div>
 
@@ -674,9 +592,7 @@ export default function Home() {
               loop
               playsInline
               preload="metadata"
-              onPlay={() =>
-                addView(index, video.id)
-              }
+              onPlay={() => addView(index, video.id)}
               style={{
                 width: "100%",
                 background: "black",
@@ -689,8 +605,7 @@ export default function Home() {
             <p>
               👁 {views[index] || 0} views &nbsp;
               👍 {likes[index] || 0} likes &nbsp;
-              💬 {comments[index]?.length || 0}{" "}
-              comments
+              💬 {comments[index]?.length || 0} comments
             </p>
 
             <div
@@ -708,9 +623,7 @@ export default function Home() {
               </a>
 
               <button
-                onClick={() =>
-                  likeVideo(index, video.id)
-                }
+                onClick={() => likeVideo(index, video.id)}
                 style={buttonStyle}
               >
                 👍 Like
@@ -724,9 +637,7 @@ export default function Home() {
               </button>
 
               <button
-                onClick={() =>
-                  shareFacebook(video.id)
-                }
+                onClick={() => shareFacebook(video.id)}
                 style={buttonStyle}
               >
                 Facebook
@@ -769,21 +680,13 @@ export default function Home() {
                 }}
               >
                 <input
-                  value={
-                    commentInputs[index] || ""
-                  }
+                  value={commentInputs[index] || ""}
                   onChange={(event) =>
-                    updateComment(
-                      index,
-                      event.target.value
-                    )
+                    updateComment(index, event.target.value)
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
-                      postComment(
-                        index,
-                        video.id
-                      );
+                      postComment(index, video.id);
                     }
                   }}
                   placeholder="Add a comment..."
@@ -850,21 +753,14 @@ export default function Home() {
         <h2>🎬 Creator Uploads</h2>
 
         <p style={{ color: "#bbb" }}>
-          Upload your own videos and watch creator
-          uploads.
+          Upload your own videos and watch creator uploads.
         </p>
 
-        <a
-          href="/creator/signup"
-          style={creatorButton}
-        >
+        <a href="/creator/signup" style={creatorButton}>
           ✨ Creator Sign Up
         </a>
 
-        <a
-          href="/creator/login"
-          style={creatorButton}
-        >
+        <a href="/creator/login" style={creatorButton}>
           🔐 Creator Login
         </a>
 
