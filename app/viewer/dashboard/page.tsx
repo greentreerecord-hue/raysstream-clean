@@ -1,300 +1,446 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type Viewer = {
   id: number;
-  name: string;
+  fullName: string;
   username: string;
   email: string;
 };
 
-export default function ViewerDashboardPage() {
-  const router = useRouter();
-
-  const [viewer, setViewer] = useState<Viewer | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function ViewerDashboard() {
+  const [viewer, setViewer] = useState<Viewer | null>(
+    null
+  );
+  const [editing, setEditing] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const savedViewer = localStorage.getItem("raysstreamViewer");
+    const viewerId = localStorage.getItem(
+      "raysstreamViewerId"
+    );
+    const viewerName = localStorage.getItem(
+      "raysstreamViewerName"
+    );
+    const viewerUsername = localStorage.getItem(
+      "raysstreamViewerUsername"
+    );
+    const viewerEmail = localStorage.getItem(
+      "raysstreamViewerEmail"
+    );
 
-    if (!savedViewer) {
-      router.replace("/viewer/login");
+    if (
+      !viewerId ||
+      !viewerName ||
+      !viewerUsername ||
+      !viewerEmail
+    ) {
+      window.location.href = "/viewer/login";
+      return;
+    }
+
+    const savedViewer = {
+      id: Number(viewerId),
+      fullName: viewerName,
+      username: viewerUsername,
+      email: viewerEmail,
+    };
+
+    setViewer(savedViewer);
+    setFullName(viewerName);
+  }, []);
+
+  async function saveProfile() {
+    if (!viewer) {
+      return;
+    }
+
+    const cleanedName = fullName.trim();
+
+    if (!cleanedName) {
+      setMessage("Please enter your full name.");
       return;
     }
 
     try {
-      const parsedViewer = JSON.parse(savedViewer) as Viewer;
+      setSaving(true);
+      setMessage("Saving profile...");
 
-      if (
-        !parsedViewer.id ||
-        !parsedViewer.name ||
-        !parsedViewer.username ||
-        !parsedViewer.email
-      ) {
-        throw new Error("Invalid viewer account");
+      const response = await fetch(
+        "/api/viewer-profile",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            viewerId: viewer.id,
+            fullName: cleanedName,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(
+          data.error || "Unable to update profile."
+        );
+        return;
       }
 
-      setViewer(parsedViewer);
-      setLoading(false);
-    } catch {
-      localStorage.removeItem("raysstreamViewer");
-      localStorage.removeItem("raysstreamViewerId");
-      localStorage.removeItem("raysstreamViewerName");
-      localStorage.removeItem("raysstreamViewerUsername");
-      localStorage.removeItem("raysstreamViewerEmail");
+      const updatedViewer = {
+        ...viewer,
+        fullName: data.viewer.fullName,
+      };
 
-      router.replace("/viewer/login");
+      setViewer(updatedViewer);
+      setFullName(data.viewer.fullName);
+
+      localStorage.setItem(
+        "raysstreamViewerName",
+        data.viewer.fullName
+      );
+
+      localStorage.setItem(
+        "raysstreamViewer",
+        JSON.stringify(updatedViewer)
+      );
+
+      setEditing(false);
+      setMessage("Your name has been updated.");
+    } catch (error) {
+      console.error("Profile update error:", error);
+
+      setMessage(
+        "Unable to connect to the database."
+      );
+    } finally {
+      setSaving(false);
     }
-  }, [router]);
+  }
 
   function logout() {
     localStorage.removeItem("raysstreamViewer");
     localStorage.removeItem("raysstreamViewerId");
     localStorage.removeItem("raysstreamViewerName");
-    localStorage.removeItem("raysstreamViewerUsername");
+    localStorage.removeItem(
+      "raysstreamViewerUsername"
+    );
     localStorage.removeItem("raysstreamViewerEmail");
 
-    router.push("/");
+    window.location.href = "/viewer/login";
   }
 
-  if (loading || !viewer) {
+  if (!viewer) {
     return (
-      <main style={styles.page}>
-        <div style={styles.card}>
-          <p style={styles.loadingText}>Loading viewer account...</p>
-        </div>
+      <main style={pageStyle}>
+        <p>Loading viewer dashboard...</p>
       </main>
     );
   }
 
+  const initial =
+    viewer.fullName.charAt(0).toUpperCase() || "V";
+
   return (
-    <main style={styles.page}>
-      <section style={styles.card}>
-        <Link href="/" style={styles.logoLink}>
+    <main style={pageStyle}>
+      <section style={dashboardStyle}>
+        <h1
+          style={{
+            fontSize: "48px",
+            margin: "0 0 28px",
+          }}
+        >
           Ray&apos;sStream
-        </Link>
+        </h1>
 
-        <p style={styles.eyebrow}>VIEWER ACCOUNT</p>
-
-        <h1 style={styles.heading}>Viewer Dashboard</h1>
-
-        <p style={styles.welcome}>
-          Welcome, <strong>{viewer.name}</strong>!
+        <p style={accountLabelStyle}>
+          VIEWER ACCOUNT
         </p>
 
-        <div style={styles.profileCard}>
-          <div style={styles.avatar}>
-            {viewer.name.charAt(0).toUpperCase()}
-          </div>
+        <h2
+          style={{
+            fontSize: "42px",
+            margin: "8px 0",
+          }}
+        >
+          Viewer Dashboard
+        </h2>
 
-          <div style={styles.profileDetails}>
-            <h2 style={styles.name}>{viewer.name}</h2>
-            <p style={styles.username}>@{viewer.username}</p>
+        <p
+          style={{
+            color: "#9dc5ff",
+            fontSize: "22px",
+            marginBottom: "30px",
+          }}
+        >
+          Welcome, <strong>{viewer.fullName}!</strong>
+        </p>
+
+        <div style={profileHeaderStyle}>
+          <div style={avatarStyle}>{initial}</div>
+
+          <div>
+            <h3
+              style={{
+                fontSize: "28px",
+                margin: "0 0 8px",
+              }}
+            >
+              {viewer.fullName}
+            </h3>
+
+            <p
+              style={{
+                color: "#80b7ff",
+                fontSize: "20px",
+                margin: 0,
+              }}
+            >
+              @{viewer.username}
+            </p>
           </div>
         </div>
 
-        <div style={styles.details}>
-          <div style={styles.detailRow}>
-            <span style={styles.label}>Full Name</span>
-            <span style={styles.value}>{viewer.name}</span>
+        <div style={informationStyle}>
+          <div style={rowStyle}>
+            <strong>Full Name</strong>
+            <span>{viewer.fullName}</span>
           </div>
 
-          <div style={styles.detailRow}>
-            <span style={styles.label}>Username</span>
-            <span style={styles.value}>@{viewer.username}</span>
+          <div style={rowStyle}>
+            <strong>Username</strong>
+            <span>@{viewer.username}</span>
           </div>
 
-          <div style={styles.detailRow}>
-            <span style={styles.label}>Email</span>
-            <span style={styles.value}>{viewer.email}</span>
+          <div style={rowStyle}>
+            <strong>Email</strong>
+            <span>{viewer.email}</span>
           </div>
         </div>
 
-        <div style={styles.actions}>
-          <Link href="/" style={styles.primaryButton}>
+        {editing && (
+          <div style={editBoxStyle}>
+            <label
+              htmlFor="fullName"
+              style={{
+                display: "block",
+                fontWeight: "bold",
+                marginBottom: "8px",
+              }}
+            >
+              Edit Full Name
+            </label>
+
+            <input
+              id="fullName"
+              value={fullName}
+              onChange={(event) =>
+                setFullName(event.target.value)
+              }
+              maxLength={100}
+              style={inputStyle}
+            />
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
+                marginTop: "14px",
+              }}
+            >
+              <button
+                onClick={saveProfile}
+                disabled={saving}
+                style={primaryButtonStyle}
+              >
+                {saving
+                  ? "Saving..."
+                  : "Save Name"}
+              </button>
+
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  setFullName(viewer.fullName);
+                  setMessage("");
+                }}
+                disabled={saving}
+                style={buttonStyle}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {message && (
+          <p
+            style={{
+              color: "#9dc5ff",
+              textAlign: "center",
+            }}
+          >
+            {message}
+          </p>
+        )}
+
+        <div style={buttonGridStyle}>
+          <a href="/" style={primaryLinkStyle}>
             Watch Videos
-          </Link>
+          </a>
 
-          <button type="button" onClick={logout} style={styles.logoutButton}>
+          <button
+            onClick={() => {
+              setEditing(true);
+              setMessage("");
+            }}
+            style={buttonStyle}
+          >
+            Edit Profile
+          </button>
+
+          <button onClick={logout} style={buttonStyle}>
             Logout
           </button>
         </div>
 
-        <Link href="/" style={styles.backLink}>
+        <a
+          href="/"
+          style={{
+            display: "inline-block",
+            color: "#ccc",
+            textDecoration: "none",
+            marginTop: "24px",
+          }}
+        >
           ← Back to Home
-        </Link>
+        </a>
       </section>
     </main>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    padding: "40px 20px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    background:
-      "radial-gradient(circle at top, #273353 0%, #111827 42%, #05070d 100%)",
-    color: "#ffffff",
-    fontFamily: "Arial, Helvetica, sans-serif",
-  },
+const pageStyle = {
+  minHeight: "100vh",
+  background: "#050505",
+  color: "white",
+  fontFamily: "Arial, sans-serif",
+  display: "flex",
+  justifyContent: "center",
+  padding: "40px 20px",
+  boxSizing: "border-box" as const,
+};
 
-  card: {
-    width: "100%",
-    maxWidth: "650px",
-    padding: "38px",
-    borderRadius: "24px",
-    border: "2px solid #000000",
-    background: "rgba(28, 37, 61, 0.96)",
-    boxShadow: "0 22px 60px rgba(0, 0, 0, 0.45)",
-    textAlign: "center",
-  },
+const dashboardStyle = {
+  width: "min(850px, 100%)",
+  textAlign: "center" as const,
+};
 
-  logoLink: {
-    display: "inline-block",
-    marginBottom: "24px",
-    color: "#ffffff",
-    fontSize: "42px",
-    fontWeight: 800,
-    textDecoration: "none",
-  },
+const accountLabelStyle = {
+  color: "#ff6347",
+  fontWeight: "bold",
+  letterSpacing: "4px",
+};
 
-  eyebrow: {
-    margin: "0 0 8px",
-    color: "#fb7185",
-    fontSize: "13px",
-    fontWeight: 800,
-    letterSpacing: "2px",
-  },
+const profileHeaderStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "24px",
+  textAlign: "left" as const,
+  background: "#121212",
+  border: "2px solid black",
+  borderRadius: "18px",
+  padding: "24px",
+};
 
-  heading: {
-    margin: "0 0 12px",
-    fontSize: "34px",
-  },
+const avatarStyle = {
+  width: "92px",
+  height: "92px",
+  borderRadius: "50%",
+  background:
+    "linear-gradient(135deg, #ff5577, #ff7a00)",
+  display: "grid",
+  placeItems: "center",
+  fontSize: "38px",
+  fontWeight: "bold",
+};
 
-  welcome: {
-    margin: "0 0 28px",
-    color: "#cbd5e1",
-    fontSize: "18px",
-  },
+const informationStyle = {
+  marginTop: "20px",
+  background: "#121212",
+  border: "2px solid black",
+  borderRadius: "18px",
+  overflow: "hidden",
+};
 
-  profileCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "18px",
-    padding: "20px",
-    marginBottom: "22px",
-    borderRadius: "18px",
-    border: "2px solid #000000",
-    background: "#111827",
-    textAlign: "left",
-  },
+const rowStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  flexWrap: "wrap" as const,
+  gap: "12px",
+  padding: "20px",
+  borderBottom: "1px solid #333",
+  textAlign: "left" as const,
+};
 
-  avatar: {
-    width: "72px",
-    height: "72px",
-    flexShrink: 0,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: "50%",
-    border: "2px solid #000000",
-    background: "linear-gradient(135deg, #fb7185, #f97316)",
-    color: "#ffffff",
-    fontSize: "32px",
-    fontWeight: 800,
-  },
+const editBoxStyle = {
+  marginTop: "20px",
+  padding: "22px",
+  background: "#121212",
+  border: "2px solid black",
+  borderRadius: "18px",
+  textAlign: "left" as const,
+};
 
-  profileDetails: {
-    minWidth: 0,
-  },
+const inputStyle = {
+  width: "100%",
+  boxSizing: "border-box" as const,
+  padding: "13px",
+  background: "#1b1b1b",
+  color: "white",
+  border: "2px solid black",
+  borderRadius: "10px",
+  fontSize: "18px",
+};
 
-  name: {
-    margin: "0 0 6px",
-    fontSize: "24px",
-    overflowWrap: "anywhere",
-  },
+const buttonGridStyle = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  marginTop: "24px",
+};
 
-  username: {
-    margin: 0,
-    color: "#94a3b8",
-    fontSize: "17px",
-    overflowWrap: "anywhere",
-  },
+const buttonStyle = {
+  background: "#222",
+  color: "white",
+  border: "2px solid black",
+  borderRadius: "24px",
+  padding: "13px 20px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
 
-  details: {
-    marginBottom: "24px",
-    overflow: "hidden",
-    borderRadius: "18px",
-    border: "2px solid #000000",
-    background: "#111827",
-  },
+const primaryButtonStyle = {
+  ...buttonStyle,
+  background:
+    "linear-gradient(90deg, #ff5577, #ff7a00)",
+};
 
-  detailRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "20px",
-    padding: "17px 20px",
-    borderBottom: "1px solid #334155",
-    textAlign: "left",
-  },
-
-  label: {
-    color: "#94a3b8",
-    fontWeight: 700,
-  },
-
-  value: {
-    color: "#ffffff",
-    fontWeight: 700,
-    textAlign: "right",
-    overflowWrap: "anywhere",
-  },
-
-  actions: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "14px",
-    marginBottom: "22px",
-  },
-
-  primaryButton: {
-    padding: "15px 18px",
-    borderRadius: "999px",
-    border: "2px solid #000000",
-    background: "linear-gradient(135deg, #fb7185, #f97316)",
-    color: "#ffffff",
-    fontSize: "16px",
-    fontWeight: 800,
-    textDecoration: "none",
-    textAlign: "center",
-  },
-
-  logoutButton: {
-    padding: "15px 18px",
-    borderRadius: "999px",
-    border: "2px solid #000000",
-    background: "#334155",
-    color: "#ffffff",
-    fontSize: "16px",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-
-  backLink: {
-    color: "#cbd5e1",
-    fontWeight: 700,
-    textDecoration: "none",
-  },
-
-  loadingText: {
-    margin: 0,
-    color: "#cbd5e1",
-    fontSize: "18px",
-  },
+const primaryLinkStyle = {
+  display: "block",
+  background:
+    "linear-gradient(90deg, #ff5577, #ff7a00)",
+  color: "white",
+  textDecoration: "none",
+  border: "2px solid black",
+  borderRadius: "24px",
+  padding: "13px 20px",
+  fontWeight: "bold",
 }; 
