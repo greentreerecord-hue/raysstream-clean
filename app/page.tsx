@@ -510,6 +510,14 @@ export default function Home() {
             Watch Live
           </a>
 
+          <a href="/viewer/signup" style={linkStyle}>
+            Viewer Sign Up
+          </a>
+
+          <a href="/viewer/login" style={linkStyle}>
+            Viewer Login
+          </a>
+
           <a href="/creator/signup" style={linkStyle}>
             Creator Sign Up
           </a>
