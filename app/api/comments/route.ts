@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
 
+import {
+  getViewerIdFromSession,
+} from "../../../lib/viewer-session";
+
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const connectionString =
   process.env.RAYSSTREAM_DB_DATABASE_URL;
@@ -15,6 +20,18 @@ if (!connectionString) {
 const sql = postgres(connectionString, {
   ssl: "require",
 });
+
+function jsonResponse(
+  body: unknown,
+  status = 200
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
 
 async function ensureCommentsTable() {
   await sql`
@@ -46,7 +63,8 @@ async function ensureCommentsTable() {
 
   await sql`
     ALTER TABLE viewers
-    ADD COLUMN IF NOT EXISTS profile_picture_url TEXT
+    ADD COLUMN IF NOT EXISTS
+    profile_picture_url TEXT
   `;
 }
 
@@ -70,7 +88,7 @@ export async function GET() {
       ORDER BY comments.created_at ASC
     `;
 
-    return NextResponse.json({
+    return jsonResponse({
       comments: rows.map((row) => ({
         id: Number(row.id),
         videoId: Number(row.video_id),
@@ -82,7 +100,8 @@ export async function GET() {
             : Number(row.viewer_id),
 
         viewerName:
-          row.viewer_name || "Ray'sStream User",
+          row.viewer_name ||
+          "Ray'sStream User",
 
         viewerUsername:
           row.viewer_username || null,
@@ -94,24 +113,101 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    console.error("Load comments error:", error);
+    console.error(
+      "Load comments error:",
+      error
+    );
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: "Unable to load comments.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    await ensureCommentsTable();
+    const origin = request.headers.get("origin");
 
-    const body = await request.json();
+    if (
+      request.headers.get("sec-fetch-site") ===
+        "cross-site" ||
+      (
+        origin !== null &&
+        origin !== new URL(request.url).origin
+      )
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "This comment request is not allowed.",
+        },
+        403
+      );
+    }
+
+    const contentType =
+      request.headers.get("content-type") || "";
+
+    if (
+      !contentType
+        .toLowerCase()
+        .startsWith("application/json")
+    ) {
+      return jsonResponse(
+        {
+          error: "A JSON request is required.",
+        },
+        415
+      );
+    }
+
+    const viewerId =
+      await getViewerIdFromSession(request);
+
+    if (viewerId === null) {
+      return jsonResponse(
+        {
+          error:
+            "Please log in to comment.",
+        },
+        401
+      );
+    }
+
+    let parsedBody: unknown;
+
+    try {
+      parsedBody = await request.json();
+    } catch {
+      return jsonResponse(
+        {
+          error: "Invalid comment request.",
+        },
+        400
+      );
+    }
+
+    if (
+      typeof parsedBody !== "object" ||
+      parsedBody === null ||
+      Array.isArray(parsedBody)
+    ) {
+      return jsonResponse(
+        {
+          error: "Invalid comment request.",
+        },
+        400
+      );
+    }
+
+    const body = parsedBody as Record<
+      string,
+      unknown
+    >;
+
     const videoId = Number(body.videoId);
 
     const text =
@@ -119,103 +215,71 @@ export async function POST(request: Request) {
         ? body.text.trim()
         : "";
 
-    const viewerId =
-      body.viewerId !== undefined &&
-      body.viewerId !== null &&
-      body.viewerId !== ""
-        ? Number(body.viewerId)
-        : null;
-
     if (
       !Number.isInteger(videoId) ||
       videoId < 1
     ) {
-      return NextResponse.json(
+      return jsonResponse(
         {
-          error: "A valid video ID is required.",
+          error:
+            "A valid video ID is required.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
     if (!text) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error: "Comment text is required.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
     if (text.length > 1000) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error:
             "Comment must be 1,000 characters or less.",
         },
+        400
+      );
+    }
+
+    await ensureCommentsTable();
+
+    const viewerRows = await sql`
+      SELECT
+        id,
+        name,
+        username,
+        profile_picture_url
+      FROM viewers
+      WHERE id = ${viewerId}
+      LIMIT 1
+    `;
+
+    if (viewerRows.length === 0) {
+      return jsonResponse(
         {
-          status: 400,
-        }
+          error:
+            "Viewer account not found. Please log in again.",
+        },
+        401
       );
     }
 
-    let viewerName = "Ray'sStream User";
-    let viewerUsername: string | null = null;
-    let viewerProfilePictureUrl: string | null =
-      null;
+    const viewerName = String(
+      viewerRows[0].name
+    );
 
-    if (viewerId !== null) {
-      if (
-        !Number.isInteger(viewerId) ||
-        viewerId < 1
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "Please sign in to a valid viewer account.",
-          },
-          {
-            status: 401,
-          }
-        );
-      }
+    const viewerUsername = String(
+      viewerRows[0].username
+    );
 
-      const viewerRows = await sql`
-        SELECT
-          id,
-          name,
-          username,
-          profile_picture_url
-        FROM viewers
-        WHERE id = ${viewerId}
-        LIMIT 1
-      `;
-
-      if (viewerRows.length === 0) {
-        return NextResponse.json(
-          {
-            error:
-              "Viewer account not found. Please log in again.",
-          },
-          {
-            status: 401,
-          }
-        );
-      }
-
-      viewerName = String(viewerRows[0].name);
-
-      viewerUsername = String(
-        viewerRows[0].username
-      );
-
-      viewerProfilePictureUrl =
-        viewerRows[0].profile_picture_url || null;
-    }
+    const viewerProfilePictureUrl =
+      viewerRows[0].profile_picture_url || null;
 
     const result = await sql`
       INSERT INTO video_comments (
@@ -244,16 +308,12 @@ export async function POST(request: Request) {
 
     const comment = result[0];
 
-    return NextResponse.json({
+    return jsonResponse({
       comment: {
         id: Number(comment.id),
         videoId: Number(comment.video_id),
         text: String(comment.comment_text),
-
-        viewerId:
-          comment.viewer_id === null
-            ? null
-            : Number(comment.viewer_id),
+        viewerId: Number(comment.viewer_id),
 
         viewerName:
           comment.viewer_name ||
@@ -268,15 +328,16 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Save comment error:", error);
+    console.error(
+      "Save comment error:",
+      error
+    );
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: "Unable to save comment.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 } 
