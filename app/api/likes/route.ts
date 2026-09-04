@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
 
+import {
+  getViewerIdFromSession,
+} from "../../../lib/viewer-session";
+
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const connectionString =
   process.env.RAYSSTREAM_DB_DATABASE_URL;
@@ -15,6 +20,18 @@ if (!connectionString) {
 const sql = postgres(connectionString, {
   ssl: "require",
 });
+
+function jsonResponse(
+  body: unknown,
+  status = 200
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
 
 async function ensureLikesTables() {
   await sql`
@@ -40,13 +57,10 @@ export async function GET(request: Request) {
   try {
     await ensureLikesTables();
 
-    const { searchParams } = new URL(request.url);
-    const viewerIdValue =
-      searchParams.get("viewerId");
-
-    const viewerId = viewerIdValue
-      ? Number(viewerIdValue)
-      : null;
+    // The query-string viewerId is deliberately ignored.
+    // Liked videos are loaded only from the secure session.
+    const viewerId =
+      await getViewerIdFromSession(request);
 
     const rows = await sql`
       SELECT video_id, like_count
@@ -63,11 +77,7 @@ export async function GET(request: Request) {
 
     let likedVideoIds: number[] = [];
 
-    if (
-      viewerId !== null &&
-      Number.isInteger(viewerId) &&
-      viewerId > 0
-    ) {
+    if (viewerId !== null) {
       const viewerLikeRows = await sql`
         SELECT video_id
         FROM viewer_video_likes
@@ -75,159 +85,235 @@ export async function GET(request: Request) {
         ORDER BY video_id
       `;
 
-      likedVideoIds = viewerLikeRows.map((row) =>
-        Number(row.video_id)
+      likedVideoIds = viewerLikeRows.map(
+        (row) => Number(row.video_id)
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       likes,
       likedVideoIds,
     });
   } catch (error) {
-    console.error("Unable to load likes:", error);
+    console.error(
+      "Unable to load likes:",
+      error
+    );
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: "Unable to load likes.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    await ensureLikesTables();
+    const origin = request.headers.get("origin");
 
-    const body = await request.json();
-    const videoId = Number(body.videoId);
+    if (
+      request.headers.get("sec-fetch-site") ===
+        "cross-site" ||
+      (
+        origin !== null &&
+        origin !== new URL(request.url).origin
+      )
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "This like request is not allowed.",
+        },
+        403
+      );
+    }
+
+    const contentType =
+      request.headers.get("content-type") || "";
+
+    if (
+      !contentType
+        .toLowerCase()
+        .startsWith("application/json")
+    ) {
+      return jsonResponse(
+        {
+          error: "A JSON request is required.",
+        },
+        415
+      );
+    }
 
     const viewerId =
-      body.viewerId !== undefined &&
-      body.viewerId !== null &&
-      body.viewerId !== ""
-        ? Number(body.viewerId)
-        : null;
+      await getViewerIdFromSession(request);
+
+    if (viewerId === null) {
+      return jsonResponse(
+        {
+          error:
+            "Please log in to like this video.",
+        },
+        401
+      );
+    }
+
+    let parsedBody: unknown;
+
+    try {
+      parsedBody = await request.json();
+    } catch {
+      return jsonResponse(
+        {
+          error: "Invalid like request.",
+        },
+        400
+      );
+    }
+
+    if (
+      typeof parsedBody !== "object" ||
+      parsedBody === null ||
+      Array.isArray(parsedBody)
+    ) {
+      return jsonResponse(
+        {
+          error: "Invalid like request.",
+        },
+        400
+      );
+    }
+
+    const body = parsedBody as Record<
+      string,
+      unknown
+    >;
+
+    const videoId = Number(body.videoId);
 
     if (
       !Number.isInteger(videoId) ||
       videoId < 1
     ) {
-      return NextResponse.json(
+      return jsonResponse(
         {
-          error: "A valid video ID is required.",
+          error:
+            "A valid video ID is required.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    if (viewerId !== null) {
-      if (
-        !Number.isInteger(viewerId) ||
-        viewerId < 1
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "Please sign in to a valid viewer account.",
-          },
-          {
-            status: 401,
-          }
-        );
-      }
+    await ensureLikesTables();
 
-      const viewerRows = await sql`
-        SELECT id
-        FROM viewers
-        WHERE id = ${viewerId}
-        LIMIT 1
-      `;
-
-      if (viewerRows.length === 0) {
-        return NextResponse.json(
-          {
-            error:
-              "Viewer account not found. Please log in again.",
-          },
-          {
-            status: 401,
-          }
-        );
-      }
-
-      const insertedLikes = await sql`
-        INSERT INTO viewer_video_likes (
-          video_id,
-          viewer_id,
-          created_at
-        )
-        VALUES (
-          ${videoId},
-          ${viewerId},
-          NOW()
-        )
-        ON CONFLICT (video_id, viewer_id)
-        DO NOTHING
-        RETURNING id
-      `;
-
-      if (insertedLikes.length === 0) {
-        const currentRows = await sql`
-          SELECT like_count
-          FROM video_likes
-          WHERE video_id = ${videoId}
+    const result = await sql.begin(
+      async (transaction) => {
+        const viewerRows = await transaction`
+          SELECT id
+          FROM viewers
+          WHERE id = ${viewerId}
           LIMIT 1
         `;
 
-        return NextResponse.json({
-          count:
-            currentRows.length > 0
-              ? Number(currentRows[0].like_count)
-              : 0,
-          alreadyLiked: true,
-        });
+        if (viewerRows.length === 0) {
+          return {
+            accountMissing: true,
+            count: 0,
+            alreadyLiked: false,
+          };
+        }
+
+        const insertedLikes = await transaction`
+          INSERT INTO viewer_video_likes (
+            video_id,
+            viewer_id,
+            created_at
+          )
+          VALUES (
+            ${videoId},
+            ${viewerId},
+            NOW()
+          )
+          ON CONFLICT (video_id, viewer_id)
+          DO NOTHING
+          RETURNING id
+        `;
+
+        if (insertedLikes.length === 0) {
+          const currentRows = await transaction`
+            SELECT like_count
+            FROM video_likes
+            WHERE video_id = ${videoId}
+            LIMIT 1
+          `;
+
+          return {
+            accountMissing: false,
+            count:
+              currentRows.length > 0
+                ? Number(
+                    currentRows[0].like_count
+                  )
+                : 0,
+            alreadyLiked: true,
+          };
+        }
+
+        const countRows = await transaction`
+          INSERT INTO video_likes (
+            video_id,
+            like_count,
+            updated_at
+          )
+          VALUES (
+            ${videoId},
+            1,
+            NOW()
+          )
+          ON CONFLICT (video_id)
+          DO UPDATE SET
+            like_count =
+              video_likes.like_count + 1,
+            updated_at = NOW()
+          RETURNING like_count
+        `;
+
+        return {
+          accountMissing: false,
+          count: Number(
+            countRows[0].like_count
+          ),
+          alreadyLiked: false,
+        };
       }
+    );
+
+    if (result.accountMissing) {
+      return jsonResponse(
+        {
+          error:
+            "Viewer account not found. Please log in again.",
+        },
+        401
+      );
     }
 
-    const rows = await sql`
-      INSERT INTO video_likes (
-        video_id,
-        like_count,
-        updated_at
-      )
-      VALUES (
-        ${videoId},
-        1,
-        NOW()
-      )
-      ON CONFLICT (video_id)
-      DO UPDATE SET
-        like_count =
-          video_likes.like_count + 1,
-        updated_at = NOW()
-      RETURNING like_count
-    `;
-
-    return NextResponse.json({
-      count: Number(rows[0].like_count),
-      alreadyLiked: false,
+    return jsonResponse({
+      count: result.count,
+      alreadyLiked: result.alreadyLiked,
     });
   } catch (error) {
-    console.error("Unable to save like:", error);
+    console.error(
+      "Unable to save like:",
+      error
+    );
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         error: "Unable to save like.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 } 
