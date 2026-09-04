@@ -1,22 +1,97 @@
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 
+import {
+  getViewerIdFromSession,
+} from "../../../lib/viewer-session";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function jsonResponse(
+  body: unknown,
+  status = 200
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 export async function POST(request: Request) {
   try {
-    const formData =
-      await request.formData();
+    const origin = request.headers.get("origin");
+
+    if (
+      request.headers.get("sec-fetch-site") ===
+        "cross-site" ||
+      (
+        origin !== null &&
+        origin !== new URL(request.url).origin
+      )
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "This upload request is not allowed.",
+        },
+        403
+      );
+    }
+
+    const viewerId =
+      await getViewerIdFromSession(request);
+
+    if (viewerId === null) {
+      return jsonResponse(
+        {
+          error:
+            "Please log in to upload a profile picture.",
+        },
+        401
+      );
+    }
+
+    const contentType =
+      request.headers.get("content-type") || "";
+
+    if (
+      !contentType
+        .toLowerCase()
+        .startsWith("multipart/form-data")
+    ) {
+      return jsonResponse(
+        {
+          error: "A picture upload is required.",
+        },
+        415
+      );
+    }
+
+    let formData: FormData;
+
+    try {
+      formData = await request.formData();
+    } catch {
+      return jsonResponse(
+        {
+          error: "Invalid picture upload.",
+        },
+        400
+      );
+    }
 
     const picture = formData.get("picture");
 
     if (!(picture instanceof File)) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error:
             "Please choose a profile picture.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
@@ -27,40 +102,44 @@ export async function POST(request: Request) {
     ];
 
     if (!allowedTypes.includes(picture.type)) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error:
             "Only JPG, PNG, and WebP pictures are allowed.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    if (picture.size > 4 * 1024 * 1024) {
-      return NextResponse.json(
+    if (
+      picture.size === 0 ||
+      picture.size > 4 * 1024 * 1024
+    ) {
+      return jsonResponse(
         {
           error:
-            "Profile picture must be smaller than 4 MB.",
+            "Choose a picture larger than 0 bytes and no larger than 4 MB.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    const safeName = picture.name.replace(
-      /[^a-zA-Z0-9._-]/g,
-      "-"
-    );
+    const extension =
+      picture.type === "image/jpeg"
+        ? "jpg"
+        : picture.type === "image/png"
+          ? "png"
+          : "webp";
 
+    // The account folder comes from the verified
+    // session, never from browser-supplied identity.
     const blob = await put(
-      `viewer-pictures/${Date.now()}-${safeName}`,
+      `viewer-pictures/${viewerId}/${Date.now()}.${extension}`,
       picture,
       {
         access: "private",
         addRandomSuffix: true,
+        contentType: picture.type,
       }
     );
 
@@ -69,7 +148,7 @@ export async function POST(request: Request) {
         blob.pathname
       )}`;
 
-    return NextResponse.json({
+    return jsonResponse({
       url: pictureUrl,
       pathname: blob.pathname,
     });
@@ -79,14 +158,12 @@ export async function POST(request: Request) {
       error
     );
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         error:
           "Unable to upload viewer picture.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 } 

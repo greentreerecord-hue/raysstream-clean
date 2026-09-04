@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import postgres from "postgres";
 
+import {
+  createViewerSession,
+  revokeViewerSession,
+  setViewerSessionCookie,
+} from "../../../lib/viewer-session";
+
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const connectionString =
   process.env.RAYSSTREAM_DB_DATABASE_URL;
@@ -32,15 +39,67 @@ async function ensureViewersTable() {
 
 export async function POST(request: Request) {
   try {
-    await ensureViewersTable();
+    const origin = request.headers.get("origin");
+    const requestOrigin =
+      new URL(request.url).origin;
 
-    const body = await request.json();
+    if (
+      request.headers.get("sec-fetch-site") ===
+        "cross-site" ||
+      (origin !== null && origin !== requestOrigin)
+    ) {
+      return NextResponse.json(
+        {
+          error: "This login request is not allowed.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
 
-    const login = String(body.login || "")
-      .trim()
-      .toLowerCase();
+    const contentType =
+      request.headers.get("content-type") || "";
 
-    const password = String(body.password || "");
+    if (
+      !contentType
+        .toLowerCase()
+        .startsWith("application/json")
+    ) {
+      return NextResponse.json(
+        {
+          error: "A JSON request is required.",
+        },
+        {
+          status: 415,
+        }
+      );
+    }
+
+    let body;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          error: "Invalid login request.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const login =
+      typeof body?.login === "string"
+        ? body.login.trim().toLowerCase()
+        : "";
+
+    const password =
+      typeof body?.password === "string"
+        ? body.password
+        : "";
 
     if (!login || !password) {
       return NextResponse.json(
@@ -53,6 +112,8 @@ export async function POST(request: Request) {
         }
       );
     }
+
+    await ensureViewersTable();
 
     const rows = await sql`
       SELECT
@@ -70,7 +131,8 @@ export async function POST(request: Request) {
     if (rows.length === 0) {
       return NextResponse.json(
         {
-          error: "Incorrect username, email, or password.",
+          error:
+            "Incorrect username, email, or password.",
         },
         {
           status: 401,
@@ -88,7 +150,8 @@ export async function POST(request: Request) {
     if (!passwordMatches) {
       return NextResponse.json(
         {
-          error: "Incorrect username, email, or password.",
+          error:
+            "Incorrect username, email, or password.",
         },
         {
           status: 401,
@@ -96,7 +159,14 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
+    // Replace this browser's previous session.
+    await revokeViewerSession(request);
+
+    const session = await createViewerSession(
+      Number(viewer.id)
+    );
+
+    const response = NextResponse.json({
       message: "Viewer login successful!",
       viewer: {
         id: Number(viewer.id),
@@ -105,6 +175,10 @@ export async function POST(request: Request) {
         email: String(viewer.email),
       },
     });
+
+    setViewerSessionCookie(response, session);
+
+    return response;
   } catch (error) {
     console.error("Viewer login error:", error);
 

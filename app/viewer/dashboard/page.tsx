@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 type Viewer = {
   id: number;
@@ -10,83 +15,123 @@ type Viewer = {
   profilePictureUrl: string;
 };
 
+function saveViewerLocally(viewer: Viewer) {
+  // These values support existing display features.
+  // They are not proof that someone is logged in.
+  try {
+    localStorage.setItem(
+      "raysstreamViewerId",
+      String(viewer.id)
+    );
+
+    localStorage.setItem(
+      "raysstreamViewerName",
+      viewer.fullName
+    );
+
+    localStorage.setItem(
+      "raysstreamViewerUsername",
+      viewer.username
+    );
+
+    localStorage.setItem(
+      "raysstreamViewerEmail",
+      viewer.email
+    );
+
+    localStorage.setItem(
+      "raysstreamViewerPicture",
+      viewer.profilePictureUrl
+    );
+
+    localStorage.setItem(
+      "raysstreamViewer",
+      JSON.stringify(viewer)
+    );
+  } catch {
+    // The session still works if storage is unavailable.
+  }
+}
+
+function clearViewerLocally() {
+  try {
+    const keys = [
+      "raysstreamViewer",
+      "raysstreamViewerId",
+      "raysstreamViewerName",
+      "raysstreamViewerUsername",
+      "raysstreamViewerEmail",
+      "raysstreamViewerPicture",
+    ];
+
+    for (const key of keys) {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Server logout does not depend on local storage.
+  }
+}
+
+function redirectToLogin() {
+  clearViewerLocally();
+  window.location.replace("/viewer/login");
+}
+
 export default function ViewerDashboard() {
   const [viewer, setViewer] =
     useState<Viewer | null>(null);
 
-  const [editing, setEditing] =
-    useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  const [fullName, setFullName] =
-    useState("");
+  const [editing, setEditing] = useState(false);
+  const [fullName, setFullName] = useState("");
 
   const [pictureFile, setPictureFile] =
     useState<File | null>(null);
 
-  const [saving, setSaving] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [uploadingPicture, setUploadingPicture] =
     useState(false);
 
-  const [message, setMessage] =
-    useState("");
+  const [loggingOut, setLoggingOut] =
+    useState(false);
+
+  const [message, setMessage] = useState("");
+
+  const fileInputRef =
+    useRef<HTMLInputElement>(null);
+
+  const busy =
+    saving || uploadingPicture || loggingOut;
 
   useEffect(() => {
-    const viewerId = localStorage.getItem(
-      "raysstreamViewerId"
-    );
-
-    const viewerName = localStorage.getItem(
-      "raysstreamViewerName"
-    );
-
-    const viewerUsername =
-      localStorage.getItem(
-        "raysstreamViewerUsername"
-      );
-
-    const viewerEmail = localStorage.getItem(
-      "raysstreamViewerEmail"
-    );
-
-    if (
-      !viewerId ||
-      !viewerName ||
-      !viewerUsername ||
-      !viewerEmail
-    ) {
-      window.location.href = "/viewer/login";
-      return;
-    }
-
-    const savedViewer: Viewer = {
-      id: Number(viewerId),
-      fullName: viewerName,
-      username: viewerUsername,
-      email: viewerEmail,
-      profilePictureUrl:
-        localStorage.getItem(
-          "raysstreamViewerPicture"
-        ) || "",
-    };
-
-    setViewer(savedViewer);
-    setFullName(savedViewer.fullName);
+    const controller = new AbortController();
 
     async function loadProfile() {
       try {
         const response = await fetch(
-          `/api/viewer-profile?viewerId=${viewerId}`,
+          "/api/viewer-profile",
           {
             cache: "no-store",
+            credentials: "same-origin",
+            signal: controller.signal,
           }
         );
+
+        if (response.status === 401) {
+          redirectToLogin();
+          return;
+        }
 
         const data = await response.json();
 
         if (!response.ok) {
-          return;
+          throw new Error(
+            data.error ||
+              "Unable to load your profile."
+          );
         }
 
         const loadedViewer: Viewer = {
@@ -103,80 +148,80 @@ export default function ViewerDashboard() {
           ),
         };
 
+        if (controller.signal.aborted) {
+          return;
+        }
+
         setViewer(loadedViewer);
         setFullName(loadedViewer.fullName);
         saveViewerLocally(loadedViewer);
       } catch (error) {
-        console.error(
-          "Unable to load viewer profile:",
-          error
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load your profile."
         );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadProfile();
-  }, []);
 
-  function saveViewerLocally(
-    updatedViewer: Viewer
-  ) {
-    localStorage.setItem(
-      "raysstreamViewerName",
-      updatedViewer.fullName
-    );
-
-    localStorage.setItem(
-      "raysstreamViewerPicture",
-      updatedViewer.profilePictureUrl
-    );
-
-    localStorage.setItem(
-      "raysstreamViewer",
-      JSON.stringify(updatedViewer)
-    );
-  }
-
-  async function updateProfile(
+    return () => {
+      controller.abort();
+    };
+  }, []); 
+async function updateProfile(
     updatedName: string,
-    updatedPictureUrl: string
+    updatedPictureUrl?: string
   ) {
-    if (!viewer) {
-      return null;
-    }
-
     const response = await fetch(
       "/api/viewer-profile",
       {
         method: "PUT",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          viewerId: viewer.id,
           fullName: updatedName,
-          profilePictureUrl:
-            updatedPictureUrl,
+          ...(updatedPictureUrl !== undefined
+            ? {
+                profilePictureUrl:
+                  updatedPictureUrl,
+              }
+            : {}),
         }),
       }
     );
+
+    if (response.status === 401) {
+      redirectToLogin();
+
+      throw new Error(
+        "Your session expired. Please log in again."
+      );
+    }
 
     const data = await response.json();
 
     if (!response.ok) {
       throw new Error(
-        data.error ||
-          "Unable to update profile."
+        data.error || "Unable to update profile."
       );
     }
 
     const updatedViewer: Viewer = {
       id: Number(data.viewer.id),
-      fullName: String(
-        data.viewer.fullName
-      ),
-      username: String(
-        data.viewer.username
-      ),
+      fullName: String(data.viewer.fullName),
+      username: String(data.viewer.username),
       email: String(data.viewer.email),
       profilePictureUrl: String(
         data.viewer.profilePictureUrl || ""
@@ -191,15 +236,20 @@ export default function ViewerDashboard() {
   }
 
   async function saveProfile() {
-    if (!viewer) {
+    if (!viewer || busy) {
       return;
     }
 
     const cleanedName = fullName.trim();
 
     if (!cleanedName) {
+      setMessage("Please enter your full name.");
+      return;
+    }
+
+    if (cleanedName.length > 100) {
       setMessage(
-        "Please enter your full name."
+        "Your name must be 100 characters or less."
       );
       return;
     }
@@ -208,22 +258,12 @@ export default function ViewerDashboard() {
       setSaving(true);
       setMessage("Saving profile...");
 
-      await updateProfile(
-        cleanedName,
-        viewer.profilePictureUrl
-      );
+      // Omitting the picture keeps the existing one.
+      await updateProfile(cleanedName);
 
       setEditing(false);
-
-      setMessage(
-        "Your profile has been updated."
-      );
+      setMessage("Your name has been updated.");
     } catch (error) {
-      console.error(
-        "Profile update error:",
-        error
-      );
-
       setMessage(
         error instanceof Error
           ? error.message
@@ -235,34 +275,61 @@ export default function ViewerDashboard() {
   }
 
   async function uploadPicture() {
-    if (!viewer || !pictureFile) {
+    if (!viewer || busy) {
+      return;
+    }
+
+    if (!pictureFile) {
+      setMessage("Please choose a picture first.");
+      return;
+    }
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(pictureFile.type)) {
       setMessage(
-        "Please choose a picture first."
+        "Please choose a JPG, PNG, or WebP picture."
+      );
+      return;
+    }
+
+    if (
+      pictureFile.size === 0 ||
+      pictureFile.size > 4 * 1024 * 1024
+    ) {
+      setMessage(
+        "Choose a picture larger than 0 bytes and no larger than 4 MB."
       );
       return;
     }
 
     try {
       setUploadingPicture(true);
-
-      setMessage(
-        "Uploading profile picture..."
-      );
+      setMessage("Uploading profile picture...");
 
       const formData = new FormData();
-
-      formData.append(
-        "picture",
-        pictureFile
-      );
+      formData.append("picture", pictureFile);
 
       const uploadResponse = await fetch(
         "/api/viewer-picture-upload",
         {
           method: "POST",
+          credentials: "same-origin",
           body: formData,
         }
       );
+
+      if (uploadResponse.status === 401) {
+        redirectToLogin();
+
+        throw new Error(
+          "Your session expired. Please log in again."
+        );
+      }
 
       const uploadData =
         await uploadResponse.json();
@@ -274,22 +341,30 @@ export default function ViewerDashboard() {
         );
       }
 
+      if (
+        typeof uploadData.url !== "string" ||
+        !uploadData.url
+      ) {
+        throw new Error(
+          "The upload did not return a picture address."
+        );
+      }
+
       await updateProfile(
         viewer.fullName,
-        String(uploadData.url)
+        uploadData.url
       );
 
       setPictureFile(null);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
       setMessage(
         "Your profile picture has been updated."
       );
     } catch (error) {
-      console.error(
-        "Profile picture error:",
-        error
-      );
-
       setMessage(
         error instanceof Error
           ? error.message
@@ -300,35 +375,43 @@ export default function ViewerDashboard() {
     }
   }
 
-  function logout() {
-    localStorage.removeItem(
-      "raysstreamViewer"
-    );
+  async function logout() {
+    if (busy) {
+      return;
+    }
 
-    localStorage.removeItem(
-      "raysstreamViewerId"
-    );
+    try {
+      setLoggingOut(true);
+      setMessage("Logging out...");
 
-    localStorage.removeItem(
-      "raysstreamViewerName"
-    );
+      const response = await fetch(
+        "/api/viewer-logout",
+        {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+        }
+      );
 
-    localStorage.removeItem(
-      "raysstreamViewerUsername"
-    );
+      if (!response.ok) {
+        throw new Error(
+          "Unable to log out. Please try again."
+        );
+      }
 
-    localStorage.removeItem(
-      "raysstreamViewerEmail"
-    );
-
-    localStorage.removeItem(
-      "raysstreamViewerPicture"
-    );
-
-    window.location.href = "/viewer/login";
-  }
-
-  if (!viewer) {
+      // Clear display data only after server logout.
+      redirectToLogin();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to log out. Please try again."
+      );
+    } finally {
+      setLoggingOut(false);
+    }
+  } 
+if (loading) {
     return (
       <main style={pageStyle}>
         <p>Loading viewer dashboard...</p>
@@ -336,10 +419,39 @@ export default function ViewerDashboard() {
     );
   }
 
+  if (!viewer) {
+    return (
+      <main style={pageStyle}>
+        <section style={dashboardStyle}>
+          <h1>Ray&apos;sStream</h1>
+
+          <p role="alert">
+            {loadError ||
+              "Please log in to continue."}
+          </p>
+
+          <button
+            onClick={() =>
+              window.location.reload()
+            }
+            style={buttonStyle}
+          >
+            Try Again
+          </button>
+
+          <a
+            href="/viewer/login"
+            style={primaryLinkStyle}
+          >
+            Viewer Login
+          </a>
+        </section>
+      </main>
+    );
+  }
+
   const initial =
-    viewer.fullName
-      .charAt(0)
-      .toUpperCase() || "V";
+    viewer.fullName.charAt(0).toUpperCase() || "V";
 
   return (
     <main style={pageStyle}>
@@ -374,7 +486,7 @@ export default function ViewerDashboard() {
             </div>
           )}
 
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h3 style={nameStyle}>
               {viewer.fullName}
             </h3>
@@ -391,31 +503,28 @@ export default function ViewerDashboard() {
           </h3>
 
           <input
+            ref={fileInputRef}
             type="file"
+            aria-label="Choose a profile picture"
             accept="image/jpeg,image/png,image/webp"
-            onChange={(event) =>
+            disabled={busy}
+            onChange={(event) => {
               setPictureFile(
-                event.target.files?.[0] ||
-                  null
-              )
-            }
+                event.target.files?.[0] || null
+              );
+              setMessage("");
+            }}
             style={fileInputStyle}
           />
 
           <button
             onClick={uploadPicture}
-            disabled={
-              uploadingPicture ||
-              !pictureFile
-            }
+            disabled={busy || !pictureFile}
             style={{
               ...primaryButtonStyle,
               marginTop: "14px",
               opacity:
-                uploadingPicture ||
-                !pictureFile
-                  ? 0.65
-                  : 1,
+                busy || !pictureFile ? 0.65 : 1,
             }}
           >
             {uploadingPicture
@@ -424,8 +533,7 @@ export default function ViewerDashboard() {
           </button>
 
           <p style={helpTextStyle}>
-            JPG, PNG, or WebP. Maximum size:
-            4 MB.
+            JPG, PNG, or WebP. Maximum size: 4 MB.
           </p>
         </div>
 
@@ -458,10 +566,9 @@ export default function ViewerDashboard() {
             <input
               id="fullName"
               value={fullName}
+              disabled={busy}
               onChange={(event) =>
-                setFullName(
-                  event.target.value
-                )
+                setFullName(event.target.value)
               }
               maxLength={100}
               style={inputStyle}
@@ -470,23 +577,19 @@ export default function ViewerDashboard() {
             <div style={editButtonStyle}>
               <button
                 onClick={saveProfile}
-                disabled={saving}
+                disabled={busy}
                 style={primaryButtonStyle}
               >
-                {saving
-                  ? "Saving..."
-                  : "Save Name"}
+                {saving ? "Saving..." : "Save Name"}
               </button>
 
               <button
                 onClick={() => {
                   setEditing(false);
-                  setFullName(
-                    viewer.fullName
-                  );
+                  setFullName(viewer.fullName);
                   setMessage("");
                 }}
-                disabled={saving}
+                disabled={busy}
                 style={buttonStyle}
               >
                 Cancel
@@ -496,24 +599,27 @@ export default function ViewerDashboard() {
         )}
 
         {message && (
-          <p style={messageStyle}>
+          <p
+            role="status"
+            aria-live="polite"
+            style={messageStyle}
+          >
             {message}
           </p>
         )}
 
         <div style={buttonGridStyle}>
-          <a
-            href="/"
-            style={primaryLinkStyle}
-          >
+          <a href="/" style={primaryLinkStyle}>
             Watch Videos
           </a>
 
           <button
             onClick={() => {
+              setFullName(viewer.fullName);
               setEditing(true);
               setMessage("");
             }}
+            disabled={busy}
             style={buttonStyle}
           >
             Edit Profile
@@ -521,9 +627,10 @@ export default function ViewerDashboard() {
 
           <button
             onClick={logout}
+            disabled={busy}
             style={buttonStyle}
           >
-            Logout
+            {loggingOut ? "Logging out..." : "Logout"}
           </button>
         </div>
 
@@ -533,9 +640,8 @@ export default function ViewerDashboard() {
       </section>
     </main>
   );
-}
-
-const pageStyle: React.CSSProperties = {
+} 
+const pageStyle: CSSProperties = {
   minHeight: "100vh",
   background: "#050505",
   color: "white",
@@ -546,36 +652,37 @@ const pageStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-const dashboardStyle: React.CSSProperties = {
+const dashboardStyle: CSSProperties = {
   width: "min(850px, 100%)",
   textAlign: "center",
 };
 
-const logoStyle: React.CSSProperties = {
+const logoStyle: CSSProperties = {
   fontSize: "48px",
   margin: "0 0 28px",
 };
 
-const accountLabelStyle: React.CSSProperties = {
+const accountLabelStyle: CSSProperties = {
   color: "#ff6347",
   fontWeight: "bold",
   letterSpacing: "4px",
 };
 
-const headingStyle: React.CSSProperties = {
+const headingStyle: CSSProperties = {
   fontSize: "42px",
   margin: "8px 0",
 };
 
-const welcomeStyle: React.CSSProperties = {
+const welcomeStyle: CSSProperties = {
   color: "#9dc5ff",
   fontSize: "22px",
   marginBottom: "30px",
 };
 
-const profileHeaderStyle: React.CSSProperties = {
+const profileHeaderStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
+  flexWrap: "wrap",
   gap: "24px",
   textAlign: "left",
   background: "#121212",
@@ -584,7 +691,7 @@ const profileHeaderStyle: React.CSSProperties = {
   padding: "24px",
 };
 
-const avatarStyle: React.CSSProperties = {
+const avatarStyle: CSSProperties = {
   width: "92px",
   height: "92px",
   flex: "0 0 92px",
@@ -597,7 +704,7 @@ const avatarStyle: React.CSSProperties = {
   fontWeight: "bold",
 };
 
-const profilePictureStyle: React.CSSProperties = {
+const profilePictureStyle: CSSProperties = {
   width: "92px",
   height: "92px",
   flex: "0 0 92px",
@@ -607,18 +714,20 @@ const profilePictureStyle: React.CSSProperties = {
   background: "#222",
 };
 
-const nameStyle: React.CSSProperties = {
+const nameStyle: CSSProperties = {
   fontSize: "28px",
   margin: "0 0 8px",
+  overflowWrap: "anywhere",
 };
 
-const usernameStyle: React.CSSProperties = {
+const usernameStyle: CSSProperties = {
   color: "#80b7ff",
   fontSize: "20px",
   margin: 0,
+  overflowWrap: "anywhere",
 };
 
-const cardStyle: React.CSSProperties = {
+const cardStyle: CSSProperties = {
   marginTop: "20px",
   padding: "22px",
   background: "#121212",
@@ -627,7 +736,7 @@ const cardStyle: React.CSSProperties = {
   textAlign: "left",
 };
 
-const fileInputStyle: React.CSSProperties = {
+const fileInputStyle: CSSProperties = {
   display: "block",
   width: "100%",
   boxSizing: "border-box",
@@ -638,13 +747,13 @@ const fileInputStyle: React.CSSProperties = {
   borderRadius: "10px",
 };
 
-const helpTextStyle: React.CSSProperties = {
+const helpTextStyle: CSSProperties = {
   color: "#aaa",
   fontSize: "14px",
   marginBottom: 0,
 };
 
-const informationStyle: React.CSSProperties = {
+const informationStyle: CSSProperties = {
   marginTop: "20px",
   background: "#121212",
   border: "2px solid black",
@@ -652,7 +761,7 @@ const informationStyle: React.CSSProperties = {
   overflow: "hidden",
 };
 
-const rowStyle: React.CSSProperties = {
+const rowStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   flexWrap: "wrap",
@@ -660,15 +769,16 @@ const rowStyle: React.CSSProperties = {
   padding: "20px",
   borderBottom: "1px solid #333",
   textAlign: "left",
+  overflowWrap: "anywhere",
 };
 
-const labelStyle: React.CSSProperties = {
+const labelStyle: CSSProperties = {
   display: "block",
   fontWeight: "bold",
   marginBottom: "8px",
 };
 
-const inputStyle: React.CSSProperties = {
+const inputStyle: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   padding: "13px",
@@ -679,19 +789,19 @@ const inputStyle: React.CSSProperties = {
   fontSize: "18px",
 };
 
-const editButtonStyle: React.CSSProperties = {
+const editButtonStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: "10px",
   marginTop: "14px",
 };
 
-const messageStyle: React.CSSProperties = {
+const messageStyle: CSSProperties = {
   color: "#9dc5ff",
   textAlign: "center",
 };
 
-const buttonGridStyle: React.CSSProperties = {
+const buttonGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns:
     "repeat(auto-fit, minmax(180px, 1fr))",
@@ -699,7 +809,7 @@ const buttonGridStyle: React.CSSProperties = {
   marginTop: "24px",
 };
 
-const buttonStyle: React.CSSProperties = {
+const buttonStyle: CSSProperties = {
   background: "#222",
   color: "white",
   border: "2px solid black",
@@ -709,13 +819,13 @@ const buttonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const primaryButtonStyle: React.CSSProperties = {
+const primaryButtonStyle: CSSProperties = {
   ...buttonStyle,
   background:
     "linear-gradient(90deg, #ff5577, #ff7a00)",
 };
 
-const primaryLinkStyle: React.CSSProperties = {
+const primaryLinkStyle: CSSProperties = {
   display: "block",
   background:
     "linear-gradient(90deg, #ff5577, #ff7a00)",
@@ -727,7 +837,7 @@ const primaryLinkStyle: React.CSSProperties = {
   fontWeight: "bold",
 };
 
-const backLinkStyle: React.CSSProperties = {
+const backLinkStyle: CSSProperties = {
   display: "inline-block",
   color: "#ccc",
   textDecoration: "none",
