@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import postgres from "postgres";
 
+import {
+  createViewerSession,
+  revokeViewerSession,
+  setViewerSessionCookie,
+} from "../../../lib/viewer-session";
+
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const connectionString =
   process.env.RAYSSTREAM_DB_DATABASE_URL;
@@ -16,6 +23,18 @@ if (!connectionString) {
 const sql = postgres(connectionString, {
   ssl: "require",
 });
+
+function jsonResponse(
+  body: unknown,
+  status = 200
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
 
 async function ensureViewersTable() {
   await sql`
@@ -32,83 +51,163 @@ async function ensureViewersTable() {
 
 export async function POST(request: Request) {
   try {
-    await ensureViewersTable();
+    const origin = request.headers.get("origin");
 
-    const body = await request.json();
-
-    const name = String(body.name || "").trim();
-    const username = String(
-      body.username || ""
-    )
-      .trim()
-      .toLowerCase();
-
-    const email = String(body.email || "")
-      .trim()
-      .toLowerCase();
-
-    const password = String(body.password || "");
-
-    if (!name || !username || !email || !password) {
-      return NextResponse.json(
+    if (
+      request.headers.get("sec-fetch-site") ===
+        "cross-site" ||
+      (
+        origin !== null &&
+        origin !== new URL(request.url).origin
+      )
+    ) {
+      return jsonResponse(
         {
           error:
-            "Name, username, email, and password are required.",
+            "This signup request is not allowed.",
         },
-        {
-          status: 400,
-        }
+        403
       );
     }
 
-    if (username.length < 3) {
-      return NextResponse.json(
+    const contentType =
+      request.headers.get("content-type") || "";
+
+    if (
+      !contentType
+        .toLowerCase()
+        .startsWith("application/json")
+    ) {
+      return jsonResponse(
         {
-          error:
-            "Username must be at least 3 characters.",
+          error: "A JSON request is required.",
         },
+        415
+      );
+    }
+
+    let parsedBody: unknown;
+
+    try {
+      parsedBody = await request.json();
+    } catch {
+      return jsonResponse(
         {
-          status: 400,
-        }
+          error: "Invalid signup request.",
+        },
+        400
       );
     }
 
     if (
-      !/^[a-z0-9._-]+$/.test(username)
+      typeof parsedBody !== "object" ||
+      parsedBody === null ||
+      Array.isArray(parsedBody)
     ) {
-      return NextResponse.json(
+      return jsonResponse(
+        {
+          error: "Invalid signup request.",
+        },
+        400
+      );
+    }
+
+    const body = parsedBody as Record<
+      string,
+      unknown
+    >;
+
+    const name =
+      typeof body.name === "string"
+        ? body.name.trim()
+        : "";
+
+    const username =
+      typeof body.username === "string"
+        ? body.username.trim().toLowerCase()
+        : "";
+
+    const email =
+      typeof body.email === "string"
+        ? body.email.trim().toLowerCase()
+        : "";
+
+    const password =
+      typeof body.password === "string"
+        ? body.password
+        : "";
+
+    if (!name || !username || !email || !password) {
+      return jsonResponse(
+        {
+          error:
+            "Name, username, email, and password are required.",
+        },
+        400
+      );
+    }
+
+    if (name.length > 100) {
+      return jsonResponse(
+        {
+          error:
+            "Name must be 100 characters or less.",
+        },
+        400
+      );
+    }
+
+    if (
+      username.length < 3 ||
+      username.length > 30
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "Username must be between 3 and 30 characters.",
+        },
+        400
+      );
+    }
+
+    if (!/^[a-z0-9._-]+$/.test(username)) {
+      return jsonResponse(
         {
           error:
             "Username can only contain letters, numbers, periods, underscores, and hyphens.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    if (!email.includes("@")) {
-      return NextResponse.json(
+    if (
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        email
+      )
+    ) {
+      return jsonResponse(
         {
           error: "Please enter a valid email.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    if (password.length < 6) {
-      return NextResponse.json(
+    if (
+      password.length < 6 ||
+      password.length > 128
+    ) {
+      return jsonResponse(
         {
           error:
-            "Password must be at least 6 characters.",
+            "Password must be between 6 and 128 characters.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
+
+    await ensureViewersTable();
 
     const passwordHash = await bcrypt.hash(
       password,
@@ -131,15 +230,31 @@ export async function POST(request: Request) {
       RETURNING id, name, username, email
     `;
 
-    return NextResponse.json({
+    const viewer = {
+      id: Number(rows[0].id),
+      name: String(rows[0].name),
+      username: String(rows[0].username),
+      email: String(rows[0].email),
+    };
+
+    // Replace any existing viewer session in
+    // this browser with the new account session.
+    await revokeViewerSession(request);
+
+    const session =
+      await createViewerSession(viewer.id);
+
+    const response = jsonResponse({
       message: "Viewer account created!",
-      viewer: {
-        id: Number(rows[0].id),
-        name: String(rows[0].name),
-        username: String(rows[0].username),
-        email: String(rows[0].email),
-      },
+      viewer,
     });
+
+    setViewerSessionCookie(
+      response,
+      session
+    );
+
+    return response;
   } catch (error) {
     console.error(
       "Unable to create viewer account:",
@@ -152,25 +267,21 @@ export async function POST(request: Request) {
     };
 
     if (databaseError.code === "23505") {
-      return NextResponse.json(
+      return jsonResponse(
         {
           error:
             "That username or email is already registered.",
         },
-        {
-          status: 409,
-        }
+        409
       );
     }
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         error:
           "Unable to create viewer account.",
       },
-      {
-        status: 500,
-      }
+      500
     );
   }
 } 
