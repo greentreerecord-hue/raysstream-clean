@@ -18,14 +18,18 @@ export default function CreatorDashboardPage() {
     useState("");
   const [loadingCreator, setLoadingCreator] =
     useState(true);
+
   const [subscription, setSubscription] =
     useState<SubscriptionStatus>({
       active: false,
       status: "inactive",
       currentPeriodEnd: null,
     });
-  const [checkingSubscription, setCheckingSubscription] =
-    useState(true);
+
+  const [
+    checkingSubscription,
+    setCheckingSubscription,
+  ] = useState(true);
 
   useEffect(() => {
     async function loadCreator() {
@@ -45,8 +49,7 @@ export default function CreatorDashboardPage() {
         const sessionData =
           await sessionResponse.json();
 
-        const creator =
-          sessionData.creator;
+        const creator = sessionData.creator;
 
         setCreatorName(creator.name || "");
         setCreatorEmail(creator.email || "");
@@ -146,9 +149,8 @@ export default function CreatorDashboardPage() {
         Verifying creator session...
       </main>
     );
-  }
-
-  return (
+  } 
+ return (
     <main
       style={{
         minHeight: "100vh",
@@ -328,6 +330,15 @@ export default function CreatorDashboardPage() {
             style={buttonStyle}
           >
             My Uploaded Videos
+          </button>
+
+          <button
+            onClick={() =>
+              router.push("/creator/profile")
+            }
+            style={buttonStyle}
+          >
+            Creator Profile
           </button>
 
           <button

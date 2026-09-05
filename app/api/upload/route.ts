@@ -14,19 +14,18 @@ const blobToken =
   process.env
     .RAYSSTREAM_VIDEO_READ_WRITE_TOKEN;
 
-function creatorFolders(
-  email: string
-) {
+function creatorFolders(email: string) {
   const safeEmail = email
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "-");
 
   return {
-    videoFolder:
-      `videos/${safeEmail}/`,
+    videoFolder: `videos/${safeEmail}/`,
     thumbnailFolder:
       `thumbnails/${safeEmail}/`,
+    profileFolder:
+      `profiles/${safeEmail}/`,
   };
 }
 
@@ -60,6 +59,7 @@ export async function POST(
             const {
               videoFolder,
               thumbnailFolder,
+              profileFolder,
             } = creatorFolders(
               creator.email
             );
@@ -74,9 +74,15 @@ export async function POST(
                 thumbnailFolder
               );
 
+            const isCreatorProfile =
+              pathname.startsWith(
+                profileFolder
+              );
+
             if (
               !isCreatorVideo &&
-              !isCreatorThumbnail
+              !isCreatorThumbnail &&
+              !isCreatorProfile
             ) {
               throw new Error(
                 "INVALID_CREATOR_UPLOAD_PATH"
