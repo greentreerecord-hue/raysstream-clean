@@ -1,16 +1,32 @@
-import { del, list } from "@vercel/blob";
+import {
+  del,
+  list,
+} from "@vercel/blob";
 import { NextResponse } from "next/server";
 import postgres from "postgres";
+import {
+  getCreatorFromSession,
+} from "../../../lib/creator-session";
 
-const connectionString = process.env.RAYSSTREAM_DB_DATABASE_URL;
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const connectionString =
+  process.env.RAYSSTREAM_DB_DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error("RAYSSTREAM_DB_DATABASE_URL is missing");
+  throw new Error(
+    "RAYSSTREAM_DB_DATABASE_URL is missing"
+  );
 }
 
 const sql = postgres(connectionString, {
   ssl: "require",
 });
+
+const blobToken =
+  process.env
+    .RAYSSTREAM_VIDEO_READ_WRITE_TOKEN;
 
 async function ensureVideoTable() {
   await sql`
@@ -43,37 +59,83 @@ async function ensureVideoTable() {
   `;
 }
 
-export async function GET(request: Request) {
+function creatorFolderFor(
+  email: string
+) {
+  const safeEmail = email.replace(
+    /[^a-z0-9]/g,
+    "-"
+  );
+
+  return {
+    videoFolder: `videos/${safeEmail}/`,
+    thumbnailFolder:
+      `thumbnails/${safeEmail}/`,
+  };
+}
+
+function unauthorized() {
+  return NextResponse.json(
+    {
+      error:
+        "Please log in to your creator account.",
+    },
+    {
+      status: 401,
+    }
+  );
+}
+
+async function blobMatches(
+  folder: string,
+  pathname: string,
+  url: string
+) {
+  const { blobs } = await list({
+    prefix: folder,
+    token: blobToken,
+  });
+
+  return blobs.some(
+    (blob) =>
+      blob.pathname === pathname &&
+      blob.url === url
+  );
+}
+
+export async function GET(
+  request: Request
+) {
   try {
-    await ensureVideoTable();
+    const creator =
+      await getCreatorFromSession(request);
 
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
-
-    if (!email) {
-      return NextResponse.json(
-        { error: "Creator email is required." },
-        { status: 400 }
-      );
+    if (!creator) {
+      return unauthorized();
     }
 
-    const creatorEmail = email.trim().toLowerCase();
-    const safeEmail = creatorEmail.replace(/[^a-z0-9]/g, "-");
+    await ensureVideoTable();
+
+    const { videoFolder } =
+      creatorFolderFor(creator.email);
 
     const { blobs } = await list({
-      prefix: `videos/${safeEmail}/`,
-      token: process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
+      prefix: videoFolder,
+      token: blobToken,
     });
 
-    const videoBlobs = blobs.filter((blob) => {
-      const name = blob.pathname.toLowerCase();
+    const videoBlobs = blobs.filter(
+      (blob) => {
+        const name =
+          blob.pathname.toLowerCase();
 
-      return (
-        name.endsWith(".mp4") ||
-        name.endsWith(".webm") ||
-        name.endsWith(".mov")
-      );
-    });
+        return (
+          name.endsWith(".mp4") ||
+          name.endsWith(".webm") ||
+          name.endsWith(".mov")
+        );
+      }
+    );
 
     const savedVideos = await sql`
       SELECT
@@ -83,80 +145,222 @@ export async function GET(request: Request) {
         thumbnail_url,
         thumbnail_pathname
       FROM creator_videos
-      WHERE creator_email = ${creatorEmail}
+      WHERE creator_email =
+        ${creator.email}
     `;
 
-    const videos = videoBlobs.map((blob) => {
-      const savedVideo = savedVideos.find(
-        (video) => video.blob_url === blob.url
-      );
+    const videos = videoBlobs.map(
+      (blob) => {
+        const savedVideo =
+          savedVideos.find(
+            (video) =>
+              video.blob_url === blob.url
+          );
 
-      return {
-        url: blob.url,
-        pathname: blob.pathname,
-        title: savedVideo?.title || null,
-        description: savedVideo?.description || "",
-        thumbnailUrl: savedVideo?.thumbnail_url || null,
-        thumbnailPathname:
-          savedVideo?.thumbnail_pathname || null,
-      };
+        return {
+          url: blob.url,
+          pathname: blob.pathname,
+          title:
+            savedVideo?.title || null,
+          description:
+            savedVideo?.description || "",
+          thumbnailUrl:
+            savedVideo?.thumbnail_url ||
+            null,
+          thumbnailPathname:
+            savedVideo
+              ?.thumbnail_pathname || null,
+        };
+      }
+    );
+
+    return NextResponse.json({
+      videos,
+      creatorEmail: creator.email,
     });
-
-    return NextResponse.json({ videos });
   } catch (error) {
-    console.error("My videos error:", error);
+    console.error(
+      "My videos error:",
+      error
+    );
 
     return NextResponse.json(
-      { error: "Could not load videos." },
-      { status: 500 }
+      {
+        error: "Could not load videos.",
+      },
+      {
+        status: 500,
+      }
     );
   }
-}
-
-export async function POST(request: Request) {
+} 
+export async function POST(
+  request: Request
+) {
   try {
+    const creator =
+      await getCreatorFromSession(request);
+
+    if (!creator) {
+      return unauthorized();
+    }
+
     await ensureVideoTable();
 
     const body = await request.json();
 
-    const email = body.email?.trim().toLowerCase();
-    const url = body.url;
-    const pathname = body.pathname;
-    const title = body.title?.trim();
+    const url =
+      typeof body.url === "string"
+        ? body.url.trim()
+        : "";
+
+    const pathname =
+      typeof body.pathname === "string"
+        ? body.pathname.trim()
+        : "";
+
+    const title =
+      typeof body.title === "string"
+        ? body.title.trim()
+        : "";
 
     const description =
       typeof body.description === "string"
         ? body.description.trim()
         : "";
 
-    const thumbnailUrl = body.thumbnailUrl || null;
-    const thumbnailPathname = body.thumbnailPathname || null;
+    const thumbnailUrl =
+      typeof body.thumbnailUrl === "string" &&
+      body.thumbnailUrl.trim()
+        ? body.thumbnailUrl.trim()
+        : null;
 
-    if (!email || !url || !pathname || !title) {
+    const thumbnailPathname =
+      typeof body.thumbnailPathname ===
+        "string" &&
+      body.thumbnailPathname.trim()
+        ? body.thumbnailPathname.trim()
+        : null;
+
+    if (!url || !pathname || !title) {
       return NextResponse.json(
-        { error: "Missing video information." },
-        { status: 400 }
-      );
-    }
-
-    const safeEmail = email.replace(/[^a-z0-9]/g, "-");
-    const creatorFolder = `videos/${safeEmail}/`;
-    const thumbnailFolder = `thumbnails/${safeEmail}/`;
-
-    if (!pathname.startsWith(creatorFolder)) {
-      return NextResponse.json(
-        { error: "Invalid creator video." },
-        { status: 403 }
+        {
+          error:
+            "Missing video information.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     if (
-      thumbnailPathname &&
-      !thumbnailPathname.startsWith(thumbnailFolder)
+      title.length > 200 ||
+      description.length > 5000
     ) {
       return NextResponse.json(
-        { error: "Invalid video thumbnail." },
-        { status: 403 }
+        {
+          error:
+            "Video title or description is too long.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const {
+      videoFolder,
+      thumbnailFolder,
+    } = creatorFolderFor(creator.email);
+
+    const validVideo =
+      pathname.startsWith(
+        videoFolder
+      ) &&
+      (await blobMatches(
+        videoFolder,
+        pathname,
+        url
+      ));
+
+    if (!validVideo) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid creator video.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    if (
+      (thumbnailUrl &&
+        !thumbnailPathname) ||
+      (!thumbnailUrl &&
+        thumbnailPathname)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Incomplete thumbnail information.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      thumbnailUrl &&
+      thumbnailPathname
+    ) {
+      const validThumbnail =
+        thumbnailPathname.startsWith(
+          thumbnailFolder
+        ) &&
+        (await blobMatches(
+          thumbnailFolder,
+          thumbnailPathname,
+          thumbnailUrl
+        ));
+
+      if (!validThumbnail) {
+        return NextResponse.json(
+          {
+            error:
+              "Invalid video thumbnail.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    }
+
+    const existingRows = await sql`
+      SELECT creator_email
+      FROM creator_videos
+      WHERE blob_url = ${url}
+      LIMIT 1
+    `;
+
+    if (
+      existingRows.length > 0 &&
+      String(
+        existingRows[0].creator_email
+      ).toLowerCase() !== creator.email
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This video belongs to another creator.",
+        },
+        {
+          status: 403,
+        }
       );
     }
 
@@ -171,7 +375,7 @@ export async function POST(request: Request) {
         thumbnail_pathname
       )
       VALUES (
-        ${email},
+        ${creator.email},
         ${url},
         ${pathname},
         ${title},
@@ -181,124 +385,202 @@ export async function POST(request: Request) {
       )
       ON CONFLICT (blob_url)
       DO UPDATE SET
-        creator_email = EXCLUDED.creator_email,
         pathname = EXCLUDED.pathname,
         title = EXCLUDED.title,
-        description = EXCLUDED.description,
-        thumbnail_url = EXCLUDED.thumbnail_url,
-        thumbnail_pathname = EXCLUDED.thumbnail_pathname
+        description =
+          EXCLUDED.description,
+        thumbnail_url =
+          EXCLUDED.thumbnail_url,
+        thumbnail_pathname =
+          EXCLUDED.thumbnail_pathname
     `;
 
     return NextResponse.json({
       success: true,
     });
   } catch (error) {
-    console.error("Save video error:", error);
+    console.error(
+      "Save video error:",
+      error
+    );
 
     return NextResponse.json(
-      { error: "Could not save video information." },
-      { status: 500 }
+      {
+        error:
+          "Could not save video information.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(
+  request: Request
+) {
   try {
+    const creator =
+      await getCreatorFromSession(request);
+
+    if (!creator) {
+      return unauthorized();
+    }
+
     await ensureVideoTable();
 
     const body = await request.json();
 
-    const email = body.email?.trim().toLowerCase();
-    const url = body.url;
-    const pathname = body.pathname;
-    const title = body.title?.trim();
+    const url =
+      typeof body.url === "string"
+        ? body.url.trim()
+        : "";
+
+    const title =
+      typeof body.title === "string"
+        ? body.title.trim()
+        : "";
 
     const description =
       typeof body.description === "string"
         ? body.description.trim()
         : "";
 
-    const thumbnailUrl = body.thumbnailUrl || null;
-    const thumbnailPathname = body.thumbnailPathname || null;
+    const thumbnailUrl =
+      typeof body.thumbnailUrl === "string" &&
+      body.thumbnailUrl.trim()
+        ? body.thumbnailUrl.trim()
+        : null;
 
-    if (!email || !url || !pathname || !title) {
+    const thumbnailPathname =
+      typeof body.thumbnailPathname ===
+        "string" &&
+      body.thumbnailPathname.trim()
+        ? body.thumbnailPathname.trim()
+        : null;
+
+    if (!url || !title) {
       return NextResponse.json(
         {
           error:
-            "Email, video, pathname, and title are required.",
+            "Video and title are required.",
         },
-        { status: 400 }
-      );
-    }
-
-    const safeEmail = email.replace(/[^a-z0-9]/g, "-");
-    const creatorFolder = `videos/${safeEmail}/`;
-    const thumbnailFolder = `thumbnails/${safeEmail}/`;
-
-    if (!pathname.startsWith(creatorFolder)) {
-      return NextResponse.json(
-        { error: "You cannot edit this video." },
-        { status: 403 }
+        {
+          status: 400,
+        }
       );
     }
 
     if (
-      thumbnailPathname &&
-      !thumbnailPathname.startsWith(thumbnailFolder)
+      title.length > 200 ||
+      description.length > 5000
     ) {
       return NextResponse.json(
-        { error: "Invalid video thumbnail." },
-        { status: 403 }
+        {
+          error:
+            "Video title or description is too long.",
+        },
+        {
+          status: 400,
+        }
+      );
+    } 
+if (
+      (thumbnailUrl &&
+        !thumbnailPathname) ||
+      (!thumbnailUrl &&
+        thumbnailPathname)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Incomplete thumbnail information.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     const existingVideos = await sql`
-      SELECT thumbnail_url
+      SELECT
+        pathname,
+        thumbnail_url
       FROM creator_videos
-      WHERE creator_email = ${email}
+      WHERE creator_email =
+        ${creator.email}
         AND blob_url = ${url}
       LIMIT 1
     `;
 
+    if (existingVideos.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Video not found for this creator.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    if (
+      thumbnailUrl &&
+      thumbnailPathname
+    ) {
+      const { thumbnailFolder } =
+        creatorFolderFor(
+          creator.email
+        );
+
+      const validThumbnail =
+        thumbnailPathname.startsWith(
+          thumbnailFolder
+        ) &&
+        (await blobMatches(
+          thumbnailFolder,
+          thumbnailPathname,
+          thumbnailUrl
+        ));
+
+      if (!validThumbnail) {
+        return NextResponse.json(
+          {
+            error:
+              "Invalid video thumbnail.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    }
+
     const oldThumbnailUrl =
-      existingVideos[0]?.thumbnail_url || null;
+      existingVideos[0]
+        .thumbnail_url || null;
 
     await sql`
-      INSERT INTO creator_videos (
-        creator_email,
-        blob_url,
-        pathname,
-        title,
-        description,
-        thumbnail_url,
-        thumbnail_pathname
-      )
-      VALUES (
-        ${email},
-        ${url},
-        ${pathname},
-        ${title},
-        ${description},
-        ${thumbnailUrl},
-        ${thumbnailPathname}
-      )
-      ON CONFLICT (blob_url)
-      DO UPDATE SET
-        creator_email = EXCLUDED.creator_email,
-        pathname = EXCLUDED.pathname,
-        title = EXCLUDED.title,
-        description = EXCLUDED.description,
-        thumbnail_url = EXCLUDED.thumbnail_url,
-        thumbnail_pathname = EXCLUDED.thumbnail_pathname
+      UPDATE creator_videos
+      SET
+        title = ${title},
+        description = ${description},
+        thumbnail_url =
+          ${thumbnailUrl},
+        thumbnail_pathname =
+          ${thumbnailPathname}
+      WHERE creator_email =
+        ${creator.email}
+        AND blob_url = ${url}
     `;
 
     if (
       oldThumbnailUrl &&
-      thumbnailUrl &&
       oldThumbnailUrl !== thumbnailUrl
     ) {
       await del(oldThumbnailUrl, {
-        token: process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
+        token: blobToken,
       });
     }
 
@@ -310,63 +592,97 @@ export async function PATCH(request: Request) {
       thumbnailPathname,
     });
   } catch (error) {
-    console.error("Edit details error:", error);
+    console.error(
+      "Edit details error:",
+      error
+    );
 
     return NextResponse.json(
-      { error: "Could not update video details." },
-      { status: 500 }
+      {
+        error:
+          "Could not update video details.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(
+  request: Request
+) {
   try {
+    const creator =
+      await getCreatorFromSession(request);
+
+    if (!creator) {
+      return unauthorized();
+    }
+
     await ensureVideoTable();
 
     const body = await request.json();
 
-    const email = body.email?.trim().toLowerCase();
-    const url = body.url;
-    const pathname = body.pathname;
+    const url =
+      typeof body.url === "string"
+        ? body.url.trim()
+        : "";
 
-    if (!email || !url || !pathname) {
+    if (!url) {
       return NextResponse.json(
-        { error: "Missing video information." },
-        { status: 400 }
-      );
-    }
-
-    const safeEmail = email.replace(/[^a-z0-9]/g, "-");
-    const creatorFolder = `videos/${safeEmail}/`;
-
-    if (!pathname.startsWith(creatorFolder)) {
-      return NextResponse.json(
-        { error: "You cannot delete this video." },
-        { status: 403 }
+        {
+          error:
+            "Video information is required.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     const savedVideos = await sql`
-      SELECT thumbnail_url
+      SELECT
+        blob_url,
+        thumbnail_url
       FROM creator_videos
-      WHERE creator_email = ${email}
+      WHERE creator_email =
+        ${creator.email}
         AND blob_url = ${url}
       LIMIT 1
     `;
 
-    const thumbnailUrl = savedVideos[0]?.thumbnail_url;
+    if (savedVideos.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Video not found for this creator.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
 
-    const filesToDelete = thumbnailUrl
-      ? [url, thumbnailUrl]
-      : [url];
+    const savedVideo =
+      savedVideos[0];
+
+    const filesToDelete =
+      savedVideo.thumbnail_url
+        ? [
+            savedVideo.blob_url,
+            savedVideo.thumbnail_url,
+          ]
+        : [savedVideo.blob_url];
 
     await del(filesToDelete, {
-      token: process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
+      token: blobToken,
     });
 
     await sql`
       DELETE FROM creator_videos
-      WHERE creator_email = ${email}
+      WHERE creator_email =
+        ${creator.email}
         AND blob_url = ${url}
     `;
 
@@ -374,11 +690,19 @@ export async function DELETE(request: Request) {
       success: true,
     });
   } catch (error) {
-    console.error("Delete video error:", error);
+    console.error(
+      "Delete video error:",
+      error
+    );
 
     return NextResponse.json(
-      { error: "Could not delete video." },
-      { status: 500 }
+      {
+        error:
+          "Could not delete video.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 } 

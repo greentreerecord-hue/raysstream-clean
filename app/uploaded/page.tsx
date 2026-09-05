@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 
@@ -16,48 +19,74 @@ type Video = {
 export default function UploadedPage() {
   const router = useRouter();
 
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const [deletingUrl, setDeletingUrl] = useState("");
-  const [editingUrl, setEditingUrl] = useState("");
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] =
+  const [videos, setVideos] =
+    useState<Video[]>([]);
+
+  const [creatorEmail, setCreatorEmail] =
     useState("");
-  const [editThumbnail, setEditThumbnail] =
-    useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [deletingUrl, setDeletingUrl] =
+    useState("");
+
+  const [editingUrl, setEditingUrl] =
+    useState("");
+
+  const [editTitle, setEditTitle] =
+    useState("");
+
+  const [
+    editDescription,
+    setEditDescription,
+  ] = useState("");
+
+  const [
+    editThumbnail,
+    setEditThumbnail,
+  ] = useState<File | null>(null);
+
+  const [saving, setSaving] =
+    useState(false);
 
   async function loadVideos() {
-    const creatorEmail = localStorage.getItem(
-      "raysstreamCreatorEmail"
-    );
-
-    if (!creatorEmail) {
-      router.push("/creator/login");
-      return;
-    }
-
     try {
       const response = await fetch(
-        `/api/my-videos?email=${encodeURIComponent(
-          creatorEmail
-        )}`
+        "/api/my-videos",
+        {
+          cache: "no-store",
+        }
       );
 
       const data = await response.json();
 
+      if (response.status === 401) {
+        router.replace("/creator/login");
+        return;
+      }
+
       if (!response.ok) {
         setMessage(
-          data.error || "Could not load videos."
+          data.error ||
+            "Could not load videos."
         );
         return;
       }
 
+      setCreatorEmail(
+        String(data.creatorEmail || "")
+      );
+
       setVideos(data.videos || []);
     } catch (error) {
       console.error(error);
-      setMessage("Could not load videos.");
+      setMessage(
+        "Could not load videos."
+      );
     } finally {
       setLoading(false);
     }
@@ -67,28 +96,46 @@ export default function UploadedPage() {
     loadVideos();
   }, []);
 
-  function cleanTitle(pathname: string) {
+  function cleanTitle(
+    pathname: string
+  ) {
     const fileName =
-      pathname.split("/").pop() || pathname;
+      pathname.split("/").pop() ||
+      pathname;
 
     return fileName
-      .replace(/\.(mp4|webm|mov)$/i, "")
+      .replace(
+        /\.(mp4|webm|mov)$/i,
+        ""
+      )
       .replace(/^\d+-/, "")
-      .replace(/-[a-zA-Z0-9]{8,}$/, "")
+      .replace(
+        /-[a-zA-Z0-9]{8,}$/,
+        ""
+      )
       .replace(/[-_]/g, " ")
       .replace(/\b\w/g, (letter) =>
         letter.toUpperCase()
       );
   }
 
-  function displayTitle(video: Video) {
-    return video.title || cleanTitle(video.pathname);
+  function displayTitle(
+    video: Video
+  ) {
+    return (
+      video.title ||
+      cleanTitle(video.pathname)
+    );
   }
 
-  function startEditing(video: Video) {
+  function startEditing(
+    video: Video
+  ) {
     setEditingUrl(video.url);
     setEditTitle(displayTitle(video));
-    setEditDescription(video.description || "");
+    setEditDescription(
+      video.description || ""
+    );
     setEditThumbnail(null);
     setMessage("");
   }
@@ -100,21 +147,26 @@ export default function UploadedPage() {
     setEditThumbnail(null);
   }
 
-  async function saveDetails(video: Video) {
-    const creatorEmail = localStorage.getItem(
-      "raysstreamCreatorEmail"
-    );
+  async function saveDetails(
+    video: Video
+  ) {
+    const newTitle =
+      editTitle.trim();
 
-    if (!creatorEmail) {
-      router.push("/creator/login");
+    const newDescription =
+      editDescription.trim();
+
+    if (!newTitle) {
+      setMessage(
+        "Please enter a video title."
+      );
       return;
     }
 
-    const newTitle = editTitle.trim();
-    const newDescription = editDescription.trim();
-
-    if (!newTitle) {
-      setMessage("Please enter a video title.");
+    if (!creatorEmail) {
+      router.replace(
+        "/creator/login"
+      );
       return;
     }
 
@@ -125,52 +177,74 @@ export default function UploadedPage() {
         video.thumbnailUrl || null;
 
       let newThumbnailPathname =
-        video.thumbnailPathname || null;
+        video.thumbnailPathname ||
+        null;
 
       if (editThumbnail) {
-        setMessage("Uploading new thumbnail...");
-
-        const safeEmail = creatorEmail
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "-");
-
-        const thumbnailBlob = await upload(
-          `thumbnails/${safeEmail}/${Date.now()}-${editThumbnail.name}`,
-          editThumbnail,
-          {
-            access: "public",
-            handleUploadUrl: "/api/upload",
-          }
+        setMessage(
+          "Uploading new thumbnail..."
         );
 
-        newThumbnailUrl = thumbnailBlob.url;
+        const safeEmail =
+          creatorEmail
+            .toLowerCase()
+            .replace(
+              /[^a-z0-9]/g,
+              "-"
+            );
+
+        const thumbnailBlob =
+          await upload(
+            `thumbnails/${safeEmail}/${Date.now()}-${editThumbnail.name}`,
+            editThumbnail,
+            {
+              access: "public",
+              handleUploadUrl:
+                "/api/upload",
+            }
+          );
+
+        newThumbnailUrl =
+          thumbnailBlob.url;
+
         newThumbnailPathname =
           thumbnailBlob.pathname;
       }
 
-      setMessage("Saving video details...");
+      setMessage(
+        "Saving video details..."
+      );
 
       const response = await fetch(
         "/api/my-videos",
         {
           method: "PATCH",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
-            email: creatorEmail,
             url: video.url,
-            pathname: video.pathname,
             title: newTitle,
-            description: newDescription,
-            thumbnailUrl: newThumbnailUrl,
+            description:
+              newDescription,
+            thumbnailUrl:
+              newThumbnailUrl,
             thumbnailPathname:
               newThumbnailPathname,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
+
+      if (response.status === 401) {
+        router.replace(
+          "/creator/login"
+        );
+        return;
+      }
 
       if (!response.ok) {
         setMessage(
@@ -181,51 +255,48 @@ export default function UploadedPage() {
       }
 
       setVideos((currentVideos) =>
-        currentVideos.map((currentVideo) =>
-          currentVideo.url === video.url
-            ? {
-                ...currentVideo,
-                title: newTitle,
-                description: newDescription,
-                thumbnailUrl:
-                  data.thumbnailUrl ||
-                  newThumbnailUrl,
-                thumbnailPathname:
-                  data.thumbnailPathname ||
-                  newThumbnailPathname,
-              }
-            : currentVideo
+        currentVideos.map(
+          (currentVideo) =>
+            currentVideo.url ===
+            video.url
+              ? {
+                  ...currentVideo,
+                  title: newTitle,
+                  description:
+                    newDescription,
+                  thumbnailUrl:
+                    data.thumbnailUrl ??
+                    newThumbnailUrl,
+                  thumbnailPathname:
+                    data.thumbnailPathname ??
+                    newThumbnailPathname,
+                }
+              : currentVideo
         )
       );
 
-      setEditingUrl("");
-      setEditTitle("");
-      setEditDescription("");
-      setEditThumbnail(null);
+      cancelEditing();
+
       setMessage(
         "Video details updated successfully."
       );
     } catch (error) {
       console.error(error);
-      setMessage("Could not update video details.");
+      setMessage(
+        "Could not update video details."
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteVideo(video: Video) {
-    const creatorEmail = localStorage.getItem(
-      "raysstreamCreatorEmail"
-    );
-
-    if (!creatorEmail) {
-      router.push("/creator/login");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this video?"
-    );
+  async function deleteVideo(
+    video: Video
+  ) {
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this video?"
+      );
 
     if (!confirmed) {
       return;
@@ -240,21 +311,29 @@ export default function UploadedPage() {
         {
           method: "DELETE",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           body: JSON.stringify({
-            email: creatorEmail,
             url: video.url,
-            pathname: video.pathname,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
+
+      if (response.status === 401) {
+        router.replace(
+          "/creator/login"
+        );
+        return;
+      }
 
       if (!response.ok) {
         setMessage(
-          data.error || "Could not delete video."
+          data.error ||
+            "Could not delete video."
         );
         return;
       }
@@ -262,32 +341,39 @@ export default function UploadedPage() {
       setVideos((currentVideos) =>
         currentVideos.filter(
           (currentVideo) =>
-            currentVideo.url !== video.url
+            currentVideo.url !==
+            video.url
         )
       );
 
-      setMessage("Video deleted successfully.");
+      setMessage(
+        "Video deleted successfully."
+      );
     } catch (error) {
       console.error(error);
-      setMessage("Could not delete video.");
+      setMessage(
+        "Could not delete video."
+      );
     } finally {
       setDeletingUrl("");
     }
-  }
-
-  return (
+  } 
+return (
     <main
       style={{
         minHeight: "100vh",
         backgroundColor: "#000",
         color: "#fff",
         padding: "30px",
-        fontFamily: "Arial, sans-serif",
+        fontFamily:
+          "Arial, sans-serif",
       }}
     >
       <button
         onClick={() =>
-          router.push("/creator/dashboard")
+          router.push(
+            "/creator/dashboard"
+          )
         }
         style={{
           padding: "12px 18px",
@@ -306,7 +392,9 @@ export default function UploadedPage() {
 
       <h1>My Uploaded Videos</h1>
 
-      {loading && <p>Loading videos...</p>}
+      {loading && (
+        <p>Loading videos...</p>
+      )}
 
       {message && (
         <p
@@ -321,11 +409,14 @@ export default function UploadedPage() {
 
       {!loading && (
         <>
-          <p>Videos found: {videos.length}</p>
+          <p>
+            Videos found: {videos.length}
+          </p>
 
           {videos.length === 0 ? (
             <p>
-              You have not uploaded any videos yet.
+              You have not uploaded any
+              videos yet.
             </p>
           ) : (
             <div
@@ -339,22 +430,30 @@ export default function UploadedPage() {
                 <div
                   key={video.url}
                   style={{
-                    paddingBottom: "30px",
-                    borderBottom: "1px solid #333",
+                    paddingBottom:
+                      "30px",
+                    borderBottom:
+                      "1px solid #333",
                   }}
                 >
-                  {editingUrl === video.url ? (
+                  {editingUrl ===
+                  video.url ? (
                     <div
                       style={{
-                        maxWidth: "700px",
-                        marginBottom: "15px",
+                        maxWidth:
+                          "700px",
+                        marginBottom:
+                          "15px",
                       }}
                     >
                       <label
                         style={{
-                          display: "block",
-                          marginBottom: "8px",
-                          fontWeight: "bold",
+                          display:
+                            "block",
+                          marginBottom:
+                            "8px",
+                          fontWeight:
+                            "bold",
                         }}
                       >
                         Video Title
@@ -363,36 +462,51 @@ export default function UploadedPage() {
                       <input
                         type="text"
                         value={editTitle}
-                        onChange={(event) =>
+                        onChange={(
+                          event
+                        ) =>
                           setEditTitle(
-                            event.target.value
+                            event.target
+                              .value
                           )
                         }
                         maxLength={150}
                         style={{
                           width: "100%",
-                          boxSizing: "border-box",
-                          padding: "12px",
-                          fontSize: "18px",
-                          marginBottom: "18px",
+                          boxSizing:
+                            "border-box",
+                          padding:
+                            "12px",
+                          fontSize:
+                            "18px",
+                          marginBottom:
+                            "18px",
                         }}
                       />
 
                       <label
                         style={{
-                          display: "block",
-                          marginBottom: "8px",
-                          fontWeight: "bold",
+                          display:
+                            "block",
+                          marginBottom:
+                            "8px",
+                          fontWeight:
+                            "bold",
                         }}
                       >
                         Video Description
                       </label>
 
                       <textarea
-                        value={editDescription}
-                        onChange={(event) =>
+                        value={
+                          editDescription
+                        }
+                        onChange={(
+                          event
+                        ) =>
                           setEditDescription(
-                            event.target.value
+                            event.target
+                              .value
                           )
                         }
                         maxLength={2000}
@@ -400,28 +514,39 @@ export default function UploadedPage() {
                         placeholder="Tell viewers about your video..."
                         style={{
                           width: "100%",
-                          boxSizing: "border-box",
-                          padding: "12px",
-                          fontSize: "16px",
-                          resize: "vertical",
+                          boxSizing:
+                            "border-box",
+                          padding:
+                            "12px",
+                          fontSize:
+                            "16px",
+                          resize:
+                            "vertical",
                         }}
                       />
 
                       <p
                         style={{
-                          color: "#bbbbbb",
-                          margin: "6px 0 18px",
+                          color:
+                            "#bbbbbb",
+                          margin:
+                            "6px 0 18px",
                         }}
                       >
-                        {editDescription.length}/2000
-                        characters
+                        {
+                          editDescription.length
+                        }
+                        /2000 characters
                       </p>
 
                       <label
                         style={{
-                          display: "block",
-                          marginBottom: "8px",
-                          fontWeight: "bold",
+                          display:
+                            "block",
+                          marginBottom:
+                            "8px",
+                          fontWeight:
+                            "bold",
                         }}
                       >
                         Change Thumbnail
@@ -429,49 +554,67 @@ export default function UploadedPage() {
 
                       <p
                         style={{
-                          color: "#bbbbbb",
-                          margin: "0 0 8px",
+                          color:
+                            "#bbbbbb",
+                          margin:
+                            "0 0 8px",
                         }}
                       >
-                        Optional: choose a new JPG, PNG,
-                        or WebP image.
+                        Optional: choose a
+                        new JPG, PNG, or WebP
+                        image.
                       </p>
 
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
-                        onChange={(event) => {
+                        onChange={(
+                          event
+                        ) => {
                           const file =
-                            event.target.files?.[0] ||
+                            event.target
+                              .files?.[0] ||
                             null;
 
-                          setEditThumbnail(file);
+                          setEditThumbnail(
+                            file
+                          );
                         }}
                         style={{
-                          display: "block",
-                          marginBottom: "18px",
+                          display:
+                            "block",
+                          marginBottom:
+                            "18px",
                         }}
                       />
 
                       <div
                         style={{
-                          display: "flex",
+                          display:
+                            "flex",
                           gap: "10px",
-                          flexWrap: "wrap",
+                          flexWrap:
+                            "wrap",
                         }}
                       >
                         <button
                           onClick={() =>
-                            saveDetails(video)
+                            saveDetails(
+                              video
+                            )
                           }
                           disabled={saving}
                           style={{
-                            padding: "10px 16px",
-                            fontSize: "15px",
-                            fontWeight: "bold",
-                            cursor: saving
-                              ? "not-allowed"
-                              : "pointer",
+                            padding:
+                              "10px 16px",
+                            fontSize:
+                              "15px",
+                            fontWeight:
+                              "bold",
+                            cursor:
+                              saving
+                                ? "not-allowed"
+                                : "pointer",
                           }}
                         >
                           {saving
@@ -480,14 +623,19 @@ export default function UploadedPage() {
                         </button>
 
                         <button
-                          onClick={cancelEditing}
+                          onClick={
+                            cancelEditing
+                          }
                           disabled={saving}
                           style={{
-                            padding: "10px 16px",
-                            fontSize: "15px",
-                            cursor: saving
-                              ? "not-allowed"
-                              : "pointer",
+                            padding:
+                              "10px 16px",
+                            fontSize:
+                              "15px",
+                            cursor:
+                              saving
+                                ? "not-allowed"
+                                : "pointer",
                           }}
                         >
                           Cancel
@@ -497,38 +645,50 @@ export default function UploadedPage() {
                   ) : (
                     <>
                       <h2>
-                        {displayTitle(video)}
+                        {displayTitle(
+                          video
+                        )}
                       </h2>
 
                       {video.description && (
                         <p
                           style={{
-                            maxWidth: "700px",
-                            color: "#dddddd",
-                            fontSize: "17px",
-                            lineHeight: 1.6,
-                            whiteSpace: "pre-wrap",
-                            overflowWrap: "anywhere",
+                            maxWidth:
+                              "700px",
+                            color:
+                              "#dddddd",
+                            fontSize:
+                              "17px",
+                            lineHeight:
+                              1.6,
+                            whiteSpace:
+                              "pre-wrap",
+                            overflowWrap:
+                              "anywhere",
                           }}
                         >
-                          {video.description}
+                          {
+                            video.description
+                          }
                         </p>
                       )}
                     </>
-                  )}
-
-                  <video
+                  )} 
+  <video
                     src={video.url}
                     poster={
-                      video.thumbnailUrl || undefined
+                      video.thumbnailUrl ||
+                      undefined
                     }
                     controls
                     style={{
                       width: "100%",
                       maxWidth: "700px",
-                      borderRadius: "10px",
+                      borderRadius:
+                        "10px",
                       display: "block",
-                      marginBottom: "15px",
+                      marginBottom:
+                        "15px",
                       background: "#111",
                     }}
                   />
@@ -542,17 +702,24 @@ export default function UploadedPage() {
                   >
                     <button
                       onClick={() =>
-                        startEditing(video)
+                        startEditing(
+                          video
+                        )
                       }
                       style={{
-                        padding: "12px 18px",
+                        padding:
+                          "12px 18px",
                         fontSize: "16px",
-                        fontWeight: "bold",
+                        fontWeight:
+                          "bold",
                         cursor: "pointer",
-                        backgroundColor: "#fff",
+                        backgroundColor:
+                          "#fff",
                         color: "#000",
-                        border: "2px solid #000",
-                        borderRadius: "8px",
+                        border:
+                          "2px solid #000",
+                        borderRadius:
+                          "8px",
                       }}
                     >
                       Edit Details
@@ -560,26 +727,36 @@ export default function UploadedPage() {
 
                     <button
                       onClick={() =>
-                        deleteVideo(video)
+                        deleteVideo(
+                          video
+                        )
                       }
                       disabled={
-                        deletingUrl === video.url
+                        deletingUrl ===
+                        video.url
                       }
                       style={{
-                        padding: "12px 18px",
+                        padding:
+                          "12px 18px",
                         fontSize: "16px",
-                        fontWeight: "bold",
+                        fontWeight:
+                          "bold",
                         cursor:
-                          deletingUrl === video.url
+                          deletingUrl ===
+                          video.url
                             ? "not-allowed"
                             : "pointer",
-                        backgroundColor: "#b91c1c",
+                        backgroundColor:
+                          "#b91c1c",
                         color: "#fff",
-                        border: "2px solid #000",
-                        borderRadius: "8px",
+                        border:
+                          "2px solid #000",
+                        borderRadius:
+                          "8px",
                       }}
                     >
-                      {deletingUrl === video.url
+                      {deletingUrl ===
+                      video.url
                         ? "Deleting..."
                         : "Delete Video"}
                     </button>
