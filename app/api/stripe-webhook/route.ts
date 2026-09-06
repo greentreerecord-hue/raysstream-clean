@@ -139,7 +139,8 @@ function verifyWebhook(
   }
 
   return null;
-} 
+}
+
 export async function POST(request: Request) {
   if (!stripeSecretKey) {
     console.error(
@@ -219,6 +220,7 @@ export async function POST(request: Request) {
 
       const creatorEmail =
         (
+          session.metadata?.creator_email ||
           session.customer_details?.email ||
           session.customer_email ||
           ""

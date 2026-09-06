@@ -31,10 +31,13 @@ export default function CreatorDashboardPage() {
     setCheckingSubscription,
   ] = useState(true);
 
+  const [startingCheckout, setStartingCheckout] =
+    useState(false);
+
   const [openingPortal, setOpeningPortal] =
     useState(false);
 
-  const [portalMessage, setPortalMessage] =
+  const [paymentMessage, setPaymentMessage] =
     useState("");
 
   useEffect(() => {
@@ -117,17 +120,43 @@ export default function CreatorDashboardPage() {
     }
   }
 
-  function openCheckout() {
-    const checkoutUrl =
-      "https://buy.stripe.com/aFa28r08qgwv0Nkcid2Nq04";
+  async function openCheckout() {
+    if (startingCheckout) {
+      return;
+    }
 
-    const separator = checkoutUrl.includes("?")
-      ? "&"
-      : "?";
+    try {
+      setStartingCheckout(true);
+      setPaymentMessage(
+        "Opening secure checkout..."
+      );
 
-    window.location.href =
-      `${checkoutUrl}${separator}prefilled_email=` +
-      encodeURIComponent(creatorEmail);
+      const response = await fetch(
+        "/api/creator-live-checkout",
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        throw new Error(
+          data.error ||
+            "Unable to open Creator Live checkout."
+        );
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      setPaymentMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to open Creator Live checkout."
+      );
+      setStartingCheckout(false);
+    }
   }
 
   async function openBillingPortal() {
@@ -137,7 +166,7 @@ export default function CreatorDashboardPage() {
 
     try {
       setOpeningPortal(true);
-      setPortalMessage(
+      setPaymentMessage(
         "Opening subscription management..."
       );
 
@@ -160,7 +189,7 @@ export default function CreatorDashboardPage() {
 
       window.location.href = data.url;
     } catch (error) {
-      setPortalMessage(
+      setPaymentMessage(
         error instanceof Error
           ? error.message
           : "Unable to open subscription management."
@@ -344,17 +373,6 @@ return (
                     : "Manage Subscription"}
                 </button>
               </div>
-
-              {portalMessage && (
-                <p
-                  style={{
-                    margin: "16px 0 0",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {portalMessage}
-                </p>
-              )}
             </>
           ) : (
             <>
@@ -381,6 +399,7 @@ return (
               <button
                 type="button"
                 onClick={openCheckout}
+                disabled={startingCheckout}
                 style={{
                   padding: "14px 26px",
                   background: "#22c55e",
@@ -389,12 +408,30 @@ return (
                   borderRadius: "24px",
                   fontSize: "18px",
                   fontWeight: "bold",
-                  cursor: "pointer",
+                  cursor: startingCheckout
+                    ? "wait"
+                    : "pointer",
+                  opacity: startingCheckout
+                    ? 0.7
+                    : 1,
                 }}
               >
-                Get Creator Live
+                {startingCheckout
+                  ? "Opening Checkout..."
+                  : "Get Creator Live"}
               </button>
             </>
+          )}
+
+          {paymentMessage && (
+            <p
+              style={{
+                margin: "16px 0 0",
+                fontWeight: "bold",
+              }}
+            >
+              {paymentMessage}
+            </p>
           )}
         </section>
 
