@@ -8,11 +8,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
-type SubscriptionStatus = {
-  active: boolean;
-  status: string;
-};
-
 type LiveAccessResponse = {
   authorized?: boolean;
   publishUrl?: string;
@@ -41,7 +36,6 @@ function waitForIceGathering(
           "icegatheringstatechange",
           checkState
         );
-
         resolve();
       }
     }
@@ -56,7 +50,6 @@ function waitForIceGathering(
         "icegatheringstatechange",
         checkState
       );
-
       resolve();
     }, 10000);
   });
@@ -67,50 +60,32 @@ export default function CreatorLivePage() {
 
   const videoRef =
     useRef<HTMLVideoElement | null>(null);
-
   const streamRef =
     useRef<MediaStream | null>(null);
-
   const peerConnectionRef =
     useRef<RTCPeerConnection | null>(null);
-
   const whipResourceUrlRef =
-    useRef<string>("");
+    useRef("");
 
   const [creatorEmail, setCreatorEmail] =
     useState("");
-
   const [title, setTitle] = useState("");
-
   const [cameraReady, setCameraReady] =
     useState(false);
-
-  const [checkingSession, setCheckingSession] =
+  const [checkingAccess, setCheckingAccess] =
     useState(true);
-
-  const [
-    checkingSubscription,
-    setCheckingSubscription,
-  ] = useState(true);
-
-  const [subscription, setSubscription] =
-    useState<SubscriptionStatus>({
-      active: false,
-      status: "inactive",
-    });
-
+  const [subscriptionActive, setSubscriptionActive] =
+    useState(false);
   const [broadcasting, setBroadcasting] =
     useState(false);
-
   const [connecting, setConnecting] =
     useState(false);
-
   const [message, setMessage] = useState(
     "Start your camera to preview your livestream."
   );
 
   useEffect(() => {
-    async function loadCreator() {
+    async function verifyAccess() {
       try {
         const sessionResponse = await fetch(
           "/api/creator-session",
@@ -121,7 +96,7 @@ export default function CreatorLivePage() {
         );
 
         if (!sessionResponse.ok) {
-          router.push("/creator/login");
+          router.replace("/creator/login");
           return;
         }
 
@@ -132,92 +107,88 @@ export default function CreatorLivePage() {
           sessionData.creator?.email || "";
 
         if (!email) {
-          router.push("/creator/login");
+          router.replace("/creator/login");
           return;
         }
 
         setCreatorEmail(email);
 
         const subscriptionResponse =
-          await fetch(
-            `/api/live-subscription?email=${encodeURIComponent(
-              email
-            )}`,
-            {
-              cache: "no-store",
-              credentials: "include",
-            }
-          );
+          await fetch("/api/live-subscription", {
+            cache: "no-store",
+            credentials: "include",
+          });
+
+        if (subscriptionResponse.status === 401) {
+          router.replace("/creator/login");
+          return;
+        }
 
         const subscriptionData =
           await subscriptionResponse.json();
 
-        if (subscriptionResponse.ok) {
-          setSubscription({
-            active: Boolean(
-              subscriptionData.active
-            ),
-            status:
-              subscriptionData.status ||
-              "inactive",
-          });
+        if (
+          !subscriptionResponse.ok ||
+          !subscriptionData.active
+        ) {
+          router.replace("/creator/dashboard");
+          return;
         }
+
+        setSubscriptionActive(true);
       } catch {
-        router.push("/creator/login");
+        router.replace("/creator/login");
       } finally {
-        setCheckingSession(false);
-        setCheckingSubscription(false);
+        setCheckingAccess(false);
       }
     }
 
-    loadCreator();
+    verifyAccess();
 
     return () => {
       if (whipResourceUrlRef.current) {
         fetch(whipResourceUrlRef.current, {
           method: "DELETE",
           keepalive: true,
-        }).catch(() => {
-          // Page is closing.
-        });
+        }).catch(() => {});
 
         whipResourceUrlRef.current = "";
       }
 
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
+      peerConnectionRef.current?.close();
+      peerConnectionRef.current = null;
 
-      if (streamRef.current) {
-        streamRef.current
-          .getTracks()
-          .forEach((track) => track.stop());
-
-        streamRef.current = null;
-      }
-    };
-  }, [router]);
-
-  function stopCameraTracks() {
-    if (streamRef.current) {
       streamRef.current
-        .getTracks()
+        ?.getTracks()
         .forEach((track) => track.stop());
 
       streamRef.current = null;
-    }
+    };
+  }, [router]); 
+ function stopCameraTracks() {
+    streamRef.current
+      ?.getTracks()
+      .forEach((track) => track.stop());
+
+    streamRef.current = null;
   }
 
   async function startCamera() {
-    try {
-      if (broadcasting || connecting) {
-        setMessage(
-          "Stop the broadcast before restarting the camera."
-        );
-        return;
-      }
+    if (!subscriptionActive) {
+      setMessage(
+        "An active Creator Live subscription is required."
+      );
+      return;
+    }
 
+    if (broadcasting || connecting) {
+      setMessage(
+        "Stop the broadcast before restarting the camera."
+      );
+      return;
+    }
+
+    try {
       stopCameraTracks();
 
       setMessage(
@@ -249,7 +220,7 @@ export default function CreatorLivePage() {
         }
 
         setMessage(
-          "No microphone was found. Starting the camera without audio..."
+          "No microphone was found. Starting without audio..."
         );
 
         mediaStream =
@@ -308,16 +279,14 @@ export default function CreatorLivePage() {
         });
       } catch (error) {
         console.error(
-          "Unable to delete the Cloudflare broadcast session:",
+          "Unable to delete the broadcast session:",
           error
         );
       }
     }
 
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
+    peerConnectionRef.current?.close();
+    peerConnectionRef.current = null;
 
     setBroadcasting(false);
     setConnecting(false);
@@ -341,10 +310,7 @@ export default function CreatorLivePage() {
     }
 
     setCameraReady(false);
-
-    setMessage(
-      "Camera and microphone stopped."
-    );
+    setMessage("Camera and microphone stopped.");
   }
 
   async function startBroadcast() {
@@ -352,9 +318,9 @@ export default function CreatorLivePage() {
       return;
     }
 
-    if (!subscription.active) {
+    if (!subscriptionActive) {
       setMessage(
-        "An active Creator Live subscription is required before broadcasting."
+        "An active Creator Live subscription is required."
       );
       return;
     }
@@ -375,7 +341,6 @@ export default function CreatorLivePage() {
 
     try {
       setConnecting(true);
-
       setMessage(
         "Verifying Creator Live access..."
       );
@@ -430,7 +395,6 @@ export default function CreatorLivePage() {
           if (state === "connected") {
             setConnecting(false);
             setBroadcasting(true);
-
             setMessage(
               `🔴 LIVE: ${title.trim()}`
             );
@@ -442,7 +406,6 @@ export default function CreatorLivePage() {
           ) {
             setConnecting(false);
             setBroadcasting(false);
-
             setMessage(
               "The live connection was interrupted. Stop the broadcast and try again."
             );
@@ -517,7 +480,6 @@ export default function CreatorLivePage() {
 
       setConnecting(false);
       setBroadcasting(true);
-
       setMessage(`🔴 LIVE: ${title.trim()}`);
     } catch (error) {
       console.error(
@@ -525,11 +487,8 @@ export default function CreatorLivePage() {
         error
       );
 
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-
+      peerConnectionRef.current?.close();
+      peerConnectionRef.current = null;
       whipResourceUrlRef.current = "";
 
       setConnecting(false);
@@ -541,9 +500,8 @@ export default function CreatorLivePage() {
           : "Unable to start the broadcast."
       );
     }
-  }
-
-  const buttonStyle: CSSProperties = {
+  } 
+const buttonStyle: CSSProperties = {
     padding: "13px 22px",
     border: "3px solid white",
     borderRadius: "14px",
@@ -554,7 +512,7 @@ export default function CreatorLivePage() {
     cursor: "pointer",
   };
 
-  if (checkingSession) {
+  if (checkingAccess) {
     return (
       <main
         style={{
@@ -568,7 +526,26 @@ export default function CreatorLivePage() {
           fontSize: "22px",
         }}
       >
-        Verifying creator session...
+        Verifying Creator Live access...
+      </main>
+    );
+  }
+
+  if (!subscriptionActive) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+          background: "black",
+          fontFamily: "Arial, sans-serif",
+          fontSize: "22px",
+        }}
+      >
+        Returning to Creator Dashboard...
       </main>
     );
   }
@@ -783,18 +760,10 @@ export default function CreatorLivePage() {
                 marginTop: "22px",
                 padding: "16px",
                 borderRadius: "12px",
-                background: checkingSubscription
-                  ? "#e5e7eb"
-                  : subscription.active
-                    ? "#dcfce7"
-                    : "#fee2e2",
+                background: "#dcfce7",
               }}
             >
-              {checkingSubscription
-                ? "Checking subscription..."
-                : subscription.active
-                  ? "✓ Creator Live subscription active"
-                  : "Creator Live subscription inactive"}
+              ✓ Creator Live subscription active
             </div>
 
             {!broadcasting ? (
@@ -807,14 +776,7 @@ export default function CreatorLivePage() {
                   width: "100%",
                   marginTop: "22px",
                   color: "black",
-                  background: subscription.active
-                    ? "#22c55e"
-                    : "#9ca3af",
-                  cursor:
-                    subscription.active &&
-                    !connecting
-                      ? "pointer"
-                      : "not-allowed",
+                  background: "#22c55e",
                   opacity: connecting ? 0.7 : 1,
                 }}
               >
