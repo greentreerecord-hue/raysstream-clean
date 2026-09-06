@@ -31,6 +31,12 @@ export default function CreatorDashboardPage() {
     setCheckingSubscription,
   ] = useState(true);
 
+  const [openingPortal, setOpeningPortal] =
+    useState(false);
+
+  const [portalMessage, setPortalMessage] =
+    useState("");
+
   useEffect(() => {
     async function loadCreator() {
       try {
@@ -38,11 +44,12 @@ export default function CreatorDashboardPage() {
           "/api/creator-session",
           {
             cache: "no-store",
+            credentials: "include",
           }
         );
 
         if (!sessionResponse.ok) {
-          router.push("/creator/login");
+          router.replace("/creator/login");
           return;
         }
 
@@ -55,12 +62,15 @@ export default function CreatorDashboardPage() {
         setCreatorEmail(creator.email || "");
 
         const subscriptionResponse =
-          await fetch(
-            "/api/live-subscription",
-            {
-              cache: "no-store",
-            }
-          );
+          await fetch("/api/live-subscription", {
+            cache: "no-store",
+            credentials: "include",
+          });
+
+        if (subscriptionResponse.status === 401) {
+          router.replace("/creator/login");
+          return;
+        }
 
         const subscriptionData =
           await subscriptionResponse.json();
@@ -79,7 +89,7 @@ export default function CreatorDashboardPage() {
           });
         }
       } catch {
-        router.push("/creator/login");
+        router.replace("/creator/login");
       } finally {
         setLoadingCreator(false);
         setCheckingSubscription(false);
@@ -93,6 +103,7 @@ export default function CreatorDashboardPage() {
     try {
       await fetch("/api/creator-session", {
         method: "DELETE",
+        credentials: "include",
       });
     } finally {
       localStorage.removeItem(
@@ -117,6 +128,45 @@ export default function CreatorDashboardPage() {
     window.location.href =
       `${checkoutUrl}${separator}prefilled_email=` +
       encodeURIComponent(creatorEmail);
+  }
+
+  async function openBillingPortal() {
+    if (openingPortal) {
+      return;
+    }
+
+    try {
+      setOpeningPortal(true);
+      setPortalMessage(
+        "Opening subscription management..."
+      );
+
+      const response = await fetch(
+        "/api/billing-portal",
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        throw new Error(
+          data.error ||
+            "Unable to open subscription management."
+        );
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      setPortalMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to open subscription management."
+      );
+      setOpeningPortal(false);
+    }
   }
 
   const buttonStyle: React.CSSProperties = {
@@ -242,24 +292,69 @@ return (
                 active
               </p>
 
-              <button
-                type="button"
-                onClick={() =>
-                  router.push("/creator/live")
-                }
+              <div
                 style={{
-                  padding: "14px 30px",
-                  background: "#22c55e",
-                  color: "black",
-                  border: "3px solid white",
-                  borderRadius: "24px",
-                  fontSize: "20px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  gap: "12px",
                 }}
               >
-                Go Live
-              </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push("/creator/live")
+                  }
+                  style={{
+                    padding: "14px 30px",
+                    background: "#22c55e",
+                    color: "black",
+                    border: "3px solid white",
+                    borderRadius: "24px",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  Go Live
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openBillingPortal}
+                  disabled={openingPortal}
+                  style={{
+                    padding: "14px 24px",
+                    background: "#facc15",
+                    color: "black",
+                    border: "3px solid white",
+                    borderRadius: "24px",
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                    cursor: openingPortal
+                      ? "wait"
+                      : "pointer",
+                    opacity: openingPortal
+                      ? 0.7
+                      : 1,
+                  }}
+                >
+                  {openingPortal
+                    ? "Opening..."
+                    : "Manage Subscription"}
+                </button>
+              </div>
+
+              {portalMessage && (
+                <p
+                  style={{
+                    margin: "16px 0 0",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {portalMessage}
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -313,6 +408,7 @@ return (
           }}
         >
           <button
+            type="button"
             onClick={() =>
               router.push("/upload")
             }
@@ -322,6 +418,7 @@ return (
           </button>
 
           <button
+            type="button"
             onClick={() =>
               router.push("/uploaded")
             }
@@ -331,6 +428,7 @@ return (
           </button>
 
           <button
+            type="button"
             onClick={() =>
               router.push("/creator/profile")
             }
@@ -340,6 +438,7 @@ return (
           </button>
 
           <button
+            type="button"
             onClick={() => router.push("/")}
             style={buttonStyle}
           >
@@ -347,6 +446,7 @@ return (
           </button>
 
           <button
+            type="button"
             onClick={logout}
             style={{
               ...buttonStyle,
