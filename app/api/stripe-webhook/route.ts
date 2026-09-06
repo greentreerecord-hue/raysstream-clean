@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import postgres from "postgres";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const databaseUrl =
   process.env.RAYSSTREAM_DB_DATABASE_URL;
@@ -57,6 +58,51 @@ function getId(
     : value.id;
 }
 
+function getSubscriptionPeriodEnd(
+  subscription: Stripe.Subscription
+) {
+  const legacySubscription =
+    subscription as Stripe.Subscription & {
+      current_period_end?: number;
+    };
+
+  const periodEnd =
+    legacySubscription.current_period_end ||
+    subscription.items.data[0]
+      ?.current_period_end ||
+    null;
+
+  return periodEnd
+    ? new Date(periodEnd * 1000)
+    : null;
+}
+
+function getInvoiceSubscriptionId(
+  invoice: Stripe.Invoice
+) {
+  const legacyInvoice =
+    invoice as Stripe.Invoice & {
+      subscription?:
+        | string
+        | { id: string }
+        | null;
+    };
+
+  const legacySubscriptionId = getId(
+    legacyInvoice.subscription
+  );
+
+  if (legacySubscriptionId) {
+    return legacySubscriptionId;
+  }
+
+  return getId(
+    invoice.parent
+      ?.subscription_details
+      ?.subscription
+  );
+}
+
 function verifyWebhook(
   stripe: Stripe,
   body: string,
@@ -93,8 +139,7 @@ function verifyWebhook(
   }
 
   return null;
-}
-
+} 
 export async function POST(request: Request) {
   if (!stripeSecretKey) {
     console.error(
@@ -113,7 +158,10 @@ export async function POST(request: Request) {
     );
 
     return NextResponse.json(
-      { error: "Stripe webhooks are not configured." },
+      {
+        error:
+          "Stripe webhooks are not configured.",
+      },
       { status: 500 }
     );
   }
@@ -151,8 +199,6 @@ export async function POST(request: Request) {
 
   const { event, mode } = verified;
 
-  // Sandbox events confirm that the webhook works,
-  // but they must not change the production database.
   if (mode === "test") {
     return NextResponse.json({
       received: true,
@@ -164,38 +210,56 @@ export async function POST(request: Request) {
   try {
     await ensureSubscriptionTable();
 
-    if (event.type === "checkout.session.completed") {
+    if (
+      event.type ===
+      "checkout.session.completed"
+    ) {
       const session =
         event.data.object as Stripe.Checkout.Session;
 
       const creatorEmail =
-        session.customer_details?.email
-          ?.trim()
-          .toLowerCase() || "";
+        (
+          session.customer_details?.email ||
+          session.customer_email ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
 
-      const customerId = getId(session.customer);
+      const customerId = getId(
+        session.customer
+      );
+
       const subscriptionId = getId(
         session.subscription
       );
 
       if (creatorEmail && subscriptionId) {
+        const subscription =
+          await stripe.subscriptions.retrieve(
+            subscriptionId
+          );
+
+        const periodEnd =
+          getSubscriptionPeriodEnd(
+            subscription
+          );
+
         await sql`
           INSERT INTO live_creator_subscriptions (
             creator_email,
             stripe_customer_id,
             stripe_subscription_id,
             subscription_status,
+            current_period_end,
             updated_at
           )
           VALUES (
             ${creatorEmail},
             ${customerId || null},
             ${subscriptionId},
-            ${
-              session.payment_status === "paid"
-                ? "active"
-                : "inactive"
-            },
+            ${subscription.status},
+            ${periodEnd},
             NOW()
           )
           ON CONFLICT (creator_email)
@@ -206,6 +270,8 @@ export async function POST(request: Request) {
               EXCLUDED.stripe_subscription_id,
             subscription_status =
               EXCLUDED.subscription_status,
+            current_period_end =
+              EXCLUDED.current_period_end,
             updated_at = NOW()
         `;
       }
@@ -221,38 +287,32 @@ export async function POST(request: Request) {
         event.data.object as Stripe.Subscription;
 
       const periodEnd =
-        subscription.items.data[0]
-          ?.current_period_end;
+        getSubscriptionPeriodEnd(
+          subscription
+        );
 
       await sql`
         UPDATE live_creator_subscriptions
         SET
           subscription_status =
             ${subscription.status},
-          current_period_end = ${
-            periodEnd
-              ? new Date(periodEnd * 1000)
-              : null
-          },
+          current_period_end =
+            ${periodEnd},
           updated_at = NOW()
         WHERE stripe_subscription_id =
           ${subscription.id}
       `;
     }
 
-    if (event.type === "invoice.payment_failed") {
+    if (
+      event.type ===
+      "invoice.payment_failed"
+    ) {
       const invoice =
         event.data.object as Stripe.Invoice;
 
       const subscriptionId =
-        typeof invoice.parent
-          ?.subscription_details?.subscription ===
-        "string"
-          ? invoice.parent.subscription_details
-              .subscription
-          : invoice.parent
-              ?.subscription_details?.subscription
-              ?.id || "";
+        getInvoiceSubscriptionId(invoice);
 
       if (subscriptionId) {
         await sql`
@@ -277,7 +337,10 @@ export async function POST(request: Request) {
     );
 
     return NextResponse.json(
-      { error: "Unable to process Stripe webhook." },
+      {
+        error:
+          "Unable to process Stripe webhook.",
+      },
       { status: 500 }
     );
   }
