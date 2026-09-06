@@ -56,9 +56,7 @@ export default function CreatorDashboardPage() {
 
         const subscriptionResponse =
           await fetch(
-            `/api/live-subscription?email=${encodeURIComponent(
-              creator.email
-            )}`,
+            "/api/live-subscription",
             {
               cache: "no-store",
             }
@@ -150,7 +148,7 @@ export default function CreatorDashboardPage() {
       </main>
     );
   } 
- return (
+return (
     <main
       style={{
         minHeight: "100vh",

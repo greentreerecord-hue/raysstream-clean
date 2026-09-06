@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
+import {
+  getCreatorFromSession,
+} from "../../../lib/creator-session";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const databaseUrl =
   process.env.RAYSSTREAM_DB_DATABASE_URL;
@@ -33,28 +37,30 @@ async function ensureSubscriptionTable() {
 
 export async function GET(request: Request) {
   try {
-    await ensureSubscriptionTable();
+    const creator =
+      await getCreatorFromSession(request);
 
-    const { searchParams } = new URL(request.url);
-    const email =
-      searchParams.get("email")?.trim().toLowerCase() ||
-      "";
-
-    if (!email) {
+    if (!creator) {
       return NextResponse.json(
         {
-          error: "Creator email is required.",
+          error:
+            "Please log in to your creator account.",
         },
-        { status: 400 }
+        {
+          status: 401,
+        }
       );
     }
+
+    await ensureSubscriptionTable();
 
     const rows = await sql`
       SELECT
         subscription_status,
         current_period_end
       FROM live_creator_subscriptions
-      WHERE LOWER(creator_email) = ${email}
+      WHERE LOWER(creator_email) =
+        ${creator.email}
       LIMIT 1
     `;
 
@@ -66,9 +72,12 @@ export async function GET(request: Request) {
       });
     }
 
-    const status = rows[0].subscription_status;
+    const status =
+      rows[0].subscription_status;
+
     const active =
-      status === "active" || status === "trialing";
+      status === "active" ||
+      status === "trialing";
 
     return NextResponse.json({
       active,
@@ -87,7 +96,9 @@ export async function GET(request: Request) {
         error:
           "Unable to check the Creator Live subscription.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 } 
