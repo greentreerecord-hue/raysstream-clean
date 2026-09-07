@@ -621,7 +621,7 @@ export default function Home() {
           }}
         >
           <a
-            href="/watch/video-1"
+            href="/live"
             style={{
               ...linkStyle,
               background: "#e54421",
