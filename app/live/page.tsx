@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type PlaybackResponse = {
@@ -16,97 +12,18 @@ type PlaybackResponse = {
 export default function LiveViewerPage() {
   const router = useRouter();
 
-  const videoRef =
-    useRef<HTMLVideoElement | null>(null);
-
-  const peerConnectionRef =
-    useRef<RTCPeerConnection | null>(null);
-
-  const playbackResourceRef =
-    useRef<string | null>(null);
-
   const [connecting, setConnecting] =
     useState(false);
 
   const [watching, setWatching] =
     useState(false);
 
+  const [playbackUrl, setPlaybackUrl] =
+    useState("");
+
   const [message, setMessage] = useState(
     "Press Watch Live to connect to the livestream."
   );
-
-  useEffect(() => {
-    return () => {
-      void disconnectPlayback(false);
-    };
-  }, []);
-
-  function waitForIceGathering(
-    peerConnection: RTCPeerConnection
-  ) {
-    if (
-      peerConnection.iceGatheringState ===
-      "complete"
-    ) {
-      return Promise.resolve();
-    }
-
-    return new Promise<void>((resolve) => {
-      function checkState() {
-        if (
-          peerConnection.iceGatheringState ===
-          "complete"
-        ) {
-          peerConnection.removeEventListener(
-            "icegatheringstatechange",
-            checkState
-          );
-
-          resolve();
-        }
-      }
-
-      peerConnection.addEventListener(
-        "icegatheringstatechange",
-        checkState
-      );
-    });
-  }
-
-  async function disconnectPlayback(
-    showMessage = true
-  ) {
-    const playbackResource =
-      playbackResourceRef.current;
-
-    playbackResourceRef.current = null;
-
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
-    if (playbackResource) {
-      try {
-        await fetch(playbackResource, {
-          method: "DELETE",
-        });
-      } catch {
-        // The connection is already closed locally.
-      }
-    }
-
-    setWatching(false);
-    setConnecting(false);
-
-    if (showMessage) {
-      setMessage("Live playback stopped.");
-    }
-  }
 
   async function watchLive() {
     if (connecting || watching) {
@@ -114,150 +31,45 @@ export default function LiveViewerPage() {
     }
 
     try {
-      await disconnectPlayback(false);
-
       setConnecting(true);
       setMessage(
         "Connecting to the Ray’sStream live broadcast..."
       );
 
-      const playbackResponse = await fetch(
+      const response = await fetch(
         "/api/live-playback",
         {
           cache: "no-store",
         }
       );
 
-      const playbackData =
-        (await playbackResponse.json()) as PlaybackResponse;
+      const data =
+        (await response.json()) as PlaybackResponse;
 
       if (
-        !playbackResponse.ok ||
-        !playbackData.available ||
-        !playbackData.playbackUrl
+        !response.ok ||
+        !data.available ||
+        !data.playbackUrl
       ) {
         throw new Error(
-          playbackData.error ||
+          data.error ||
             "Live playback is unavailable."
         );
       }
 
-      const peerConnection =
-        new RTCPeerConnection();
+      const separator =
+        data.playbackUrl.includes("?") ? "&" : "?";
 
-      peerConnectionRef.current =
-        peerConnection;
-
-      const receivedStream = new MediaStream();
-
-      peerConnection.ontrack = (event) => {
-        receivedStream.addTrack(event.track);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject =
-            receivedStream;
-
-          void videoRef.current.play().catch(
-            () => {
-              setMessage(
-                "The livestream connected. Press play on the video if it does not start automatically."
-              );
-            }
-          );
-        }
-      };
-
-      peerConnection.onconnectionstatechange =
-        () => {
-          const state =
-            peerConnection.connectionState;
-
-          if (state === "connected") {
-            setConnecting(false);
-            setWatching(true);
-            setMessage(
-              "You are watching Ray’sStream Live."
-            );
-          }
-
-          if (
-            state === "failed" ||
-            state === "disconnected"
-          ) {
-            setWatching(false);
-            setConnecting(false);
-            setMessage(
-              "The live broadcast is offline or the connection ended."
-            );
-          }
-        };
-
-      peerConnection.addTransceiver("video", {
-        direction: "recvonly",
-      });
-
-      peerConnection.addTransceiver("audio", {
-        direction: "recvonly",
-      });
-
-      const offer =
-        await peerConnection.createOffer();
-
-      await peerConnection.setLocalDescription(
-        offer
+      setPlaybackUrl(
+        `${data.playbackUrl}${separator}autoplay=true&muted=false`
       );
 
-      await waitForIceGathering(
-        peerConnection
+      setWatching(true);
+      setMessage(
+        "You are watching Ray’sStream Live."
       );
-
-      const localDescription =
-        peerConnection.localDescription;
-
-      if (!localDescription?.sdp) {
-        throw new Error(
-          "The browser could not create a playback connection."
-        );
-      }
-
-      const whepResponse = await fetch(
-        playbackData.playbackUrl,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/sdp",
-          },
-          body: localDescription.sdp,
-        }
-      );
-
-      if (!whepResponse.ok) {
-        throw new Error(
-          "No live broadcast is currently available."
-        );
-      }
-
-      const answerSdp =
-        await whepResponse.text();
-
-      const resourceLocation =
-        whepResponse.headers.get("Location");
-
-      if (resourceLocation) {
-        playbackResourceRef.current = new URL(
-          resourceLocation,
-          playbackData.playbackUrl
-        ).toString();
-      }
-
-      await peerConnection.setRemoteDescription({
-        type: "answer",
-        sdp: answerSdp,
-      });
     } catch (error) {
-      await disconnectPlayback(false);
-
-      setConnecting(false);
+      setPlaybackUrl("");
       setWatching(false);
 
       setMessage(
@@ -265,7 +77,16 @@ export default function LiveViewerPage() {
           ? error.message
           : "Unable to connect to the live broadcast."
       );
+    } finally {
+      setConnecting(false);
     }
+  }
+
+  function stopWatching() {
+    setPlaybackUrl("");
+    setWatching(false);
+    setConnecting(false);
+    setMessage("Live playback stopped.");
   }
 
   const buttonStyle = {
@@ -341,23 +162,20 @@ export default function LiveViewerPage() {
             borderRadius: "22px",
           }}
         >
-          <video
-            ref={videoRef}
-            autoPlay
-            controls
-            playsInline
-            style={{
-              width: "100%",
-              minHeight: "480px",
-              objectFit: "contain",
-              display: watching
-                ? "block"
-                : "none",
-              background: "black",
-            }}
-          />
-
-          {!watching && (
+          {watching && playbackUrl ? (
+            <iframe
+              src={playbackUrl}
+              title="Ray’sStream Live Broadcast"
+              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+              allowFullScreen
+              style={{
+                width: "100%",
+                minHeight: "480px",
+                border: 0,
+                background: "black",
+              }}
+            />
+          ) : (
             <div
               style={{
                 padding: "30px",
@@ -393,11 +211,13 @@ export default function LiveViewerPage() {
                 position: "absolute",
                 top: "18px",
                 left: "18px",
+                zIndex: 2,
                 padding: "9px 15px",
                 color: "white",
                 background: "#dc2626",
                 borderRadius: "999px",
                 fontWeight: "bold",
+                pointerEvents: "none",
               }}
             >
               ● LIVE
@@ -438,9 +258,7 @@ export default function LiveViewerPage() {
 
           <button
             type="button"
-            onClick={() =>
-              void disconnectPlayback(true)
-            }
+            onClick={stopWatching}
             disabled={!connecting && !watching}
             style={{
               ...buttonStyle,
