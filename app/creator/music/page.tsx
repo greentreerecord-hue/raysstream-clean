@@ -27,6 +27,14 @@ type MusicRelease = {
   published: boolean;
 };
 
+type StripeStatus = {
+  connected: boolean;
+  onboardingComplete: boolean;
+  payoutsEnabled: boolean;
+  chargesEnabled: boolean;
+  accountId?: string;
+};
+
 function safePath(value: string) {
   return value
     .trim()
@@ -47,11 +55,25 @@ export default function CreatorMusicPage() {
   const [checkingSession, setCheckingSession] =
     useState(true);
 
+  const [stripeStatus, setStripeStatus] =
+    useState<StripeStatus | null>(null);
+
+  const [checkingStripe, setCheckingStripe] =
+    useState(true);
+
+  const [startingStripe, setStartingStripe] =
+    useState(false);
+
+  const [stripeMessage, setStripeMessage] =
+    useState("");
+
   const [title, setTitle] = useState("");
+
   const [artistName, setArtistName] =
     useState("");
 
   const [genre, setGenre] = useState("Pop");
+
   const [price, setPrice] = useState("0.99");
 
   const [audioFile, setAudioFile] =
@@ -96,6 +118,45 @@ export default function CreatorMusicPage() {
     }
   }
 
+  async function loadStripeStatus() {
+    try {
+      setCheckingStripe(true);
+
+      const response = await fetch(
+        "/api/stripe-connect",
+        {
+          cache: "no-store",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to check payout status."
+        );
+      }
+
+      setStripeStatus(data);
+      setStripeMessage("");
+    } catch (error) {
+      console.error(
+        "Unable to check Stripe status:",
+        error
+      );
+
+      setStripeMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to check payout status."
+      );
+    } finally {
+      setCheckingStripe(false);
+    }
+  }
+
   useEffect(() => {
     async function verifyCreator() {
       try {
@@ -130,7 +191,10 @@ export default function CreatorMusicPage() {
         setCreatorEmail(email);
         setArtistName(name);
 
-        await loadMyReleases();
+        await Promise.all([
+          loadMyReleases(),
+          loadStripeStatus(),
+        ]);
       } catch {
         router.replace("/creator/login");
       } finally {
@@ -140,6 +204,53 @@ export default function CreatorMusicPage() {
 
     verifyCreator();
   }, [router]);
+
+  async function startStripeSetup() {
+    try {
+      setStartingStripe(true);
+      setStripeMessage(
+        "Opening secure Stripe payout setup..."
+      );
+
+      const response = await fetch(
+        "/api/stripe-connect",
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to start Stripe payout setup."
+        );
+      }
+
+      if (!data.url) {
+        throw new Error(
+          "Stripe did not return a setup link."
+        );
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      console.error(
+        "Stripe payout setup error:",
+        error
+      );
+
+      setStripeMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to start Stripe payout setup."
+      );
+
+      setStartingStripe(false);
+    }
+  }
 
   async function submitSong(event: FormEvent) {
     event.preventDefault();
@@ -352,6 +463,11 @@ export default function CreatorMusicPage() {
     );
   }
 
+  const stripeReady =
+    stripeStatus?.onboardingComplete &&
+    stripeStatus?.payoutsEnabled &&
+    stripeStatus?.chargesEnabled;
+
   return (
     <main
       style={{
@@ -398,7 +514,7 @@ export default function CreatorMusicPage() {
         <header
           style={{
             marginTop: "28px",
-                       padding: "28px",
+            padding: "28px",
             textAlign: "center",
             background:
               "linear-gradient(135deg, #581c87, #be123c)",
@@ -428,6 +544,123 @@ export default function CreatorMusicPage() {
             </strong>
           </p>
         </header>
+
+        <section
+          style={{
+            marginTop: "28px",
+            padding: "26px",
+            color: "black",
+            background: "white",
+            border: `4px solid ${
+              stripeReady
+                ? "#22c55e"
+                : "#635bff"
+            }`,
+            borderRadius: "22px",
+          }}
+        >
+          <h2
+            style={{
+              marginTop: 0,
+              fontSize: "30px",
+            }}
+          >
+            💳 Creator Payouts
+          </h2>
+
+          {checkingStripe ? (
+            <p style={{ fontWeight: "bold" }}>
+              Checking Stripe payout status...
+            </p>
+          ) : stripeReady ? (
+            <div
+              style={{
+                padding: "16px",
+                background: "#dcfce7",
+                border: "3px solid #22c55e",
+                borderRadius: "12px",
+                fontWeight: "bold",
+                lineHeight: 1.6,
+              }}
+            >
+              ✓ Stripe payouts are ready. You can
+              receive your 60% creator share from
+              eligible music sales.
+            </div>
+          ) : (
+            <>
+              <p
+                style={{
+                  fontSize: "18px",
+                  lineHeight: 1.6,
+                }}
+              >
+                Connect a Stripe account to receive
+                payouts when customers purchase your
+                music.
+              </p>
+
+              <div
+                style={{
+                  marginBottom: "18px",
+                  padding: "16px",
+                  background: "#fef3c7",
+                  border: "3px solid #f59e0b",
+                  borderRadius: "12px",
+                  lineHeight: 1.6,
+                }}
+              >
+                <strong>Music sales split:</strong>
+                <br />
+                Creator receives 60%.
+                <br />
+                Ray&apos;sStream receives a 40%
+                platform administration fee.
+                <br />
+                Stripe processing fees may also
+                apply.
+              </div>
+
+              <button
+                type="button"
+                disabled={startingStripe}
+                onClick={startStripeSetup}
+                style={{
+                  ...buttonStyle,
+                  width: "100%",
+                  color: "white",
+                  background: startingStripe
+                    ? "#9ca3af"
+                    : "#635bff",
+                  cursor: startingStripe
+                    ? "not-allowed"
+                    : "pointer",
+                }}
+              >
+                {startingStripe
+                  ? "Opening Stripe..."
+                  : stripeStatus?.connected
+                    ? "Continue Stripe Payout Setup"
+                    : "Connect Stripe for Payouts"}
+              </button>
+            </>
+          )}
+
+          {stripeMessage && (
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "14px",
+                background: "#e0f2fe",
+                border: "3px solid #0284c7",
+                borderRadius: "12px",
+                fontWeight: "bold",
+              }}
+            >
+              {stripeMessage}
+            </div>
+          )}
+        </section>
 
         <section
           style={{
@@ -606,8 +839,8 @@ export default function CreatorMusicPage() {
                 I confirm that I own or have
                 permission to use and sell the
                 recording, composition, artwork,
-                beats, and samples included in
-                this release.
+                beats, and samples included in this
+                release.
               </span>
             </label>
 
@@ -671,8 +904,7 @@ export default function CreatorMusicPage() {
 
           {releases.length === 0 ? (
             <p>
-              You have not submitted any songs
-              yet.
+              You have not submitted any songs yet.
             </p>
           ) : (
             <div
