@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       body,
 
       onBeforeGenerateToken: async (pathname) => {
-        if (!pathname.startsWith(creatorFolder)) {
+        if (!pathname.startsWith("music/")) {
           throw new Error(
             "Invalid music upload folder."
           );
