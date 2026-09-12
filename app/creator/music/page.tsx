@@ -5,6 +5,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { upload } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 
 type CreatorSessionResponse = {
@@ -13,6 +14,26 @@ type CreatorSessionResponse = {
     email?: string;
   };
 };
+
+type MusicRelease = {
+  id: number;
+  artistName: string;
+  title: string;
+  genre: string;
+  priceCents: number;
+  audioUrl: string;
+  coverUrl: string;
+  reviewStatus: string;
+  published: boolean;
+};
+
+function safePath(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 export default function CreatorMusicPage() {
   const router = useRouter();
@@ -42,7 +63,38 @@ export default function CreatorMusicPage() {
   const [ownsRights, setOwnsRights] =
     useState(false);
 
+  const [uploading, setUploading] =
+    useState(false);
+
   const [message, setMessage] = useState("");
+
+  const [releases, setReleases] =
+    useState<MusicRelease[]>([]);
+
+  async function loadMyReleases() {
+    try {
+      const response = await fetch(
+        "/api/music?mine=true",
+        {
+          cache: "no-store",
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+
+      setReleases(data.songs || []);
+    } catch (error) {
+      console.error(
+        "Unable to load music releases:",
+        error
+      );
+    }
+  }
 
   useEffect(() => {
     async function verifyCreator() {
@@ -77,6 +129,8 @@ export default function CreatorMusicPage() {
         setCreatorName(name);
         setCreatorEmail(email);
         setArtistName(name);
+
+        await loadMyReleases();
       } catch {
         router.replace("/creator/login");
       } finally {
@@ -87,7 +141,7 @@ export default function CreatorMusicPage() {
     verifyCreator();
   }, [router]);
 
-  function prepareUpload(event: FormEvent) {
+  async function submitSong(event: FormEvent) {
     event.preventDefault();
 
     if (!title.trim()) {
@@ -110,12 +164,12 @@ export default function CreatorMusicPage() {
       return;
     }
 
-    const songPrice = Number(price);
+    const priceNumber = Number(price);
 
     if (
-      !Number.isFinite(songPrice) ||
-      songPrice < 0.5 ||
-      songPrice > 100
+      !Number.isFinite(priceNumber) ||
+      priceNumber < 0.5 ||
+      priceNumber > 100
     ) {
       setMessage(
         "Enter a price between $0.50 and $100.00."
@@ -130,14 +184,136 @@ export default function CreatorMusicPage() {
       return;
     }
 
-    setMessage(
-      "Song information is ready. Secure music storage and database saving are the next step."
-    );
+    try {
+      setUploading(true);
+      setMessage("Uploading song audio...");
+
+      const emailPath =
+        safePath(creatorEmail);
+
+      const timestamp = Date.now();
+
+      const audioName =
+        safePath(audioFile.name) ||
+        "song-audio";
+
+      const coverName =
+        safePath(coverFile.name) ||
+        "cover-artwork";
+
+      const audioBlob = await upload(
+        `music/${emailPath}/${timestamp}-${audioName}`,
+        audioFile,
+        {
+          access: "public",
+          handleUploadUrl:
+            "/api/music-upload",
+        }
+      );
+
+      setMessage("Uploading cover artwork...");
+
+      const coverBlob = await upload(
+        `music/${emailPath}/${timestamp}-${coverName}`,
+        coverFile,
+        {
+          access: "public",
+          handleUploadUrl:
+            "/api/music-upload",
+        }
+      );
+
+      setMessage(
+        "Saving song information..."
+      );
+
+      const saveResponse = await fetch(
+        "/api/music",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            title: title.trim(),
+            artistName:
+              artistName.trim(),
+            genre,
+            priceCents: Math.round(
+              priceNumber * 100
+            ),
+            audioUrl: audioBlob.url,
+            audioPathname:
+              audioBlob.pathname,
+            coverUrl: coverBlob.url,
+            coverPathname:
+              coverBlob.pathname,
+            rightsConfirmed: true,
+          }),
+        }
+      );
+
+      const saveData =
+        await saveResponse.json();
+
+      if (!saveResponse.ok) {
+        throw new Error(
+          saveData.error ||
+            "Unable to save the song."
+        );
+      }
+
+      setMessage(
+        "Song uploaded successfully and submitted for administrator review."
+      );
+
+      setTitle("");
+      setPrice("0.99");
+      setAudioFile(null);
+      setCoverFile(null);
+      setOwnsRights(false);
+
+      const audioInput =
+        document.getElementById(
+          "music-audio-file"
+        ) as HTMLInputElement | null;
+
+      const coverInput =
+        document.getElementById(
+          "music-cover-file"
+        ) as HTMLInputElement | null;
+
+      if (audioInput) {
+        audioInput.value = "";
+      }
+
+      if (coverInput) {
+        coverInput.value = "";
+      }
+
+      await loadMyReleases();
+    } catch (error) {
+      console.error(
+        "Music upload error:",
+        error
+      );
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to upload the song."
+      );
+    } finally {
+      setUploading(false);
+    }
   }
 
   const inputStyle = {
     width: "100%",
     boxSizing: "border-box" as const,
+    marginTop: "8px",
     padding: "13px",
     border: "3px solid black",
     borderRadius: "11px",
@@ -222,7 +398,7 @@ export default function CreatorMusicPage() {
         <header
           style={{
             marginTop: "28px",
-            padding: "28px",
+                       padding: "28px",
             textAlign: "center",
             background:
               "linear-gradient(135deg, #581c87, #be123c)",
@@ -272,18 +448,7 @@ export default function CreatorMusicPage() {
             Add a New Song
           </h2>
 
-          <p
-            style={{
-              color: "#4b5563",
-              lineHeight: 1.5,
-            }}
-          >
-            Add the song information, audio,
-            artwork, price, and rights
-            confirmation.
-          </p>
-
-          <form onSubmit={prepareUpload}>
+          <form onSubmit={submitSong}>
             <div
               style={{
                 display: "grid",
@@ -293,33 +458,28 @@ export default function CreatorMusicPage() {
               }}
             >
               <label
-                style={{
-                  fontWeight: "bold",
-                }}
+                style={{ fontWeight: "bold" }}
               >
                 Song title
                 <input
                   value={title}
+                  disabled={uploading}
                   onChange={(event) =>
                     setTitle(event.target.value)
                   }
                   placeholder="Enter song title"
                   maxLength={200}
-                  style={{
-                    ...inputStyle,
-                    marginTop: "8px",
-                  }}
+                  style={inputStyle}
                 />
               </label>
 
               <label
-                style={{
-                  fontWeight: "bold",
-                }}
+                style={{ fontWeight: "bold" }}
               >
                 Artist name
                 <input
                   value={artistName}
+                  disabled={uploading}
                   onChange={(event) =>
                     setArtistName(
                       event.target.value
@@ -327,28 +487,21 @@ export default function CreatorMusicPage() {
                   }
                   placeholder="Enter artist name"
                   maxLength={150}
-                  style={{
-                    ...inputStyle,
-                    marginTop: "8px",
-                  }}
+                  style={inputStyle}
                 />
               </label>
 
               <label
-                style={{
-                  fontWeight: "bold",
-                }}
+                style={{ fontWeight: "bold" }}
               >
                 Genre
                 <select
                   value={genre}
+                  disabled={uploading}
                   onChange={(event) =>
                     setGenre(event.target.value)
                   }
-                  style={{
-                    ...inputStyle,
-                    marginTop: "8px",
-                  }}
+                  style={inputStyle}
                 >
                   <option>Pop</option>
                   <option>Rock</option>
@@ -363,68 +516,58 @@ export default function CreatorMusicPage() {
               </label>
 
               <label
-                style={{
-                  fontWeight: "bold",
-                }}
+                style={{ fontWeight: "bold" }}
               >
                 Song price
                 <input
                   type="number"
                   value={price}
+                  disabled={uploading}
                   onChange={(event) =>
                     setPrice(event.target.value)
                   }
                   min="0.50"
                   max="100"
                   step="0.01"
-                  style={{
-                    ...inputStyle,
-                    marginTop: "8px",
-                  }}
+                  style={inputStyle}
                 />
               </label>
 
               <label
-                style={{
-                  fontWeight: "bold",
-                }}
+                style={{ fontWeight: "bold" }}
               >
                 Song audio
                 <input
+                  id="music-audio-file"
                   type="file"
                   accept=".mp3,.wav,.m4a,audio/*"
+                  disabled={uploading}
                   onChange={(event) =>
                     setAudioFile(
                       event.target.files?.[0] ||
                         null
                     )
                   }
-                  style={{
-                    ...inputStyle,
-                    marginTop: "8px",
-                  }}
+                  style={inputStyle}
                 />
               </label>
 
               <label
-                style={{
-                  fontWeight: "bold",
-                }}
+                style={{ fontWeight: "bold" }}
               >
                 Cover artwork
                 <input
+                  id="music-cover-file"
                   type="file"
                   accept=".jpg,.jpeg,.png,.webp,image/*"
+                  disabled={uploading}
                   onChange={(event) =>
                     setCoverFile(
                       event.target.files?.[0] ||
                         null
                     )
                   }
-                  style={{
-                    ...inputStyle,
-                    marginTop: "8px",
-                  }}
+                  style={inputStyle}
                 />
               </label>
             </div>
@@ -446,6 +589,7 @@ export default function CreatorMusicPage() {
               <input
                 type="checkbox"
                 checked={ownsRights}
+                disabled={uploading}
                 onChange={(event) =>
                   setOwnsRights(
                     event.target.checked
@@ -469,15 +613,23 @@ export default function CreatorMusicPage() {
 
             <button
               type="submit"
+              disabled={uploading}
               style={{
                 ...buttonStyle,
                 width: "100%",
                 marginTop: "22px",
                 color: "black",
-                background: "#22c55e",
+                background: uploading
+                  ? "#9ca3af"
+                  : "#22c55e",
+                cursor: uploading
+                  ? "not-allowed"
+                  : "pointer",
               }}
             >
-              Prepare Song Upload
+              {uploading
+                ? "Uploading Song..."
+                : "Upload Song for Review"}
             </button>
           </form>
 
@@ -501,60 +653,110 @@ export default function CreatorMusicPage() {
         <section
           style={{
             marginTop: "28px",
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "18px",
+            padding: "26px",
+            color: "black",
+            background: "white",
+            border: "4px solid #7c3aed",
+            borderRadius: "22px",
           }}
         >
-          {[
-            {
-              icon: "🎵",
-              title: "My Releases",
-              text: "Edit, publish, or remove your songs and albums.",
-            },
-            {
-              icon: "💵",
-              title: "Sales & Earnings",
-              text: "Track purchases, platform fees, and creator earnings.",
-            },
-            {
-              icon: "🏦",
-              title: "Payout Setup",
-              text: "Connect your secure Stripe seller account.",
-            },
-          ].map((item) => (
-            <article
-              key={item.title}
+          <h2
+            style={{
+              marginTop: 0,
+              fontSize: "30px",
+            }}
+          >
+            My Music Releases
+          </h2>
+
+          {releases.length === 0 ? (
+            <p>
+              You have not submitted any songs
+              yet.
+            </p>
+          ) : (
+            <div
               style={{
-                padding: "22px",
-                color: "black",
-                background: "white",
-                border: "4px solid #7c3aed",
-                borderRadius: "18px",
-                textAlign: "center",
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "18px",
               }}
             >
-              <div
-                style={{
-                  fontSize: "46px",
-                }}
-              >
-                {item.icon}
-              </div>
+              {releases.map((release) => (
+                <article
+                  key={release.id}
+                  style={{
+                    overflow: "hidden",
+                    border: "3px solid black",
+                    borderRadius: "16px",
+                    background: "#f3f4f6",
+                  }}
+                >
+                  <img
+                    src={release.coverUrl}
+                    alt={`${release.title} cover`}
+                    style={{
+                      width: "100%",
+                      aspectRatio: "1 / 1",
+                      objectFit: "cover",
+                      background: "#111827",
+                    }}
+                  />
 
-              <h3>{item.title}</h3>
+                  <div style={{ padding: "16px" }}>
+                    <h3
+                      style={{
+                        margin: "0 0 6px",
+                      }}
+                    >
+                      {release.title}
+                    </h3>
 
-              <p
-                style={{
-                  color: "#4b5563",
-                  lineHeight: 1.5,
-                }}
-              >
-                {item.text}
-              </p>
-            </article>
-          ))}
+                    <p
+                      style={{
+                        margin: "0 0 6px",
+                      }}
+                    >
+                      {release.artistName}
+                    </p>
+
+                    <p>
+                      {release.genre} · $
+                      {(
+                        release.priceCents / 100
+                      ).toFixed(2)}
+                    </p>
+
+                    <audio
+                      src={release.audioUrl}
+                      controls
+                      preload="none"
+                      style={{ width: "100%" }}
+                    />
+
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        padding: "10px",
+                        background:
+                          release.reviewStatus ===
+                          "approved"
+                            ? "#dcfce7"
+                            : "#fef3c7",
+                        borderRadius: "10px",
+                        fontWeight: "bold",
+                        textAlign: "center",
+                      }}
+                    >
+                      Status:{" "}
+                      {release.reviewStatus}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>
