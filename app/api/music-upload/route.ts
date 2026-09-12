@@ -1,4 +1,7 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import {
+  handleUpload,
+  type HandleUploadBody,
+} from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -14,22 +17,36 @@ const allowedContentTypes = [
   "image/webp",
 ];
 
-function safeEmail(value: string) {
-  return value
+function safeEmail(email: string) {
+  return email
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9@._-]/g, "")
-    .replace(/@/g, "-at-");
+    .replace(/[^a-z0-9@._-]/g, "-");
 }
 
 export async function POST(request: Request) {
   try {
+    const blobToken =
+      process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN;
+
+    if (!blobToken) {
+      return NextResponse.json(
+        {
+          error:
+            "RAYSSTREAM_VIDEO_READ_WRITE_TOKEN is missing.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const cookie = request.headers.get("cookie") ?? "";
+
     const sessionResponse = await fetch(
       new URL("/api/creator-session", request.url),
       {
         method: "GET",
         headers: {
-          cookie: request.headers.get("cookie") || "",
+          cookie,
         },
         cache: "no-store",
       }
@@ -37,7 +54,7 @@ export async function POST(request: Request) {
 
     if (!sessionResponse.ok) {
       return NextResponse.json(
-        { error: "Creator login required. Please log in again." },
+        { error: "Creator login required." },
         { status: 401 }
       );
     }
@@ -45,9 +62,9 @@ export async function POST(request: Request) {
     const session = await sessionResponse.json();
 
     const creatorEmail = String(
-      session.email ||
-        session.creatorEmail ||
-        session.creator?.email ||
+      session.email ??
+        session.creatorEmail ??
+        session.creator?.email ??
         ""
     )
       .trim()
@@ -55,21 +72,30 @@ export async function POST(request: Request) {
 
     if (!creatorEmail) {
       return NextResponse.json(
-        { error: "Creator session email was not found. Please log in again." },
+        {
+          error:
+            "Creator session email was not found. Please log in again.",
+        },
         { status: 401 }
       );
     }
 
-    const body = (await request.json()) as HandleUploadBody;
-    const creatorFolder = `music/${safeEmail(creatorEmail)}/`;
+    const body =
+      (await request.json()) as HandleUploadBody;
+
+    const creatorFolder =
+      `music/${safeEmail(creatorEmail)}/`;
 
     const result = await handleUpload({
+      token: blobToken,
       request,
       body,
 
       onBeforeGenerateToken: async (pathname) => {
         if (!pathname.startsWith(creatorFolder)) {
-          throw new Error("Invalid music upload folder.");
+          throw new Error(
+            "Invalid music upload folder."
+          );
         }
 
         return {
@@ -82,18 +108,20 @@ export async function POST(request: Request) {
         };
       },
 
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        console.log("Music file uploaded:", {
-          url: blob.url,
-          pathname: blob.pathname,
-          tokenPayload,
-        });
+      onUploadCompleted: async ({ blob }) => {
+        console.log(
+          "Music file uploaded:",
+          blob.pathname
+        );
       },
     });
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Music upload token error:", error);
+    console.error(
+      "Music upload token error:",
+      error
+    );
 
     return NextResponse.json(
       {
