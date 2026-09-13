@@ -15,6 +15,7 @@ type PurchasedSong = {
 };
 
 type PurchaseData = {
+  sessionId: string;
   paid: boolean;
   buyerEmail: string;
   amountTotalCents: number;
@@ -71,6 +72,7 @@ export default function MusicPurchaseSuccessPage() {
         }
 
         setPurchase(data);
+
         setMessage(
           "Payment confirmed. Thank you for supporting this artist!"
         );
@@ -114,8 +116,7 @@ export default function MusicPurchaseSuccessPage() {
             textAlign: "center",
             background:
               "linear-gradient(135deg, #1664ff, #5922a8)",
-            border:
-              "4px solid white",
+            border: "4px solid white",
             borderRadius: "22px",
           }}
         >
@@ -270,12 +271,10 @@ export default function MusicPurchaseSuccessPage() {
               />
 
               <a
-                href={
-                  purchase.song.audioUrl
-                }
+                href={`/api/music-download?session_id=${encodeURIComponent(
+                  purchase.sessionId
+                )}`}
                 download
-                target="_blank"
-                rel="noopener noreferrer"
                 style={{
                   display: "block",
                   width: "100%",
