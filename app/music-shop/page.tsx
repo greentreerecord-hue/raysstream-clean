@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 type ApiSong = {
   id: number;
@@ -27,10 +31,21 @@ type Song = {
 };
 
 export default function MusicShopPage() {
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [search, setSearch] = useState("");
-  const [genre, setGenre] = useState("All");
-  const [loading, setLoading] = useState(true);
+  const [songs, setSongs] =
+    useState<Song[]>([]);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [genre, setGenre] =
+    useState("All");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [buyingSongId, setBuyingSongId] =
+    useState<number | null>(null);
+
   const [message, setMessage] = useState(
     "Loading approved music..."
   );
@@ -43,16 +58,20 @@ export default function MusicShopPage() {
     try {
       setLoading(true);
 
-      const response = await fetch("/api/music", {
-        method: "GET",
-        cache: "no-store",
-      });
+      const response = await fetch(
+        "/api/music",
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error ?? "Unable to load the music catalog."
+          data.error ??
+            "Unable to load the music catalog."
         );
       }
 
@@ -60,34 +79,48 @@ export default function MusicShopPage() {
         data.songs ?? []
       ).map((song: ApiSong) => ({
         id: Number(song.id),
-        title: String(song.title ?? "Untitled Song"),
+        title: String(
+          song.title ?? "Untitled Song"
+        ),
         artistName: String(
           song.artist_name ??
             song.artistName ??
             "Ray’sStream Creator"
         ),
-        genre: String(song.genre ?? "Other"),
+        genre: String(
+          song.genre ?? "Other"
+        ),
         priceCents: Number(
-          song.price_cents ?? song.priceCents ?? 0
+          song.price_cents ??
+            song.priceCents ??
+            0
         ),
         audioUrl: String(
-          song.audio_url ?? song.audioUrl ?? ""
+          song.audio_url ??
+            song.audioUrl ??
+            ""
         ),
         coverUrl: String(
-          song.cover_url ?? song.coverUrl ?? ""
+          song.cover_url ??
+            song.coverUrl ??
+            ""
         ),
       }));
 
       setSongs(approvedSongs);
+
       setMessage(
         approvedSongs.length
           ? `${approvedSongs.length} published song${
-              approvedSongs.length === 1 ? "" : "s"
+              approvedSongs.length === 1
+                ? ""
+                : "s"
             } available.`
           : "No approved songs are available yet."
       );
     } catch (error) {
       setSongs([]);
+
       setMessage(
         error instanceof Error
           ? error.message
@@ -98,28 +131,92 @@ export default function MusicShopPage() {
     }
   }
 
+  async function buySong(song: Song) {
+    try {
+      setBuyingSongId(song.id);
+
+      setMessage(
+        `Opening secure checkout for ${song.title}...`
+      );
+
+      const response = await fetch(
+        "/api/music-checkout",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            releaseId: song.id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ??
+            "Unable to start music checkout."
+        );
+      }
+
+      if (!data.url) {
+        throw new Error(
+          "Stripe did not return a checkout link."
+        );
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      console.error(
+        "Music checkout error:",
+        error
+      );
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to start music checkout."
+      );
+
+      setBuyingSongId(null);
+    }
+  }
+
   const genres = useMemo(() => {
     return [
       "All",
       ...Array.from(
-        new Set(songs.map((song) => song.genre))
+        new Set(
+          songs.map((song) => song.genre)
+        )
       ).sort(),
     ];
   }, [songs]);
 
   const filteredSongs = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query =
+      search.trim().toLowerCase();
 
     return songs.filter((song) => {
       const matchesSearch =
         !query ||
-        song.title.toLowerCase().includes(query) ||
-        song.artistName.toLowerCase().includes(query);
+        song.title
+          .toLowerCase()
+          .includes(query) ||
+        song.artistName
+          .toLowerCase()
+          .includes(query);
 
       const matchesGenre =
-        genre === "All" || song.genre === genre;
+        genre === "All" ||
+        song.genre === genre;
 
-      return matchesSearch && matchesGenre;
+      return (
+        matchesSearch && matchesGenre
+      );
     });
   }, [songs, search, genre]);
 
@@ -127,7 +224,10 @@ export default function MusicShopPage() {
     <main style={styles.page}>
       <div style={styles.container}>
         <nav style={styles.navigation}>
-          <a href="/" style={styles.homeLink}>
+          <a
+            href="/"
+            style={styles.homeLink}
+          >
             ← Ray’sStream Home
           </a>
 
@@ -140,7 +240,9 @@ export default function MusicShopPage() {
         </nav>
 
         <header style={styles.hero}>
-          <div style={styles.musicNote}>♫</div>
+          <div style={styles.musicNote}>
+            ♫
+          </div>
 
           <div>
             <h1 style={styles.heading}>
@@ -148,8 +250,9 @@ export default function MusicShopPage() {
             </h1>
 
             <p style={styles.subtitle}>
-              Discover music, support artists, and
-              purchase songs directly from Ray’sStream
+              Discover music, support
+              artists, and purchase songs
+              directly from Ray’sStream
               creators.
             </p>
           </div>
@@ -165,7 +268,9 @@ export default function MusicShopPage() {
               type="search"
               value={search}
               onChange={(event) =>
-                setSearch(event.target.value)
+                setSearch(
+                  event.target.value
+                )
               }
               placeholder="Search by song or artist"
               style={styles.searchInput}
@@ -174,7 +279,9 @@ export default function MusicShopPage() {
             <select
               value={genre}
               onChange={(event) =>
-                setGenre(event.target.value)
+                setGenre(
+                  event.target.value
+                )
               }
               style={styles.select}
             >
@@ -189,7 +296,9 @@ export default function MusicShopPage() {
             </select>
           </div>
 
-          <p style={styles.message}>{message}</p>
+          <p style={styles.message}>
+            {message}
+          </p>
         </section>
 
         <section>
@@ -201,6 +310,9 @@ export default function MusicShopPage() {
             <button
               type="button"
               onClick={loadSongs}
+              disabled={
+                buyingSongId !== null
+              }
               style={styles.refreshButton}
             >
               Refresh Catalog
@@ -211,87 +323,158 @@ export default function MusicShopPage() {
             <div style={styles.empty}>
               Loading music...
             </div>
-          ) : filteredSongs.length === 0 ? (
+          ) : filteredSongs.length ===
+            0 ? (
             <div style={styles.empty}>
-              <div style={styles.headphones}>🎧</div>
+              <div
+                style={styles.headphones}
+              >
+                🎧
+              </div>
 
-              <h3>No matching songs found</h3>
+              <h3>
+                No matching songs found
+              </h3>
 
               <p>
-                Try a different search or genre.
+                Try a different search or
+                genre.
               </p>
             </div>
           ) : (
             <div style={styles.grid}>
-              {filteredSongs.map((song) => (
-                <article
-                  key={song.id}
-                  style={styles.card}
-                >
-                  {song.coverUrl ? (
-                    <img
-                      src={song.coverUrl}
-                      alt={`${song.title} cover artwork`}
-                      style={styles.cover}
-                    />
-                  ) : (
-                    <div style={styles.coverPlaceholder}>
-                      🎵
-                    </div>
-                  )}
+              {filteredSongs.map(
+                (song) => {
+                  const isBuying =
+                    buyingSongId === song.id;
 
-                  <div style={styles.cardBody}>
-                    <span style={styles.genre}>
-                      {song.genre}
-                    </span>
+                  const anotherCheckout =
+                    buyingSongId !== null &&
+                    !isBuying;
 
-                    <h3 style={styles.songTitle}>
-                      {song.title}
-                    </h3>
+                  return (
+                    <article
+                      key={song.id}
+                      style={styles.card}
+                    >
+                      {song.coverUrl ? (
+                        <img
+                          src={song.coverUrl}
+                          alt={`${song.title} cover artwork`}
+                          style={styles.cover}
+                        />
+                      ) : (
+                        <div
+                          style={
+                            styles.coverPlaceholder
+                          }
+                        >
+                          🎵
+                        </div>
+                      )}
 
-                    <p style={styles.artist}>
-                      {song.artistName}
-                    </p>
-
-                    {song.audioUrl && (
-                      <audio
-                        controls
-                        preload="metadata"
-                        src={song.audioUrl}
-                        style={styles.audio}
-                      />
-                    )}
-
-                    <div style={styles.purchaseRow}>
-                      <strong style={styles.price}>
-                        $
-                        {(
-                          song.priceCents / 100
-                        ).toFixed(2)}
-                      </strong>
-
-                      <button
-                        type="button"
-                        disabled
-                        title="Secure purchases are coming next."
-                        style={styles.buyButton}
+                      <div
+                        style={styles.cardBody}
                       >
-                        Purchases Coming Soon
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                        <span
+                          style={styles.genre}
+                        >
+                          {song.genre}
+                        </span>
+
+                        <h3
+                          style={
+                            styles.songTitle
+                          }
+                        >
+                          {song.title}
+                        </h3>
+
+                        <p
+                          style={styles.artist}
+                        >
+                          {song.artistName}
+                        </p>
+
+                        {song.audioUrl && (
+                          <audio
+                            controls
+                            preload="metadata"
+                            src={song.audioUrl}
+                            style={styles.audio}
+                          />
+                        )}
+
+                        <div
+                          style={
+                            styles.purchaseRow
+                          }
+                        >
+                          <strong
+                            style={styles.price}
+                          >
+                            $
+                            {(
+                              song.priceCents /
+                              100
+                            ).toFixed(2)}
+                          </strong>
+
+                          <button
+                            type="button"
+                            disabled={
+                              isBuying ||
+                              anotherCheckout
+                            }
+                            onClick={() =>
+                              buySong(song)
+                            }
+                            style={{
+                              ...styles.buyButton,
+                              background:
+                                isBuying ||
+                                anotherCheckout
+                                  ? "#9ca3af"
+                                  : "#22c55e",
+                              cursor:
+                                isBuying ||
+                                anotherCheckout
+                                  ? "not-allowed"
+                                  : "pointer",
+                            }}
+                          >
+                            {isBuying
+                              ? "Opening Secure Checkout..."
+                              : "Buy Song"}
+                          </button>
+                        </div>
+
+                        <p
+                          style={
+                            styles.secureMessage
+                          }
+                        >
+                          🔒 Secure checkout
+                          powered by Stripe
+                        </p>
+                      </div>
+                    </article>
+                  );
+                }
+              )}
             </div>
           )}
         </section>
 
         <section style={styles.sellerPanel}>
-          <h2>Sell Your Music on Ray’sStream</h2>
+          <h2>
+            Sell Your Music on Ray’sStream
+          </h2>
 
           <p>
-            Approved creators can upload original music,
-            artwork, prices, and rights information for
+            Approved creators can upload
+            original music, artwork, prices,
+            and rights information for
             administrator review.
           </p>
 
@@ -311,7 +494,10 @@ export default function MusicShopPage() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<
+  string,
+  React.CSSProperties
+> = {
   page: {
     minHeight: "100vh",
     padding: "26px 18px 50px",
@@ -355,18 +541,21 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 22,
     textAlign: "center",
     padding: "30px 18px",
-    borderBottom: "4px solid #ff8a00",
+    borderBottom:
+      "4px solid #ff8a00",
     background:
       "radial-gradient(circle, #27135f, transparent 70%)",
   },
   musicNote: {
     color: "#1664ff",
-    fontSize: "clamp(60px, 10vw, 110px)",
+    fontSize:
+      "clamp(60px, 10vw, 110px)",
     fontWeight: 900,
   },
   heading: {
     margin: 0,
-    fontSize: "clamp(38px, 7vw, 72px)",
+    fontSize:
+      "clamp(38px, 7vw, 72px)",
   },
   subtitle: {
     maxWidth: 760,
@@ -416,7 +605,8 @@ const styles: Record<string, React.CSSProperties> = {
   catalogHeader: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     gap: 14,
     flexWrap: "wrap",
   },
@@ -445,7 +635,8 @@ const styles: Record<string, React.CSSProperties> = {
     background: "white",
     border: "4px solid #ff8a00",
     borderRadius: 22,
-    boxShadow: "0 14px 35px rgba(0,0,0,.35)",
+    boxShadow:
+      "0 14px 35px rgba(0,0,0,.35)",
   },
   cover: {
     display: "block",
@@ -503,11 +694,17 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     minWidth: 170,
     padding: 12,
-    color: "#333",
-    background: "#d9d9d9",
+    color: "#111",
     border: "3px solid #111",
     borderRadius: 12,
     fontWeight: 900,
+  },
+  secureMessage: {
+    margin: "12px 0 0",
+    textAlign: "center",
+    color: "#374151",
+    fontSize: 13,
+    fontWeight: 700,
   },
   empty: {
     padding: 35,
