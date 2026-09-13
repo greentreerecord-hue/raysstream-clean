@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import postgres from "postgres";
-import Stripe from "stripe"; 
+import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -37,44 +37,67 @@ async function ensureConnectColumn() {
   `;
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request
+) {
   try {
     await ensureConnectColumn();
 
+    const stripeSecretKey =
+      process.env.STRIPE_SECRET_KEY;
+
+    if (!stripeSecretKey) {
+      throw new Error(
+        "STRIPE_SECRET_KEY is missing"
+      );
+    }
+
     const body = await request.json();
-    const releaseId = Number(body.releaseId);
+
+    const releaseId = Number(
+      body.releaseId
+    );
 
     if (
       !Number.isInteger(releaseId) ||
       releaseId < 1
     ) {
       return NextResponse.json(
-        { error: "A valid music release is required." },
+        {
+          error:
+            "A valid music release is required.",
+        },
         { status: 400 }
       );
     }
 
-    const rows = await sql<MusicRelease[]>`
-      SELECT
-        music_releases.id,
-        music_releases.creator_email,
-        music_releases.title,
-        music_releases.artist_name,
-        music_releases.genre,
-        music_releases.price_cents,
-        music_releases.audio_url,
-        music_releases.cover_url,
-        creators.stripe_account_id
-      FROM music_releases
-      LEFT JOIN creators
-        ON LOWER(creators.email) =
-           LOWER(music_releases.creator_email)
-      WHERE
-        music_releases.id = ${releaseId}
-        AND music_releases.review_status = 'approved'
-        AND music_releases.published = TRUE
-      LIMIT 1
-    `;
+    const rows =
+      await sql<MusicRelease[]>`
+        SELECT
+          music_releases.id,
+          music_releases.creator_email,
+          music_releases.title,
+          music_releases.artist_name,
+          music_releases.genre,
+          music_releases.price_cents,
+          music_releases.audio_url,
+          music_releases.cover_url,
+          creators.stripe_account_id
+        FROM music_releases
+        LEFT JOIN creators
+          ON LOWER(creators.email) =
+             LOWER(
+               music_releases.creator_email
+             )
+        WHERE
+          music_releases.id =
+            ${releaseId}
+          AND music_releases.review_status =
+            'approved'
+          AND music_releases.published =
+            TRUE
+        LIMIT 1
+      `;
 
     const release = rows[0];
 
@@ -107,38 +130,51 @@ export async function POST(request: Request) {
       priceCents < 50
     ) {
       return NextResponse.json(
-        { error: "The song price is invalid." },
+        {
+          error:
+            "The song price is invalid.",
+        },
         { status: 400 }
       );
     }
 
-    const platformFeeCents = Math.round(
-      priceCents * 0.4
-    );
+    const platformFeeCents =
+      Math.round(priceCents * 0.4);
+
+    const creatorShareCents =
+      priceCents - platformFeeCents;
 
     const origin =
       process.env.NEXT_PUBLIC_SITE_URL ??
       new URL(request.url).origin;
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string) ;
+    const stripe = new Stripe(
+      stripeSecretKey
+    );
 
     const session =
       await stripe.checkout.sessions.create({
         mode: "payment",
-        payment_method_types: ["card"],
+
+        payment_method_types: [
+          "card",
+        ],
 
         line_items: [
           {
             quantity: 1,
             price_data: {
               currency: "usd",
-              unit_amount: priceCents,
+              unit_amount:
+                priceCents,
               product_data: {
                 name: release.title,
                 description:
                   `${release.artist_name} · ${release.genre}`,
                 images: release.cover_url
-                  ? [release.cover_url]
+                  ? [
+                      release.cover_url,
+                    ]
                   : [],
               },
             },
@@ -148,31 +184,42 @@ export async function POST(request: Request) {
         payment_intent_data: {
           application_fee_amount:
             platformFeeCents,
+
           transfer_data: {
             destination:
               release.stripe_account_id,
           },
+
           metadata: {
-            purchase_type: "music",
-            release_id: String(release.id),
+            purchase_type:
+              "music",
+            release_id: String(
+              release.id
+            ),
             creator_email:
               release.creator_email,
-            platform_fee_percent: "40",
-            creator_share_percent: "60",
+            platform_fee_percent:
+              "40",
+            creator_share_percent:
+              "60",
           },
         },
 
         metadata: {
           purchase_type: "music",
-          release_id: String(release.id),
+          release_id: String(
+            release.id
+          ),
           creator_email:
             release.creator_email,
-          platform_fee_percent: "40",
-          creator_share_percent: "60",
+          platform_fee_percent:
+            "40",
+          creator_share_percent:
+            "60",
         },
 
         success_url:
-          `${origin}/music-shop?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
+          `${origin}/music-purchase/success?session_id={CHECKOUT_SESSION_ID}`,
 
         cancel_url:
           `${origin}/music-shop?purchase=cancelled`,
@@ -187,8 +234,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       url: session.url,
       platformFeeCents,
-      creatorShareCents:
-        priceCents - platformFeeCents,
+      creatorShareCents,
     });
   } catch (error) {
     console.error(
