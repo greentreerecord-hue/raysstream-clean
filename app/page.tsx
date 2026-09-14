@@ -670,7 +670,9 @@ export default function Home() {
 
           <a href="/admin" style={linkStyle}>
             Admin Dashboard
-          </a>
+          </a><a href="/admin/music" style={linkStyle}>
+  Music Approvals
+</a> 
 
           <a
             href="https://buy.stripe.com/fZu6oH08q6VV3Zw5TP2Nq02"
