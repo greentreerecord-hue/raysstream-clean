@@ -668,7 +668,7 @@ export default function Home() {
             Creator Dashboard
           </a>
 
-          <a href="/admin/login" style={linkStyle}>
+          <a href="/admin" style={linkStyle}>
             Admin Dashboard
           </a>
 
