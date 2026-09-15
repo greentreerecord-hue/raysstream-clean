@@ -373,17 +373,7 @@ export async function PATCH(request: Request) {
         WHERE LOWER(creator_email) = ${oldEmail}
       `;
 
-      await transaction`
-        UPDATE live_creator_subscriptions
-        SET creator_email = ${newEmail}
-        WHERE LOWER(creator_email) = ${oldEmail}
-      `;
-
-      await transaction`
-        UPDATE creator_subscriptions
-        SET channel_id = MD5(${newEmail})
-        WHERE channel_id = MD5(${oldEmail})
-      `;
+      
 
       await transaction`
         UPDATE creators
