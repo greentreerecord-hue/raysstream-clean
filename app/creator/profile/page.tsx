@@ -394,6 +394,25 @@ export default function CreatorProfilePage() {
                   >
                     {profile.email}
                   </p>
+<button
+  type="button"
+  onClick={() =>
+    router.push("/creator/email")
+  }
+  style={{
+    marginTop: "14px",
+    padding: "11px 17px",
+    borderRadius: "8px",
+    border: "2px solid #000000",
+    backgroundColor: "#2563eb",
+    color: "#ffffff",
+    fontSize: "16px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  }}
+>
+  Edit Email
+</button> 
                 </div>
               </div>
 

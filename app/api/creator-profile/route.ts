@@ -276,3 +276,143 @@ export async function POST(request: Request) {
     );
   }
 } 
+export async function PATCH(request: Request) {
+  try {
+    const creator =
+      await getCreatorFromSession(request);
+
+    if (!creator) {
+      return unauthorizedResponse();
+    }
+
+    const body = await request.json();
+
+    const newEmail =
+      typeof body.email === "string"
+        ? body.email.trim().toLowerCase()
+        : "";
+
+    const emailPattern =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(newEmail)) {
+      return NextResponse.json(
+        {
+          error:
+            "Please enter a valid email address.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const existingCreators = await sql`
+      SELECT id
+      FROM creators
+      WHERE LOWER(email) = ${newEmail}
+        AND id <> ${creator.id}
+      LIMIT 1
+    `;
+
+    if (existingCreators.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "That email address is already being used.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    const currentCreators = await sql`
+      SELECT email
+      FROM creators
+      WHERE id = ${creator.id}
+      LIMIT 1
+    `;
+
+    if (currentCreators.length === 0) {
+      return NextResponse.json(
+        {
+          error: "Creator was not found.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    const oldEmail = String(
+      currentCreators[0].email
+    )
+      .trim()
+      .toLowerCase();
+
+    if (oldEmail === newEmail) {
+      return NextResponse.json({
+        success: true,
+        email: newEmail,
+        message:
+          "Your email address is already up to date.",
+      });
+    }
+
+    await sql.begin(async (transaction) => {
+      await transaction`
+        UPDATE creator_videos
+        SET creator_email = ${newEmail}
+        WHERE LOWER(creator_email) = ${oldEmail}
+      `;
+
+      await transaction`
+        UPDATE music_releases
+        SET creator_email = ${newEmail}
+        WHERE LOWER(creator_email) = ${oldEmail}
+      `;
+
+      await transaction`
+        UPDATE live_creator_subscriptions
+        SET creator_email = ${newEmail}
+        WHERE LOWER(creator_email) = ${oldEmail}
+      `;
+
+      await transaction`
+        UPDATE creator_subscriptions
+        SET channel_id = MD5(${newEmail})
+        WHERE channel_id = MD5(${oldEmail})
+      `;
+
+      await transaction`
+        UPDATE creators
+        SET email = ${newEmail}
+        WHERE id = ${creator.id}
+      `;
+    });
+
+    return NextResponse.json({
+      success: true,
+      email: newEmail,
+      message:
+        "Your creator email was updated successfully.",
+    });
+  } catch (error) {
+    console.error(
+      "Update creator email error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "Could not update your creator email.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+} 
+
