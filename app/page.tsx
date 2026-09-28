@@ -653,7 +653,7 @@ export default function Home() {
 </a> 
 
 <a
-  href="https://www.raysnotes.com/copyright-center"
+  href="https://www.raysnotes.com/copyright"
   target="_blank"
   rel="noopener noreferrer"
   style={{
