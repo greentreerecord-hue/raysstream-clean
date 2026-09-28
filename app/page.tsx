@@ -652,6 +652,19 @@ export default function Home() {
   ✍️ Publishing
 </a> 
 
+<a
+  href="https://www.raysnotes.com/copyright-center"
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+    ...linkStyle,
+    background: "#7c3aed",
+    color: "white",
+  }}
+>
+  © Ray&apos;snotes Copyright Center
+</a> 
+
 
           <a href="/viewer/signup" style={linkStyle}>
             Viewer Sign Up
