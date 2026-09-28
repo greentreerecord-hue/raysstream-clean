@@ -630,7 +630,28 @@ export default function Home() {
             Watch Live
           </a>
 
-          <a href="/music-shop" style={{...linkStyle, background: "#f59e0b", color: "black"}}>🎵 Music Shop</a>
+          <a
+  href="/music-shop"
+  style={{
+    ...linkStyle,
+    background: "#f59e0b",
+    color: "black",
+  }}
+>
+  🎵 Music Shop
+</a>
+
+<a
+  href="/publishing"
+  style={{
+    ...linkStyle,
+    background: "#7c3aed",
+    color: "white",
+  }}
+>
+  ✍️ Publishing
+</a> 
+
 
           <a href="/viewer/signup" style={linkStyle}>
             Viewer Sign Up
