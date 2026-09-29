@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import postgres from "postgres";
 import Stripe from "stripe";
 
+import {
+  getViewerIdFromSession,
+} from "../../../lib/viewer-session";
+
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const databaseUrl =
   process.env.RAYSSTREAM_DB_DATABASE_URL;
@@ -37,11 +42,29 @@ async function ensureConnectColumn() {
   `;
 }
 
-export async function POST(
-  request: Request
-) {
+export async function POST(request: Request) {
   try {
-    await ensureConnectColumn();
+    const requestOrigin =
+      new URL(request.url).origin;
+
+    const originHeader =
+      request.headers.get("origin");
+
+    if (
+      request.headers.get("sec-fetch-site") ===
+        "cross-site" ||
+      (
+        originHeader !== null &&
+        originHeader !== requestOrigin
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error: "This checkout request is not allowed.",
+        },
+        { status: 403 }
+      );
+    }
 
     const stripeSecretKey =
       process.env.STRIPE_SECRET_KEY;
@@ -52,14 +75,23 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
+    let body;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid checkout request." },
+        { status: 400 }
+      );
+    }
 
     const releaseId = Number(
-      body.releaseId
+      body?.releaseId
     );
 
     if (
-      !Number.isInteger(releaseId) ||
+      !Number.isSafeInteger(releaseId) ||
       releaseId < 1
     ) {
       return NextResponse.json(
@@ -71,33 +103,34 @@ export async function POST(
       );
     }
 
-    const rows =
-      await sql<MusicRelease[]>`
-        SELECT
-          music_releases.id,
-          music_releases.creator_email,
-          music_releases.title,
-          music_releases.artist_name,
-          music_releases.genre,
-          music_releases.price_cents,
-          music_releases.audio_url,
-          music_releases.cover_url,
-          creators.stripe_account_id
-        FROM music_releases
-        LEFT JOIN creators
-          ON LOWER(creators.email) =
-             LOWER(
-               music_releases.creator_email
-             )
-        WHERE
-          music_releases.id =
-            ${releaseId}
-          AND music_releases.review_status =
-            'approved'
-          AND music_releases.published =
-            TRUE
-        LIMIT 1
-      `;
+    // Read the buyer identity from the secure
+    // session cookie, never from the request body.
+    const viewerId =
+      await getViewerIdFromSession(request);
+
+    await ensureConnectColumn();
+
+    const rows = await sql<MusicRelease[]>`
+      SELECT
+        music_releases.id,
+        music_releases.creator_email,
+        music_releases.title,
+        music_releases.artist_name,
+        music_releases.genre,
+        music_releases.price_cents,
+        music_releases.audio_url,
+        music_releases.cover_url,
+        creators.stripe_account_id
+      FROM music_releases
+      LEFT JOIN creators
+        ON LOWER(creators.email) =
+           LOWER(music_releases.creator_email)
+      WHERE music_releases.id = ${releaseId}
+        AND music_releases.review_status =
+          'approved'
+        AND music_releases.published = TRUE
+      LIMIT 1
+    `;
 
     const release = rows[0];
 
@@ -126,13 +159,12 @@ export async function POST(
     );
 
     if (
-      !Number.isInteger(priceCents) ||
+      !Number.isSafeInteger(priceCents) ||
       priceCents < 50
     ) {
       return NextResponse.json(
         {
-          error:
-            "The song price is invalid.",
+          error: "The song price is invalid.",
         },
         { status: 400 }
       );
@@ -144,9 +176,22 @@ export async function POST(
     const creatorShareCents =
       priceCents - platformFeeCents;
 
-    const origin =
-      process.env.NEXT_PUBLIC_SITE_URL ??
-      new URL(request.url).origin;
+    const siteOrigin = new URL(
+      process.env.NEXT_PUBLIC_SITE_URL ||
+        requestOrigin
+    ).origin;
+
+    const metadata: Record<string, string> = {
+      purchase_type: "music",
+      release_id: String(release.id),
+      creator_email: release.creator_email,
+      platform_fee_percent: "40",
+      creator_share_percent: "60",
+    };
+
+    if (viewerId !== null) {
+      metadata.viewer_id = String(viewerId);
+    }
 
     const stripe = new Stripe(
       stripeSecretKey
@@ -156,25 +201,20 @@ export async function POST(
       await stripe.checkout.sessions.create({
         mode: "payment",
 
-        payment_method_types: [
-          "card",
-        ],
+        payment_method_types: ["card"],
 
         line_items: [
           {
             quantity: 1,
             price_data: {
               currency: "usd",
-              unit_amount:
-                priceCents,
+              unit_amount: priceCents,
               product_data: {
                 name: release.title,
                 description:
                   `${release.artist_name} · ${release.genre}`,
                 images: release.cover_url
-                  ? [
-                      release.cover_url,
-                    ]
+                  ? [release.cover_url]
                   : [],
               },
             },
@@ -184,45 +224,20 @@ export async function POST(
         payment_intent_data: {
           application_fee_amount:
             platformFeeCents,
-
           transfer_data: {
             destination:
               release.stripe_account_id,
           },
-
-          metadata: {
-            purchase_type:
-              "music",
-            release_id: String(
-              release.id
-            ),
-            creator_email:
-              release.creator_email,
-            platform_fee_percent:
-              "40",
-            creator_share_percent:
-              "60",
-          },
+          metadata,
         },
 
-        metadata: {
-          purchase_type: "music",
-          release_id: String(
-            release.id
-          ),
-          creator_email:
-            release.creator_email,
-          platform_fee_percent:
-            "40",
-          creator_share_percent:
-            "60",
-        },
+        metadata,
 
         success_url:
-          `${origin}/music-purchase/success?session_id={CHECKOUT_SESSION_ID}`,
+          `${siteOrigin}/music-purchase/success?session_id={CHECKOUT_SESSION_ID}`,
 
         cancel_url:
-          `${origin}/music-shop?purchase=cancelled`,
+          `${siteOrigin}/music-shop?purchase=cancelled`,
       });
 
     if (!session.url) {
@@ -231,11 +246,18 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({
-      url: session.url,
-      platformFeeCents,
-      creatorShareCents,
-    });
+    return NextResponse.json(
+      {
+        url: session.url,
+        platformFeeCents,
+        creatorShareCents,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "Music checkout error:",
@@ -245,9 +267,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "Unable to start music checkout.",
+          "Unable to start music checkout. Please try again.",
       },
       { status: 500 }
     );

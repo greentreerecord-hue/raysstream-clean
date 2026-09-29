@@ -640,7 +640,16 @@ export default function Home() {
 >
   🎵 Music Shop
 </a>
-
+ <a
+            href="/my-music"
+            style={{
+              ...linkStyle,
+              background: "#22c55e",
+              color: "black",
+            }}
+          >
+            🎵 My Music
+          </a> 
 <a
   href="/publishing"
   style={{

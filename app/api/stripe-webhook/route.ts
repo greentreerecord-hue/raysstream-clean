@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import postgres from "postgres";
 
+import {
+  recordMusicPurchase,
+} from "../../../lib/music-purchases";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -200,7 +204,8 @@ export async function POST(request: Request) {
 
   const { event, mode } = verified;
 
-  if (mode === "test") {
+  // Sandbox events never grant real purchases.
+  if (mode === "test" || !event.livemode) {
     return NextResponse.json({
       received: true,
       mode: "test",
@@ -209,6 +214,26 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (
+      event.type === "checkout.session.completed" ||
+      event.type ===
+        "checkout.session.async_payment_succeeded"
+    ) {
+      const session =
+        event.data.object as Stripe.Checkout.Session;
+
+      if (
+        session.metadata?.purchase_type === "music"
+      ) {
+        await recordMusicPurchase(session);
+
+        return NextResponse.json({
+          received: true,
+          mode: "live",
+        });
+      }
+    }
+
     await ensureSubscriptionTable();
 
     if (
@@ -347,4 +372,3 @@ export async function POST(request: Request) {
     );
   }
 } 
-

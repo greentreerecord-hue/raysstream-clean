@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import postgres from "postgres";
 import Stripe from "stripe";
 
+import {
+  recordMusicPurchase,
+} from "../../../lib/music-purchases";
+
+import {
+  getViewerIdFromSession,
+} from "../../../lib/viewer-session";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -28,9 +36,19 @@ type MusicRelease = {
   price_cents: number;
 };
 
-export async function GET(
-  request: Request
+function json(
+  data: unknown,
+  status = 200
 ) {
+  return NextResponse.json(data, {
+    status,
+    headers: {
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
+export async function GET(request: Request) {
   try {
     const stripeSecretKey =
       process.env.STRIPE_SECRET_KEY;
@@ -45,19 +63,18 @@ export async function GET(
       new URL(request.url);
 
     const sessionId =
-      searchParams.get("session_id") ??
-      "";
+      searchParams.get("session_id") ?? "";
 
     if (
-      !sessionId ||
-      !sessionId.startsWith("cs_")
+      !/^cs_[a-zA-Z0-9_]+$/.test(sessionId) ||
+      sessionId.length > 255
     ) {
-      return NextResponse.json(
+      return json(
         {
           error:
             "A valid purchase session is required.",
         },
-        { status: 400 }
+        400
       );
     }
 
@@ -71,46 +88,94 @@ export async function GET(
       );
 
     if (
-      session.metadata?.purchase_type !==
-      "music"
+      session.mode !== "payment" ||
+      session.metadata?.purchase_type !== "music"
     ) {
-      return NextResponse.json(
+      return json(
         {
-          error:
-            "This is not a music purchase.",
+          error: "This is not a music purchase.",
         },
-        { status: 400 }
+        400
       );
     }
 
     if (
-      session.payment_status !== "paid"
+      session.payment_status !== "paid" ||
+      session.status !== "complete"
     ) {
-      return NextResponse.json(
+      return json(
         {
           error:
-            "Payment has not been completed.",
+            "Payment has not been completed. Please refresh shortly.",
         },
-        { status: 402 }
+        402
       );
+    }
+
+    const accountId =
+      session.metadata?.viewer_id;
+
+    if (accountId) {
+      const purchaseViewerId =
+        Number(accountId);
+
+      if (
+        !Number.isSafeInteger(purchaseViewerId) ||
+        purchaseViewerId < 1
+      ) {
+        return json(
+          {
+            error:
+              "The purchase account is invalid.",
+          },
+          400
+        );
+      }
+
+      const viewerId =
+        await getViewerIdFromSession(request);
+
+      if (viewerId === null) {
+        return json(
+          {
+            error:
+              "Please sign in to the viewer account used for this purchase, then return to this page.",
+          },
+          401
+        );
+      }
+
+      if (viewerId !== purchaseViewerId) {
+        return json(
+          {
+            error:
+              "This purchase belongs to a different viewer account.",
+          },
+          403
+        );
+      }
     }
 
     const releaseId = Number(
-      session.metadata.release_id
+      session.metadata?.release_id
     );
 
     if (
-      !Number.isInteger(releaseId) ||
+      !Number.isSafeInteger(releaseId) ||
       releaseId < 1
     ) {
-      return NextResponse.json(
+      return json(
         {
           error:
             "The purchased song could not be identified.",
         },
-        { status: 400 }
+        400
       );
     }
+
+    // This also runs in the webhook.
+    // The session ID prevents duplicate records.
+    await recordMusicPurchase(session);
 
     const releases =
       await sql<MusicRelease[]>`
@@ -130,12 +195,12 @@ export async function GET(
     const release = releases[0];
 
     if (!release) {
-      return NextResponse.json(
+      return json(
         {
           error:
             "The purchased song was not found.",
         },
-        { status: 404 }
+        404
       );
     }
 
@@ -147,18 +212,19 @@ export async function GET(
       .trim()
       .toLowerCase();
 
-    return NextResponse.json({
+    return json({
       paid: true,
       sessionId: session.id,
       buyerEmail,
       amountTotalCents:
         session.amount_total ??
         release.price_cents,
+      savedToMyMusic:
+        Boolean(accountId) && session.livemode,
       song: {
         id: release.id,
         title: release.title,
-        artistName:
-          release.artist_name,
+        artistName: release.artist_name,
         genre: release.genre,
         audioUrl: release.audio_url,
         coverUrl: release.cover_url,
@@ -170,14 +236,12 @@ export async function GET(
       error
     );
 
-    return NextResponse.json(
+    return json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "Unable to verify the music purchase.",
+          "Unable to verify the music purchase. Please try again.",
       },
-      { status: 500 }
+      500
     );
   }
 } 
