@@ -191,9 +191,20 @@ export default function MyMusicPage() {
               Music Shop
             </a>
 
-            <a href="/" style={buttonStyle}>
-              Ray’sStream Home
-            </a>
+              <a href="/" style={buttonStyle}>
+  Ray’sStream Home
+</a>
+
+<a
+  href="/viewer/dashboard"
+  style={{
+    ...buttonStyle,
+    background: "#1664ff",
+  }}
+>
+  Back to Viewer Dashboard
+</a> 
+
 
             <button
               type="button"
