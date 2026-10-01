@@ -226,7 +226,7 @@ export default function ShufflePlayer() {
   player.current?.pause();
   setPlaying(false);
   setMessage("");
-  nextVideo(false);
+  nextVideo(true);
 } 
 
 
