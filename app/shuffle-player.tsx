@@ -223,12 +223,12 @@ export default function ShufflePlayer() {
   }
 
   function openPlayer() {
-    setVisible(true);
+  player.current?.pause();
+  setPlaying(false);
+  setMessage("");
+  nextVideo(false);
+} 
 
-    if (!current) {
-      nextVideo(false);
-    }
-  }
 
   function hidePlayer() {
     player.current?.pause();
