@@ -854,9 +854,18 @@ export default function Home() {
               loop
               playsInline
               preload="metadata"
-              onPlay={() =>
-                addView(index, video.id)
-              }
+           onPlay={(event) => {
+  const activeVideo = event.currentTarget;
+
+  document.querySelectorAll("video").forEach((video) => {
+    if (video !== activeVideo) {
+      video.pause();
+    }
+  });
+
+  addView(index, video.id);
+}} 
+
               style={{
                 width: "100%",
                 background: "black",

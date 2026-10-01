@@ -296,10 +296,19 @@ export default function ShufflePlayer() {
                 playsInline
                 preload="metadata"
                 autoPlay={started}
-                onPlay={() => {
-                  setPlaying(true);
-                  setStarted(true);
-                }}
+                onPlay={(event) => {
+  const activeVideo = event.currentTarget;
+
+  document.querySelectorAll("video").forEach((video) => {
+    if (video !== activeVideo) {
+      video.pause();
+    }
+  });
+
+  setPlaying(true);
+  setStarted(true);
+}} 
+
                 onPause={() => setPlaying(false)}
                 onEnded={() => nextVideo(true)}
                 onError={() => {
