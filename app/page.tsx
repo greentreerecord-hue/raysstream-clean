@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import CreatorFeed from "./creator-feed";
-
+import ShufflePlayer from "./shuffle-player"; 
 type VideoComment = {
   id: number;
   text: string;
@@ -807,7 +807,7 @@ export default function Home() {
           )}
         </div>
       </header>
-
+<ShufflePlayer /> 
       <section
         style={{
           textAlign: "center",
