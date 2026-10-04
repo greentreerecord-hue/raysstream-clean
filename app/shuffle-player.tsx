@@ -90,6 +90,9 @@ export default function ShufflePlayer() {
   const failed = useRef(new Set<string>());
   const player = useRef<HTMLVideoElement>(null);
   const countedVideos = useRef(new Set<string>());
+const watchedSeconds = useRef(0);
+const lastPlaybackTime = useRef<number | null>(null); 
+
   const pendingLikes = useRef(new Set<string>());
 
   // Prevent an older GET from overwriting a saved like.
@@ -532,6 +535,8 @@ export default function ShufflePlayer() {
     if (!next) return;
 
     countedVideos.current.delete(next.id);
+    watchedSeconds.current = 0;
+lastPlaybackTime.current = null;
     currentId.current = next.id;
     setMessage("");
     setCurrent(next);
@@ -705,9 +710,54 @@ export default function ShufflePlayer() {
 
                   setPlaying(true);
                   setStarted(true);
-                  void countView(current);
                 }}
-                onPause={() => setPlaying(false)}
+                  onPlaying={(event) => {
+                  
+  lastPlaybackTime.current =
+    event.currentTarget.currentTime;
+}}
+onSeeking={() => {
+  lastPlaybackTime.current = null;
+}}
+onSeeked={(event) => {
+  lastPlaybackTime.current =
+    event.currentTarget.currentTime;
+}}
+onWaiting={() => {
+  lastPlaybackTime.current = null;
+}}
+onTimeUpdate={(event) => {
+  const video = event.currentTarget;
+  const previous = lastPlaybackTime.current;
+  lastPlaybackTime.current = video.currentTime;
+
+  if (
+    video.paused ||
+    video.seeking ||
+    previous === null ||
+    video.playbackRate <= 0
+  ) {
+    return;
+  }
+
+  const elapsed =
+    (video.currentTime - previous) /
+    video.playbackRate;
+
+  if (elapsed > 0 && elapsed <= 1) {
+    watchedSeconds.current += elapsed;
+  }
+
+  if (watchedSeconds.current >= 30) {
+    void countView(current);
+  }
+}} 
+
+                
+                onPause={() => {
+  lastPlaybackTime.current = null;
+  setPlaying(false);
+}} 
                 onEnded={() => nextVideo(true)}
                 onError={() => {
                   failed.current.add(current.id);
