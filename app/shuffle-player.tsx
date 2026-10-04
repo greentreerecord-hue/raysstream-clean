@@ -24,6 +24,11 @@ type FeedVideo = {
   thumbnailUrl?: string;
 };
 
+type LikeStatus = {
+  count: number;
+  liked: boolean;
+};
+
 const originals: ShuffleVideo[] = [
   {
     id: "original-1",
@@ -67,107 +72,325 @@ export default function ShufflePlayer() {
     useState<ShuffleVideo | null>(null);
   const [message, setMessage] = useState("");
 
+  const [viewCounts, setViewCounts] = useState<
+    Record<string, number | null>
+  >({});
+
+  const [likeStatuses, setLikeStatuses] = useState<
+    Record<string, LikeStatus | null>
+  >({});
+
+  const [likingId, setLikingId] = useState<
+    string | null
+  >(null);
+
   const library = useRef<ShuffleVideo[]>(originals);
   const queue = useRef<ShuffleVideo[]>([]);
   const currentId = useRef("");
   const failed = useRef(new Set<string>());
   const player = useRef<HTMLVideoElement>(null);
-const [viewCounts, setViewCounts] = useState<
-  Record<string, number | null>
->({});
-const countedVideos = useRef(new Set<string>());
+  const countedVideos = useRef(new Set<string>());
+  const pendingLikes = useRef(new Set<string>());
 
-useEffect(() => {
-  if (!current) return;
+  // Prevent an older GET from overwriting a saved like.
+  const likeVersions = useRef<Record<string, number>>(
+    {}
+  );
 
-  const video = current;
-  const controller = new AbortController();
+  useEffect(() => {
+    if (!current) return;
 
-  async function loadViewCount() {
+    const video = current;
+    const controller = new AbortController();
+
+    async function loadViewCount() {
+      try {
+        const isOriginal =
+          video.id.startsWith("original-");
+
+        const numericId = Number(
+          video.id.replace("original-", "")
+        );
+
+        const response = await fetch(
+          isOriginal
+            ? "/api/views"
+            : `/api/creator-engagement?videoId=${encodeURIComponent(
+                video.id
+              )}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Views unavailable");
+        }
+
+        const data = await response.json();
+
+        if (controller.signal.aborted) return;
+
+        const count = Number(
+          isOriginal
+            ? data.views?.[numericId] ?? 0
+            : data.views ?? 0
+        );
+
+        setViewCounts((previous) => ({
+          ...previous,
+          [video.id]: Math.max(
+            previous[video.id] ?? 0,
+            count
+          ),
+        }));
+      } catch {
+        if (!controller.signal.aborted) {
+          setViewCounts((previous) => ({
+            ...previous,
+            [video.id]: previous[video.id] ?? null,
+          }));
+        }
+      }
+    }
+
+    void loadViewCount();
+
+    return () => controller.abort();
+  }, [current]);
+
+  useEffect(() => {
+    if (!current) return;
+
+    const video = current;
+    const controller = new AbortController();
+    const version =
+      likeVersions.current[video.id] ?? 0;
+
+    async function loadLikes() {
+      try {
+        const isOriginal =
+          video.id.startsWith("original-");
+
+        const numericId = Number(
+          video.id.replace("original-", "")
+        );
+
+        const response = await fetch(
+          isOriginal
+            ? "/api/likes"
+            : `/api/creator-engagement?videoId=${encodeURIComponent(
+                video.id
+              )}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Likes unavailable");
+        }
+
+        const data = await response.json();
+
+        if (
+          controller.signal.aborted ||
+          (likeVersions.current[video.id] ?? 0) !==
+            version
+        ) {
+          return;
+        }
+
+        const liked = isOriginal
+          ? Array.isArray(data.likedVideoIds) &&
+            data.likedVideoIds.some(
+              (id: unknown) => Number(id) === numericId
+            )
+          : Boolean(data.liked);
+
+        const count = Number(
+          isOriginal
+            ? data.likes?.[numericId] ?? 0
+            : data.likes ?? 0
+        );
+
+        setLikeStatuses((previous) => ({
+          ...previous,
+          [video.id]: { count, liked },
+        }));
+      } catch {
+        if (
+          !controller.signal.aborted &&
+          (likeVersions.current[video.id] ?? 0) ===
+            version
+        ) {
+          setLikeStatuses((previous) => ({
+            ...previous,
+            [video.id]:
+              previous[video.id] ?? null,
+          }));
+        }
+      }
+    }
+
+    void loadLikes();
+
+    return () => controller.abort();
+  }, [current]);
+
+  async function countView(video: ShuffleVideo) {
+    if (countedVideos.current.has(video.id)) return;
+
+    countedVideos.current.add(video.id);
+
+    const isOriginal =
+      video.id.startsWith("original-");
+
     try {
-      const isOriginal = video.id.startsWith("original-");
-      const numericId = Number(video.id.replace("original-", ""));
-
       const response = await fetch(
         isOriginal
           ? "/api/views"
-          : `/api/creator-engagement?videoId=${encodeURIComponent(video.id)}`,
+          : "/api/creator-engagement",
         {
-          cache: "no-store",
-          signal: controller.signal,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            isOriginal
+              ? {
+                  videoId: Number(
+                    video.id.replace("original-", "")
+                  ),
+                }
+              : {
+                  videoId: video.id,
+                  action: "view",
+                }
+          ),
         }
       );
 
-      if (!response.ok) throw new Error("Views unavailable");
+      if (!response.ok) {
+        throw new Error("Unable to save view");
+      }
 
       const data = await response.json();
-      const count = Number(
-        isOriginal ? data.views?.[numericId] ?? 0 : data.views ?? 0
-      );
 
       setViewCounts((previous) => ({
         ...previous,
-        [video.id]: Math.max(previous[video.id] ?? 0, count),
+        [video.id]: Math.max(
+          previous[video.id] ?? 0,
+          Number(data.count ?? 0)
+        ),
       }));
-    } catch {
-      if (!controller.signal.aborted) {
-        setViewCounts((previous) => ({
-          ...previous,
-          [video.id]: previous[video.id] ?? null,
-        }));
-      }
+    } catch (error) {
+      countedVideos.current.delete(video.id);
+
+      console.error(
+        "Unable to count shuffle view:",
+        error
+      );
     }
   }
 
-  void loadViewCount();
-  return () => controller.abort();
-}, [current]);
+  async function likeVideo(video: ShuffleVideo) {
+    if (
+      likeStatuses[video.id]?.liked ||
+      pendingLikes.current.has(video.id)
+    ) {
+      return;
+    }
 
-async function countView(video: ShuffleVideo) {
-  if (countedVideos.current.has(video.id)) return;
-  countedVideos.current.add(video.id);
+    pendingLikes.current.add(video.id);
+    setLikingId(video.id);
+    setMessage("");
 
-  const isOriginal = video.id.startsWith("original-");
+    const isOriginal =
+      video.id.startsWith("original-");
 
-  try {
-    const response = await fetch(
-      isOriginal ? "/api/views" : "/api/creator-engagement",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          isOriginal
-            ? {
-                videoId: Number(
-                  video.id.replace("original-", "")
-                ),
-              }
-            : { videoId: video.id, action: "view" }
-        ),
+    try {
+      const response = await fetch(
+        isOriginal
+          ? "/api/likes"
+          : "/api/creator-engagement",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            isOriginal
+              ? {
+                  videoId: Number(
+                    video.id.replace("original-", "")
+                  ),
+                }
+              : {
+                  videoId: video.id,
+                  action: "like",
+                }
+          ),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (currentId.current === video.id) {
+          setMessage(
+            response.status === 401
+              ? "Please log in to your viewer account to like videos."
+              : data.error || "Unable to save like."
+          );
+        }
+
+        return;
       }
-    );
 
-    if (!response.ok) throw new Error("Unable to save view");
+      likeVersions.current[video.id] =
+        (likeVersions.current[video.id] ?? 0) + 1;
 
-    const data = await response.json();
+      setLikeStatuses((previous) => ({
+        ...previous,
+        [video.id]: {
+          count: Number(data.count ?? 0),
+          liked: true,
+        },
+      }));
 
-    setViewCounts((previous) => ({
-      ...previous,
-      [video.id]: Math.max(
-        previous[video.id] ?? 0,
-        Number(data.count ?? 0)
-      ),
-    }));
-  } catch (error) {
-    countedVideos.current.delete(video.id);
-    console.error("Unable to count shuffle view:", error);
+      if (currentId.current === video.id) {
+        setMessage(
+          data.alreadyLiked
+            ? "You already liked this video."
+            : "Thanks! Your like has been saved."
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Unable to like shuffle video:",
+        error
+      );
+
+      if (currentId.current === video.id) {
+        setMessage(
+          "Unable to save your like. Please try again."
+        );
+      }
+    } finally {
+      pendingLikes.current.delete(video.id);
+
+      setLikingId((value) =>
+        value === video.id ? null : value
+      );
+    }
   }
-} 
 
   useEffect(() => {
     const controller = new AbortController();
+
     const timeout = window.setTimeout(
       () => controller.abort(),
       10000
@@ -185,6 +408,7 @@ async function countView(video: ShuffleVideo) {
         }
 
         const data = await response.json();
+
         const feed: FeedVideo[] = Array.isArray(
           data.videos
         )
@@ -208,7 +432,8 @@ async function countView(video: ShuffleVideo) {
               ""
             )}`,
             creatorName:
-              video.creatorName || "Ray'sStream Creator",
+              video.creatorName ||
+              "Ray'sStream Creator",
             thumbnailUrl: video.thumbnailUrl || "",
           }));
 
@@ -223,7 +448,6 @@ async function countView(video: ShuffleVideo) {
           ...uniqueCreators,
         ];
 
-        // Add new creator videos to the remaining queue.
         queue.current = shuffled([
           ...queue.current,
           ...uniqueCreators,
@@ -243,7 +467,6 @@ async function countView(video: ShuffleVideo) {
       }
     }
 
-    // Prepare originals while creator videos load.
     queue.current = shuffled(originals);
     void loadCreators();
 
@@ -294,7 +517,6 @@ async function countView(video: ShuffleVideo) {
     if (!queue.current.length) {
       queue.current = shuffled(available);
 
-      // Avoid the same video at the start of a new round.
       if (
         queue.current.length > 1 &&
         queue.current[0].id === currentId.current
@@ -308,20 +530,21 @@ async function countView(video: ShuffleVideo) {
 
     const next = queue.current.shift();
     if (!next) return;
-countedVideos.current.delete(next.id); 
+
+    countedVideos.current.delete(next.id);
     currentId.current = next.id;
+    setMessage("");
     setCurrent(next);
     setStarted(autoplay);
     setVisible(true);
   }
 
   function openPlayer() {
-  player.current?.pause();
-  setPlaying(false);
-  setMessage("");
-  nextVideo(true);
-} 
-
+    player.current?.pause();
+    setPlaying(false);
+    setMessage("");
+    nextVideo(true);
+  }
 
   function hidePlayer() {
     player.current?.pause();
@@ -329,6 +552,13 @@ countedVideos.current.delete(next.id);
     setStarted(false);
     setVisible(false);
   }
+
+  const currentLikes = current
+    ? likeStatuses[current.id]
+    : undefined;
+
+  const savingLike =
+    current !== null && likingId === current.id;
 
   return (
     <section
@@ -379,13 +609,80 @@ countedVideos.current.delete(next.id);
             <>
               <h3>{current.title}</h3>
               <p>{current.creatorName}</p>
-<p style={{ color: "#bbb", fontWeight: "bold" }}>
-  {viewCounts[current.id] === undefined
-    ? "Loading views..."
-    : viewCounts[current.id] === null
-      ? "Views unavailable"
-      : `👁 ${viewCounts[current.id]?.toLocaleString()} views`}
-</p> 
+
+              <p
+                style={{
+                  color: "#bbb",
+                  fontWeight: "bold",
+                }}
+              >
+                {viewCounts[current.id] === undefined
+                  ? "Loading views..."
+                  : viewCounts[current.id] === null
+                    ? "Views unavailable"
+                    : `👁 ${viewCounts[
+                        current.id
+                      ]?.toLocaleString()} views`}
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "12px",
+                  marginBottom: "16px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => void likeVideo(current)}
+                  disabled={
+                    savingLike ||
+                    Boolean(currentLikes?.liked)
+                  }
+                  aria-pressed={
+                    Boolean(currentLikes?.liked)
+                  }
+                  style={{
+                    ...buttonStyle,
+                    background: currentLikes?.liked
+                      ? "#7c3aed"
+                      : "#2b2b2b",
+                    opacity: savingLike ? 0.7 : 1,
+                    cursor:
+                      savingLike || currentLikes?.liked
+                        ? "default"
+                        : "pointer",
+                  }}
+                >
+                  {savingLike
+                    ? "Saving..."
+                    : currentLikes?.liked
+                      ? "👍 Liked"
+                      : "👍 Like"}
+                </button>
+
+                <span style={{ color: "#bbb" }}>
+                  {currentLikes === undefined
+                    ? "Loading likes..."
+                    : currentLikes === null
+                      ? "Likes unavailable"
+                      : `${currentLikes.count.toLocaleString()} ${
+                          currentLikes.count === 1
+                            ? "like"
+                            : "likes"
+                        }`}
+                </span>
+
+                <a
+                  href="/viewer/login"
+                  style={{ color: "#c4b5fd" }}
+                >
+                  Viewer Login
+                </a>
+              </div>
+
               <video
                 ref={player}
                 key={current.id}
@@ -396,19 +693,20 @@ countedVideos.current.delete(next.id);
                 preload="metadata"
                 autoPlay={started}
                 onPlay={(event) => {
-  const activeVideo = event.currentTarget;
+                  const activeVideo = event.currentTarget;
 
-  document.querySelectorAll("video").forEach((video) => {
-    if (video !== activeVideo) {
-      video.pause();
-    }
-  });
+                  document
+                    .querySelectorAll("video")
+                    .forEach((video) => {
+                      if (video !== activeVideo) {
+                        video.pause();
+                      }
+                    });
 
-  setPlaying(true);
-  setStarted(true);
-  void countView(current);
-}} 
-
+                  setPlaying(true);
+                  setStarted(true);
+                  void countView(current);
+                }}
                 onPause={() => setPlaying(false)}
                 onEnded={() => nextVideo(true)}
                 onError={() => {
@@ -440,10 +738,7 @@ countedVideos.current.delete(next.id);
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    setMessage("");
-                    nextVideo(true);
-                  }}
+                  onClick={() => nextVideo(true)}
                   style={buttonStyle}
                 >
                   ⏭ Next Video
