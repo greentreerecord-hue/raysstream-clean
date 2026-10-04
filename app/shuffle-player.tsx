@@ -71,7 +71,7 @@ export default function ShufflePlayer() {
   const [current, setCurrent] =
     useState<ShuffleVideo | null>(null);
   const [message, setMessage] = useState("");
-
+const [showShareOptions, setShowShareOptions] = useState(false); 
   const [viewCounts, setViewCounts] = useState<
     Record<string, number | null>
   >({});
@@ -547,7 +547,53 @@ lastPlaybackTime.current = null;
     setMessage("");
     nextVideo(true);
   }
-async function shareVideo(video: ShuffleVideo) {
+async function copyVideoLink(video: ShuffleVideo) {
+  const url = new URL(
+    video.watchUrl,
+    window.location.origin
+  ).href;
+
+  try {
+    await navigator.clipboard.writeText(url);
+    setMessage("Video link copied!");
+  } catch {
+    window.prompt("Copy this video link:", url);
+  }
+} 
+function shareToService(
+  video: ShuffleVideo,
+  service: "facebook" | "x" | "whatsapp" | "reddit"
+) {
+  const url = new URL(
+    video.watchUrl,
+    window.location.origin
+  ).href;
+
+  const link = encodeURIComponent(url);
+  const title = encodeURIComponent(video.title);
+  const text = encodeURIComponent(
+    `Watch ${video.title} on Ray'sStream ${url}`
+  );
+
+  const services = {
+    facebook:
+      `https://www.facebook.com/sharer/sharer.php?u=${link}`,
+    x:
+      `https://twitter.com/intent/tweet?url=${link}&text=${title}`,
+    whatsapp:
+      `https://wa.me/?text=${text}`,
+    reddit:
+      `https://www.reddit.com/submit?url=${link}&title=${title}`,
+  };
+
+  window.open(
+    services[service],
+    "_blank",
+    "noopener,noreferrer"
+  );
+} 
+
+  async function shareVideo(video: ShuffleVideo) {
   const url = new URL(
     video.watchUrl,
     window.location.origin
@@ -834,13 +880,80 @@ onTimeUpdate={(event) => {
                 <button
   type="button"
   onClick={() => {
-    void shareVideo(current);
+  setShowShareOptions((open) => !open);   
   }}
   style={buttonStyle}
 >
   Share
 </button> 
               </div>
+              {showShareOptions && (
+  <div style={{ marginTop: "18px" }}>
+    <h3>Share This Video</h3>
+
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "10px",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => void shareVideo(current)}
+        style={buttonStyle}
+      >
+        Share to Apps
+      </button>
+
+      <button
+        type="button"
+        onClick={() => shareToService(current, "facebook")}
+        style={buttonStyle}
+      >
+        Facebook
+      </button>
+
+      <button
+        type="button"
+        onClick={() => shareToService(current, "x")}
+        style={buttonStyle}
+      >
+        X
+      </button>
+
+      <button
+        type="button"
+        onClick={() => shareToService(current, "whatsapp")}
+        style={buttonStyle}
+      >
+        WhatsApp
+      </button>
+
+      <button
+        type="button"
+        onClick={() => shareToService(current, "reddit")}
+        style={buttonStyle}
+      >
+        Reddit
+      </button>
+
+      <button
+        type="button"
+        onClick={() => void copyVideoLink(current)}
+        style={buttonStyle}
+      >
+        Copy Link
+      </button>
+    </div>
+
+    <p style={{ color: "#bbb" }}>
+      For Instagram, TikTok, Messenger, and other apps,
+      use Share to Apps or Copy Link.
+    </p>
+  </div>
+)} 
+
             </>
           )}
 
