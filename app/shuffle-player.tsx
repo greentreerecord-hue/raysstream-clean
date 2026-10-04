@@ -430,10 +430,7 @@ const lastPlaybackTime = useRef<number | null>(null);
             id: video.id,
             title: video.title || "Creator Video",
             url: video.url,
-            watchUrl: `/creator/watch/${video.id.replace(
-              "creator-",
-              ""
-            )}`,
+            watchUrl: `/watch/creator/${video.id}`, 
             creatorName:
               video.creatorName ||
               "Ray'sStream Creator",
@@ -550,6 +547,37 @@ lastPlaybackTime.current = null;
     setMessage("");
     nextVideo(true);
   }
+async function shareVideo(video: ShuffleVideo) {
+  const url = new URL(
+    video.watchUrl,
+    window.location.origin
+  ).href;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: video.title,
+        text: `Watch ${video.title} on Ray'sStream`,
+        url,
+      });
+      return;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(url);
+    setMessage("Video link copied!");
+  } catch {
+    window.prompt("Copy this video link:", url);
+  }
+} 
 
   function hidePlayer() {
     player.current?.pause();
@@ -803,6 +831,15 @@ onTimeUpdate={(event) => {
                 >
                   Open Watch Page
                 </a>
+                <button
+  type="button"
+  onClick={() => {
+    void shareVideo(current);
+  }}
+  style={buttonStyle}
+>
+  Share
+</button> 
               </div>
             </>
           )}
