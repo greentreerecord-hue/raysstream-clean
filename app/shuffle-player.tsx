@@ -72,6 +72,99 @@ export default function ShufflePlayer() {
   const currentId = useRef("");
   const failed = useRef(new Set<string>());
   const player = useRef<HTMLVideoElement>(null);
+const [viewCounts, setViewCounts] = useState<
+  Record<string, number | null>
+>({});
+const countedVideos = useRef(new Set<string>());
+
+useEffect(() => {
+  if (!current) return;
+
+  const video = current;
+  const controller = new AbortController();
+
+  async function loadViewCount() {
+    try {
+      const isOriginal = video.id.startsWith("original-");
+      const numericId = Number(video.id.replace("original-", ""));
+
+      const response = await fetch(
+        isOriginal
+          ? "/api/views"
+          : `/api/creator-engagement?videoId=${encodeURIComponent(video.id)}`,
+        {
+          cache: "no-store",
+          signal: controller.signal,
+        }
+      );
+
+      if (!response.ok) throw new Error("Views unavailable");
+
+      const data = await response.json();
+      const count = Number(
+        isOriginal ? data.views?.[numericId] ?? 0 : data.views ?? 0
+      );
+
+      setViewCounts((previous) => ({
+        ...previous,
+        [video.id]: Math.max(previous[video.id] ?? 0, count),
+      }));
+    } catch {
+      if (!controller.signal.aborted) {
+        setViewCounts((previous) => ({
+          ...previous,
+          [video.id]: previous[video.id] ?? null,
+        }));
+      }
+    }
+  }
+
+  void loadViewCount();
+  return () => controller.abort();
+}, [current]);
+
+async function countView(video: ShuffleVideo) {
+  if (countedVideos.current.has(video.id)) return;
+  countedVideos.current.add(video.id);
+
+  const isOriginal = video.id.startsWith("original-");
+
+  try {
+    const response = await fetch(
+      isOriginal ? "/api/views" : "/api/creator-engagement",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          isOriginal
+            ? {
+                videoId: Number(
+                  video.id.replace("original-", "")
+                ),
+              }
+            : { videoId: video.id, action: "view" }
+        ),
+      }
+    );
+
+    if (!response.ok) throw new Error("Unable to save view");
+
+    const data = await response.json();
+
+    setViewCounts((previous) => ({
+      ...previous,
+      [video.id]: Math.max(
+        previous[video.id] ?? 0,
+        Number(data.count ?? 0)
+      ),
+    }));
+  } catch (error) {
+    countedVideos.current.delete(video.id);
+    console.error("Unable to count shuffle view:", error);
+  }
+} 
 
   useEffect(() => {
     const controller = new AbortController();
@@ -286,7 +379,13 @@ export default function ShufflePlayer() {
             <>
               <h3>{current.title}</h3>
               <p>{current.creatorName}</p>
-
+<p style={{ color: "#bbb", fontWeight: "bold" }}>
+  {viewCounts[current.id] === undefined
+    ? "Loading views..."
+    : viewCounts[current.id] === null
+      ? "Views unavailable"
+      : `👁 ${viewCounts[current.id]?.toLocaleString()} views`}
+</p> 
               <video
                 ref={player}
                 key={current.id}
@@ -307,6 +406,7 @@ export default function ShufflePlayer() {
 
   setPlaying(true);
   setStarted(true);
+  void countView(current);
 }} 
 
                 onPause={() => setPlaying(false)}
