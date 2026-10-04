@@ -308,7 +308,7 @@ async function countView(video: ShuffleVideo) {
 
     const next = queue.current.shift();
     if (!next) return;
-
+countedVideos.current.delete(next.id); 
     currentId.current = next.id;
     setCurrent(next);
     setStarted(autoplay);
