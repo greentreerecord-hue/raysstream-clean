@@ -6,7 +6,13 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-
+type ShuffleComment = {
+  id: number;
+  text: string;
+  viewerName: string;
+  viewerUsername: string | null;
+  viewerProfilePictureUrl: string | null;
+}; 
 type ShuffleVideo = {
   id: string;
   title: string;
@@ -71,6 +77,13 @@ export default function ShufflePlayer() {
   const [current, setCurrent] =
     useState<ShuffleVideo | null>(null);
   const [message, setMessage] = useState("");
+  const [comments, setComments] = useState<
+  Record<string, ShuffleComment[]>
+>({});
+const [commentText, setCommentText] = useState("");
+const [commentsLoading, setCommentsLoading] = useState(false);
+const [commentError, setCommentError] = useState("");
+const [postingComment, setPostingComment] = useState(false); 
 const [showShareOptions, setShowShareOptions] = useState(false); 
   const [viewCounts, setViewCounts] = useState<
     Record<string, number | null>
@@ -242,6 +255,173 @@ const lastPlaybackTime = useRef<number | null>(null);
 
     return () => controller.abort();
   }, [current]);
+const commentRequest = useRef(false);
+  const commentSelection = useRef(0);
+
+  useEffect(() => {
+    if (!current) return;
+
+    const video = current;
+    const controller = new AbortController();
+
+    setCommentText("");
+    setCommentError("");
+    setCommentsLoading(true);
+
+    async function loadComments() {
+      try {
+        const isOriginal = video.id.startsWith("original-");
+        const numericId = Number(video.id.replace("original-", ""));
+
+        const response = await fetch(
+          isOriginal
+            ? "/api/comments"
+            : `/api/creator-engagement?videoId=${encodeURIComponent(video.id)}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Unable to load comments.");
+        }
+
+        if (!Array.isArray(data.comments)) {
+          throw new Error("Unable to load comments.");
+        }
+
+        if (controller.signal.aborted) return;
+
+        const loaded: ShuffleComment[] = isOriginal
+          ? data.comments.filter(
+              (comment: ShuffleComment & { videoId: number }) =>
+                Number(comment.videoId) === numericId
+            )
+          : data.comments;
+
+        setComments((previous) => {
+          const combined = new Map<number, ShuffleComment>();
+
+          loaded.forEach((comment) => {
+            combined.set(comment.id, comment);
+          });
+
+          // Preserve a comment saved while this request was loading.
+          (previous[video.id] || []).forEach((comment) => {
+            if (!combined.has(comment.id)) {
+              combined.set(comment.id, comment);
+            }
+          });
+
+          return {
+            ...previous,
+            [video.id]: Array.from(combined.values()).sort(
+              (a, b) => a.id - b.id
+            ),
+          };
+        });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setCommentError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load comments."
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setCommentsLoading(false);
+        }
+      }
+    }
+
+    void loadComments();
+
+    return () => controller.abort();
+  }, [current]);
+
+  async function postComment(video: ShuffleVideo) {
+    const text = commentText.trim();
+
+    if (!text || commentRequest.current) return;
+
+    if (text.length > 1000) {
+      setCommentError("Comment must be 1,000 characters or less.");
+      return;
+    }
+
+    const selection = commentSelection.current;
+    commentRequest.current = true;
+    setPostingComment(true);
+    setCommentError("");
+
+    const isOriginal = video.id.startsWith("original-");
+
+    try {
+      const response = await fetch(
+        isOriginal ? "/api/comments" : "/api/creator-engagement",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            isOriginal
+              ? {
+                  videoId: Number(video.id.replace("original-", "")),
+                  text,
+                }
+              : {
+                  videoId: video.id,
+                  action: "comment",
+                  text,
+                }
+          ),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to save comment.");
+      }
+
+      if (!data.comment) {
+        throw new Error("Unable to confirm your saved comment.");
+      }
+
+      const saved: ShuffleComment = data.comment;
+
+      setComments((previous) => ({
+        ...previous,
+        [video.id]: [
+          ...(previous[video.id] || []).filter(
+            (comment) => comment.id !== saved.id
+          ),
+          saved,
+        ].sort((a, b) => a.id - b.id),
+      }));
+
+      if (commentSelection.current === selection) {
+        setCommentText("");
+        setMessage("Your comment has been saved!");
+      }
+    } catch (error) {
+      if (commentSelection.current === selection) {
+        setCommentError(
+          error instanceof Error
+            ? error.message
+            : "Unable to save comment. Please try again."
+        );
+      }
+    } finally {
+      commentRequest.current = false;
+      setPostingComment(false);
+    }
+  } 
 
   async function countView(video: ShuffleVideo) {
     if (countedVideos.current.has(video.id)) return;
@@ -535,6 +715,10 @@ const lastPlaybackTime = useRef<number | null>(null);
     watchedSeconds.current = 0;
 lastPlaybackTime.current = null;
     currentId.current = next.id;
+    commentSelection.current += 1;
+    setCommentText("");
+    setCommentError("");
+    setCommentsLoading(true); 
     setMessage("");
     setCurrent(next);
     setStarted(autoplay);
@@ -887,6 +1071,176 @@ onTimeUpdate={(event) => {
   Share
 </button> 
               </div>
+              <div style={{ marginTop: "24px" }}>
+                <h3>
+                  Comments ({(comments[current.id] || []).length})
+                </h3>
+
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void postComment(current);
+                  }}
+                >
+                  <label
+                    htmlFor="shuffle-comment"
+                    style={{ display: "block", marginBottom: "8px" }}
+                  >
+                    Add a comment
+                  </label>
+
+                  <textarea
+                    id="shuffle-comment"
+                    value={commentText}
+                    onChange={(event) =>
+                      setCommentText(event.target.value)
+                    }
+                    placeholder="Join the conversation..."
+                    maxLength={1000}
+                    rows={3}
+                    disabled={postingComment}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px",
+                      borderRadius: "12px",
+                      border: "2px solid #555",
+                      background: "#222",
+                      color: "white",
+                      font: "inherit",
+                      resize: "vertical",
+                    }}
+                  />
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: "12px",
+                      marginTop: "10px",
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      disabled={
+                        postingComment || !commentText.trim()
+                      }
+                      style={{
+                        ...buttonStyle,
+                        opacity:
+                          postingComment || !commentText.trim()
+                            ? 0.6
+                            : 1,
+                      }}
+                    >
+                      {postingComment
+                        ? "Posting..."
+                        : "Post Comment"}
+                    </button>
+
+                    <a
+                      href="/viewer/login"
+                      style={{ color: "#c4b5fd" }}
+                    >
+                      Log in to comment
+                    </a>
+                  </div>
+                </form>
+
+                {commentError && (
+                  <p role="alert" style={{ color: "#fca5a5" }}>
+                    {commentError}
+                  </p>
+                )}
+
+                {commentsLoading && (
+                  <p role="status">Loading comments...</p>
+                )}
+
+                {!commentsLoading &&
+                  !commentError &&
+                  (comments[current.id] || []).length === 0 && (
+                    <p style={{ color: "#bbb" }}>
+                      No comments yet. Start the conversation!
+                    </p>
+                  )}
+
+                {(comments[current.id] || []).map((comment) => (
+                  <div
+                    key={comment.id}
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      marginTop: "12px",
+                      padding: "14px",
+                      background: "#222",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    {comment.viewerProfilePictureUrl ? (
+                      <img
+                        src={comment.viewerProfilePictureUrl}
+                        alt=""
+                        width={40}
+                        height={40}
+                        style={{
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          borderRadius: "50%",
+                          background: "#7c3aed",
+                          display: "grid",
+                          placeItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {(comment.viewerName || "R")
+                          .charAt(0)
+                          .toUpperCase()}
+                      </span>
+                    )}
+
+                    <div
+                      style={{
+                        minWidth: 0,
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      <strong>{comment.viewerName}</strong>
+
+                      {comment.viewerUsername && (
+                        <span
+                          style={{
+                            color: "#bbb",
+                            marginLeft: "8px",
+                          }}
+                        >
+                          @{comment.viewerUsername}
+                        </span>
+                      )}
+
+                      <p
+                        style={{
+                          margin: "6px 0 0",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {comment.text}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div> 
+
               {showShareOptions && (
   <div style={{ marginTop: "18px" }}>
     <h3>Share This Video</h3>
