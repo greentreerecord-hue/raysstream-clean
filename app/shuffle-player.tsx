@@ -665,8 +665,15 @@ const commentRequest = useRef(false);
     return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    if (playing) return;
+ useEffect(() => {
+    if (
+      playing ||
+      postingComment ||
+      commentText.length > 0 ||
+      showShareOptions
+    ) {
+      return;
+    }
 
     const timer = window.setTimeout(
       () => setVisible((value) => !value),
@@ -674,7 +681,14 @@ const commentRequest = useRef(false);
     );
 
     return () => window.clearTimeout(timer);
-  }, [visible, playing, current]);
+  }, [
+    visible,
+    playing,
+    current,
+    postingComment,
+    commentText,
+    showShareOptions,
+  ]); 
 
   function nextVideo(autoplay = true) {
     const available = library.current.filter(
