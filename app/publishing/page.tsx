@@ -350,6 +350,15 @@ export default function PublishingPage() {
 >
   Download Publishing Agreement Draft (PDF)
 </a> 
+<a
+  className="coming-badge"
+  href="/contracts/RaysStream_Publishing_Agreement_Draft.pdf"
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{ marginLeft: "12px" }}
+>
+  View Draft (PDF)
+</a> 
  <p> Draft for legal review — not ready for signature.
 </p> 
 <div>
