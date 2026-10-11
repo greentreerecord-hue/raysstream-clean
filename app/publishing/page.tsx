@@ -345,13 +345,12 @@ export default function PublishingPage() {
 
  <a
   className="coming-badge"
-  href="/contracts/RaysStream_Publishing_Agreement_Draft.docx"
+  href="/contracts/RaysStream_Publishing_Agreement_Draft.pdf"
   download
 >
-  Download Publishing Agreement Draft
-</a>
-<p>
-  Draft for legal review — not ready for signature.
+  Download Publishing Agreement Draft (PDF)
+</a> 
+ <p> Draft for legal review — not ready for signature.
 </p> 
 <div>
   <h3>Planned Publishing Terms</h3>
