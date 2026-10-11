@@ -343,9 +343,17 @@ export default function PublishingPage() {
             available yet.
           </p>
 
-          <span className="coming-badge">
-            More details coming soon
-          </span>
+ <a
+  className="coming-badge"
+  href="/contracts/RaysStream_Publishing_Agreement_Draft.docx"
+  download
+>
+  Download Publishing Agreement Draft
+</a>
+<p>
+  Draft for legal review — not ready for signature.
+</p> 
+
         </section>
 
         <p className="disclaimer">
