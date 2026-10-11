@@ -353,6 +353,25 @@ export default function PublishingPage() {
 <p>
   Draft for legal review — not ready for signature.
 </p> 
+<div>
+  <h3>Planned Publishing Terms</h3>
+  <p>
+    Songwriter: 60% · Ray&apos;sStream administration fee: 40%
+    of eligible publishing royalties actually collected.
+  </p>
+  <p>
+    Proposed term: 10 years · Territory: worldwide.
+  </p>
+  <p>
+    Songwriters retain copyright ownership. Exclusive
+    administration applies only to the songs and ownership
+    shares listed in the finalized agreement.
+  </p>
+  <p>
+    Program coming soon. These draft terms require legal
+    review before signing.
+  </p>
+</div> 
 
         </section>
 
