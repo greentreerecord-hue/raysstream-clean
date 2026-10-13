@@ -629,7 +629,16 @@ export default function Home() {
           >
             Watch Live
           </a>
-
+<a
+  href="/prerelease"
+  style={{
+    ...linkStyle,
+    background: "#0891b2",
+    color: "white",
+  }}
+>
+  🎬 Prerelease
+</a> 
           <a
   href="/music-shop"
   style={{
