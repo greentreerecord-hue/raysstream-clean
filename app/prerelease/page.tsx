@@ -15,6 +15,134 @@ type Prerelease = {
   previewUrl: string;
 };
 
+async function uploadPreview(file: File) {
+  if (!file.name.toLowerCase().endsWith(".mp3")) {
+    throw new Error("Please choose an MP3 file.");
+  }
+
+  if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+    throw new Error("Choose a nonempty MP3 under 10 MB.");
+  }
+
+  const blob = await upload(
+    `prerelease/${crypto.randomUUID()}.mp3`,
+    file,
+    {
+      access: "public",
+      contentType: "audio/mpeg",
+      handleUploadUrl: "/api/prerelease-upload",
+    }
+  );
+
+  return blob.url;
+}
+
+function AttachPreview({
+  release,
+  onSaved,
+}: {
+  release: Prerelease;
+  onSaved: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [uploadedUrl, setUploadedUrl] = useState("");
+
+  async function attach(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+
+    const form = event.currentTarget;
+    const file = new FormData(form).get("previewFile");
+    setBusy(true);
+    setMessage("");
+
+    try {
+      let url = uploadedUrl;
+
+      if (file instanceof File && file.size > 0) {
+        setMessage("Uploading preview...");
+        url = await uploadPreview(file);
+        setUploadedUrl(url);
+
+        const input = form.elements.namedItem("previewFile");
+        if (input instanceof HTMLInputElement) input.value = "";
+      }
+
+      if (!url) {
+        throw new Error("Choose your MP3 preview first.");
+      }
+
+      setMessage("Saving preview...");
+
+      const response = await fetch("/api/prerelease", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: release.id,
+          previewUrl: url,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not attach preview.");
+      }
+
+      setUploadedUrl("");
+      form.reset();
+      setMessage("Audio preview attached!");
+      await onSaved();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not attach preview."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <details style={{ marginTop: 20 }}>
+      <summary>
+        {release.previewUrl
+          ? "Replace Audio Preview"
+          : "Attach Audio Preview"}
+      </summary>
+
+      <p>
+        For the creator of this announcement.
+        Log in to your creator account before saving.
+      </p>
+
+      <form onSubmit={attach}>
+        <fieldset disabled={busy}>
+          <label>
+            Choose MP3 preview (up to 10 MB)
+            <input
+              name="previewFile"
+              type="file"
+              accept=".mp3,audio/mpeg"
+              onChange={() => setUploadedUrl("")}
+            />
+          </label>
+
+          <p>Your snippet will be publicly playable.</p>
+
+          <button type="submit">
+            {busy ? "Saving..." : "Save Audio Preview"}
+          </button>
+        </fieldset>
+      </form>
+
+      {message && <p role="status">{message}</p>}
+    </details>
+  );
+}
+
 export default function PrereleasePage() {
   const [releases, setReleases] = useState<Prerelease[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,55 +189,33 @@ export default function PrereleasePage() {
 
     const form = event.currentTarget;
     const fields = new FormData(form);
-
     setSaving(true);
     setMessage("");
 
     try {
-      const audioFile = fields.get("audioFile");
+      const file = fields.get("audioFile");
 
-      if (audioFile instanceof File && audioFile.size > 0) {
-        if (!audioFile.name.toLowerCase().endsWith(".mp3")) {
-          throw new Error("Please choose an MP3 file.");
-        }
-
-        if (audioFile.size > 10 * 1024 * 1024) {
-          throw new Error("Please choose an MP3 under 10 MB.");
-        }
-
+      if (file instanceof File && file.size > 0) {
         if (fields.get("kind") !== "Music") {
-          throw new Error(
-            "Choose Music when uploading an MP3 preview."
-          );
+          throw new Error("Choose Music for an MP3 preview.");
         }
 
         setMessage("Uploading your audio preview...");
+        const url = await uploadPreview(file);
+        fields.set("previewUrl", url);
 
-        const blob = await upload(
-          `prerelease/${crypto.randomUUID()}.mp3`,
-          audioFile,
-          {
-            access: "public",
-            contentType: "audio/mpeg",
-            handleUploadUrl: "/api/prerelease-upload",
-          }
-        );
-
-        fields.set("previewUrl", blob.url);
-
-        // Keep the uploaded link if publishing needs to be retried.
-        const previewInput = form.elements.namedItem("previewUrl");
-        if (previewInput instanceof HTMLInputElement) {
-          previewInput.value = blob.url;
+        const linkInput = form.elements.namedItem("previewUrl");
+        if (linkInput instanceof HTMLInputElement) {
+          linkInput.value = url;
         }
 
         const fileInput = form.elements.namedItem("audioFile");
         if (fileInput instanceof HTMLInputElement) {
           fileInput.value = "";
         }
-
-        setMessage("Publishing your prerelease...");
       }
+
+      setMessage("Publishing your prerelease...");
 
       const response = await fetch("/api/prerelease", {
         method: "POST",
@@ -127,9 +233,7 @@ export default function PrereleasePage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.error || "Could not publish prerelease."
-        );
+        throw new Error(data.error || "Could not publish prerelease.");
       }
 
       form.reset();
@@ -154,17 +258,12 @@ export default function PrereleasePage() {
       });
   }
 
-  const visible = releases.filter((release) => {
-    const matchesKind =
-      filter === "All" || release.kind === filter;
-
-    const matchesSearch =
-      `${release.title} ${release.creator} ${release.description}`
-        .toLowerCase()
-        .includes(search.toLowerCase().trim());
-
-    return matchesKind && matchesSearch;
-  });
+  const visible = releases.filter((release) =>
+    (filter === "All" || release.kind === filter) &&
+    `${release.title} ${release.creator} ${release.description}`
+      .toLowerCase()
+      .includes(search.toLowerCase().trim())
+  );
 
   return (
     <main className="prerelease">
@@ -173,18 +272,14 @@ export default function PrereleasePage() {
 
         <header>
           <h1>🎬 Prerelease</h1>
-          <p>
-            Discover previews of new and upcoming music and videos.
-          </p>
+          <p>Discover previews of new and upcoming music and videos.</p>
         </header>
 
         <details className="panel">
           <summary>Add a Prerelease</summary>
-
           <p>
-            Creators:{" "}
-            <Link href="/creator/login">log in</Link>{" "}
-            before posting. Your submission will appear publicly
+            Creators: <Link href="/creator/login">log in</Link>{" "}
+            before posting. Your announcement appears publicly
             under your creator name.
           </p>
 
@@ -192,11 +287,7 @@ export default function PrereleasePage() {
             <fieldset disabled={saving}>
               <label>
                 Title
-                <input
-                  name="title"
-                  required
-                  maxLength={200}
-                />
+                <input name="title" required maxLength={200} />
               </label>
 
               <label>
@@ -209,20 +300,12 @@ export default function PrereleasePage() {
 
               <label>
                 Release date
-                <input
-                  name="releaseDate"
-                  type="date"
-                  required
-                />
+                <input name="releaseDate" type="date" required />
               </label>
 
               <label>
                 Description
-                <textarea
-                  name="description"
-                  rows={4}
-                  maxLength={3000}
-                />
+                <textarea name="description" rows={4} maxLength={3000} />
               </label>
 
               <label>
@@ -246,9 +329,8 @@ export default function PrereleasePage() {
               </label>
 
               <p>
-                Choose an MP3 snippet up to 10 MB. Your uploaded
-                snippet will be publicly playable. If you choose
-                a file, it replaces the preview link below.
+                MP3 snippets up to 10 MB. Uploaded snippets are public.
+                A chosen file replaces the preview link below.
               </p>
 
               <label>
@@ -262,16 +344,10 @@ export default function PrereleasePage() {
                 />
               </label>
 
-              <p>
-                For links, use a direct HTTPS link to an image,
-                audio file, or video file. Share only the preview
-                you want visitors to access.
-              </p>
+              <p>Use direct HTTPS links to media files.</p>
 
               <button type="submit">
-                {saving
-                  ? "Uploading / Publishing..."
-                  : "Publish Prerelease"}
+                {saving ? "Uploading / Publishing..." : "Publish Prerelease"}
               </button>
             </fieldset>
           </form>
@@ -286,7 +362,6 @@ export default function PrereleasePage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-
           <select
             aria-label="Filter release type"
             value={filter}
@@ -296,95 +371,86 @@ export default function PrereleasePage() {
             <option value="Music">Music</option>
             <option value="Video">Videos</option>
           </select>
-
           <button
             type="button"
-            onClick={() => void loadReleases()}
             disabled={loading || saving}
+            onClick={() => void loadReleases()}
           >
             Reload
           </button>
         </div>
 
-        {loading ? (
-          <p role="status">Loading prereleases...</p>
-        ) : loadError ? (
-          <p role="alert">{loadError} Try Reload.</p>
-        ) : visible.length === 0 ? (
+        {loadError && <p role="alert">{loadError} Try Reload.</p>}
+        {loading && <p role="status">Loading prereleases...</p>}
+
+        {!loading && !loadError && visible.length === 0 && (
           <section className="panel">
             <h2>
               {releases.length === 0
                 ? "No prereleases announced yet"
                 : "No matching prereleases"}
             </h2>
-
-            <p>
-              {releases.length === 0
-                ? "Check back for new previews and release dates."
-                : "Try another search or release type."}
-            </p>
+            <p>Check back for previews or try another search.</p>
           </section>
-        ) : (
-          <div className="grid">
-            {visible.map((release) => (
-              <article className="card" key={release.id}>
-                {release.coverUrl && (
-                  <img
-                    src={release.coverUrl}
-                    alt={`${release.title} cover`}
-                    loading="lazy"
+        )}
+
+        <div className="grid">
+          {visible.map((release) => (
+            <article className="card" key={release.id}>
+              {release.coverUrl && (
+                <img
+                  src={release.coverUrl}
+                  alt={`${release.title} cover`}
+                  loading="lazy"
+                />
+              )}
+
+              <div className="card-body">
+                <span className="badge">{release.kind} • Prerelease</span>
+                <h2>{release.title}</h2>
+                <p>By {release.creator}</p>
+                <p className="description">{release.description}</p>
+                <p>
+                  Release date:{" "}
+                  <time dateTime={release.releaseDate}>
+                    {release.releaseDate}
+                  </time>
+                </p>
+
+                {release.previewUrl &&
+                  (release.kind === "Music" ? (
+                    <audio
+                      key={release.previewUrl}
+                      controls
+                      preload="none"
+                      src={release.previewUrl}
+                      onPlay={(event) => pauseOthers(event.currentTarget)}
+                    />
+                  ) : (
+                    <video
+                      key={release.previewUrl}
+                      controls
+                      playsInline
+                      preload="none"
+                      src={release.previewUrl}
+                      poster={release.coverUrl || undefined}
+                      onPlay={(event) => pauseOthers(event.currentTarget)}
+                    />
+                  ))}
+
+                {release.kind === "Music" && (
+                  <AttachPreview
+                    release={release}
+                    onSaved={loadReleases}
                   />
                 )}
-
-                <div className="card-body">
-                  <span className="badge">
-                    {release.kind} • Prerelease
-                  </span>
-
-                  <h2>{release.title}</h2>
-                  <p>By {release.creator}</p>
-
-                  <p className="description">
-                    {release.description}
-                  </p>
-
-                  <p>
-                    Release date:{" "}
-                    <time dateTime={release.releaseDate}>
-                      {release.releaseDate}
-                    </time>
-                  </p>
-
-                  {release.previewUrl &&
-                    (release.kind === "Music" ? (
-                      <audio
-                        controls
-                        preload="none"
-                        src={release.previewUrl}
-                        onPlay={(event) =>
-                          pauseOthers(event.currentTarget)
-                        }
-                      />
-                    ) : (
-                      <video
-                        controls
-                        playsInline
-                        preload="none"
-                        src={release.previewUrl}
-                        poster={release.coverUrl || undefined}
-                        onPlay={(event) =>
-                          pauseOthers(event.currentTarget)
-                        }
-                      />
-                    ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+              </div>
+            </article>
+          ))}
+        </div>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         .prerelease {
           min-height: 100vh;
           padding: 30px 18px;
@@ -392,52 +458,27 @@ export default function PrereleasePage() {
           color: white;
           font-family: Arial, sans-serif;
         }
-        .container {
-          max-width: 1050px;
-          margin: auto;
-        }
-        .container :global(a) {
-          color: #67e8f9;
-        }
-        header {
-          text-align: center;
-          padding: 30px 0;
-        }
-        h1 {
-          font-size: clamp(32px, 7vw, 48px);
-        }
-        p {
-          line-height: 1.6;
-          color: #ccc;
-        }
-        .panel,
-        .card {
+        .prerelease .container { max-width: 1050px; margin: auto; }
+        .prerelease a { color: #67e8f9; }
+        .prerelease header { text-align: center; padding: 30px 0; }
+        .prerelease h1 { font-size: clamp(32px, 7vw, 48px); }
+        .prerelease p { line-height: 1.6; color: #ccc; }
+        .prerelease .panel, .prerelease .card {
           background: #151515;
           border: 1px solid #333;
           border-radius: 16px;
         }
-        .panel {
-          padding: 24px;
-          margin-bottom: 24px;
-        }
-        summary {
+        .prerelease .panel { padding: 24px; margin-bottom: 24px; }
+        .prerelease summary {
           cursor: pointer;
-          font-size: 22px;
+          font-size: 20px;
           font-weight: bold;
         }
-        fieldset {
-          border: 0;
-          padding: 0;
-          margin: 0;
-          min-width: 0;
+        .prerelease fieldset {
+          border: 0; padding: 0; margin: 0; min-width: 0;
         }
-        label {
-          display: block;
-          margin: 16px 0;
-        }
-        input,
-        select,
-        textarea {
+        .prerelease label { display: block; margin: 16px 0; }
+        .prerelease input, .prerelease select, .prerelease textarea {
           display: block;
           box-sizing: border-box;
           width: 100%;
@@ -449,10 +490,8 @@ export default function PrereleasePage() {
           color: white;
           font: inherit;
         }
-        textarea {
-          resize: vertical;
-        }
-        button {
+        .prerelease textarea { resize: vertical; }
+        .prerelease button {
           padding: 12px 18px;
           border: 0;
           border-radius: 8px;
@@ -462,56 +501,36 @@ export default function PrereleasePage() {
           font-weight: bold;
           cursor: pointer;
         }
-        button:disabled {
-          opacity: 0.6;
-          cursor: wait;
-        }
-        .filters {
+        .prerelease button:disabled { opacity: 0.6; cursor: wait; }
+        .prerelease .filters {
           display: flex;
           flex-wrap: wrap;
           gap: 12px;
           align-items: center;
           margin-bottom: 24px;
         }
-        .filters input {
-          flex: 2;
-          min-width: 180px;
-          margin: 0;
+        .prerelease .filters input {
+          flex: 2; min-width: 180px; margin: 0;
         }
-        .filters select {
-          flex: 1;
-          min-width: 140px;
-          margin: 0;
+        .prerelease .filters select {
+          flex: 1; min-width: 140px; margin: 0;
         }
-        .grid {
+        .prerelease .grid {
           display: grid;
-          grid-template-columns:
-            repeat(auto-fit, minmax(260px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
           gap: 24px;
         }
-        .card {
-          overflow: hidden;
-          min-width: 0;
+        .prerelease .card { overflow: hidden; min-width: 0; }
+        .prerelease .card img {
+          width: 100%; height: 240px; object-fit: cover;
         }
-        .card img {
-          width: 100%;
-          height: 240px;
-          object-fit: cover;
+        .prerelease .card-body {
+          padding: 20px; overflow-wrap: anywhere;
         }
-        .card-body {
-          padding: 20px;
-          overflow-wrap: anywhere;
-        }
-        .badge {
-          color: #67e8f9;
-        }
-        .description {
-          white-space: pre-wrap;
-        }
-        audio,
-        video {
-          width: 100%;
-          margin-top: 12px;
+        .prerelease .badge { color: #67e8f9; }
+        .prerelease .description { white-space: pre-wrap; }
+        .prerelease audio, .prerelease video {
+          width: 100%; margin-top: 12px;
         }
       `}</style>
     </main>

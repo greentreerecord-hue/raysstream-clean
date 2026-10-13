@@ -195,3 +195,89 @@ export async function POST(request: Request) {
     await sql.end();
   }
 } 
+export async function PATCH(request: Request) {
+  if (
+    request.headers.get("origin") !==
+    new URL(request.url).origin
+  ) {
+    return json({ error: "Invalid request origin." }, 403);
+  }
+
+  let body: Record<string, unknown>;
+
+  try {
+    const parsed = await request.json();
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
+      return json({ error: "Invalid update." }, 400);
+    }
+
+    body = parsed;
+  } catch {
+    return json({ error: "Invalid update." }, 400);
+  }
+
+  const id = String(body.id ?? "");
+  const previewUrl =
+    typeof body.previewUrl === "string"
+      ? body.previewUrl.trim()
+      : "";
+
+  if (
+    !/^[1-9]\d{0,9}$/.test(id) ||
+    Number(id) > 2147483647 ||
+    !previewUrl ||
+    previewUrl.length > 2048 ||
+    !validUrl(previewUrl)
+  ) {
+    return json(
+      { error: "A valid prerelease and HTTPS preview link are required." },
+      400
+    );
+  }
+
+  const sql = getDatabase();
+
+  try {
+    const creator = await getCreatorFromSession(request);
+
+    if (!creator) {
+      return json(
+        { error: "Please log in as a creator." },
+        401
+      );
+    }
+
+    await ensureTable(sql);
+
+    const rows = await sql`
+      UPDATE prereleases
+      SET preview_url = ${previewUrl}
+      WHERE id = ${Number(id)}
+        AND creator_id = ${creator.id}
+      RETURNING id::text AS id
+    `;
+
+    if (rows.length === 0) {
+      return json(
+        { error: "This prerelease was not found in your account." },
+        404
+      );
+    }
+
+    return json({ success: true, id: rows[0].id });
+  } catch (error) {
+    console.error("Prerelease update failed:", error);
+
+    return json(
+      { error: "Could not update your prerelease." },
+      500
+    );
+  } finally {
+    await sql.end();
+  }
+} 
