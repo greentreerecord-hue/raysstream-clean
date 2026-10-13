@@ -1,10 +1,11 @@
 "use client";
 
 import {
-  ChangeEvent,
-  FormEvent,
   useEffect,
   useState,
+  type ChangeEvent,
+  type FormEvent,
+  type CSSProperties,
 } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
@@ -16,37 +17,38 @@ type CreatorProfile = {
   profilePicturePathname: string;
 };
 
+const buttonStyle: CSSProperties = {
+  padding: "12px 18px",
+  borderRadius: "8px",
+  border: "2px solid black",
+  color: "white",
+  background: "#2563eb",
+  fontSize: "16px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
 export default function CreatorProfilePage() {
   const router = useRouter();
+  const [profile, setProfile] = useState<CreatorProfile | null>(null);
+  const [name, setName] = useState("");
+  const [selectedPicture, setSelectedPicture] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [savingName, setSavingName] = useState(false);
+  const [savingPicture, setSavingPicture] = useState(false);
+  const [nameMessage, setNameMessage] = useState("");
+  const [pictureMessage, setPictureMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
 
-  const [profile, setProfile] =
-    useState<CreatorProfile | null>(null);
-
-  const [selectedPicture, setSelectedPicture] =
-    useState<File | null>(null);
-
-  const [previewUrl, setPreviewUrl] =
-    useState("");
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [saving, setSaving] =
-    useState(false);
-
-  const [message, setMessage] =
-    useState("");
+  const busy = savingName || savingPicture;
 
   useEffect(() => {
     async function loadProfile() {
       try {
-        const response = await fetch(
-          "/api/creator-profile",
-          {
-            cache: "no-store",
-          }
-        );
-
+        const response = await fetch("/api/creator-profile", {
+          cache: "no-store",
+        });
         const data = await response.json();
 
         if (response.status === 401) {
@@ -55,145 +57,58 @@ export default function CreatorProfilePage() {
         }
 
         if (!response.ok) {
-          setMessage(
-            data.error ||
-              "Could not load your profile."
-          );
-          return;
+          throw new Error(data.error || "Could not load your profile.");
         }
 
-        setProfile({
+        const loadedProfile: CreatorProfile = {
           name: data.name || "",
           email: data.email || "",
-          profilePictureUrl:
-            data.profilePictureUrl || "",
-          profilePicturePathname:
-            data.profilePicturePathname || "",
-        });
-      } catch (error) {
-        console.error(
-          "Load profile error:",
-          error
-        );
+          profilePictureUrl: data.profilePictureUrl || "",
+          profilePicturePathname: data.profilePicturePathname || "",
+        };
 
-        setMessage(
-          "Could not load your profile."
+        setProfile(loadedProfile);
+        setName(loadedProfile.name);
+      } catch (error) {
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "Could not load your profile."
         );
       } finally {
         setLoading(false);
       }
     }
 
-    loadProfile();
+    void loadProfile();
   }, [router]);
 
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
-  function choosePicture(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
-    const file =
-      event.target.files?.[0] || null;
-
-    setMessage("");
-
-    if (!file) {
-      setSelectedPicture(null);
-      setPreviewUrl("");
-      return;
-    }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      event.target.value = "";
-      setSelectedPicture(null);
-      setPreviewUrl("");
-      setMessage(
-        "Please choose a JPG, PNG, or WebP image."
-      );
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      event.target.value = "";
-      setSelectedPicture(null);
-      setPreviewUrl("");
-      setMessage(
-        "Please choose an image smaller than 5 MB."
-      );
-      return;
-    }
-
-    setSelectedPicture(file);
-    setPreviewUrl(URL.createObjectURL(file));
-  }
-
-  async function saveProfile(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function saveName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!profile || busy) return;
 
-    if (!profile) {
+    const newName = name.trim().replace(/\s+/g, " ");
+
+    if (!newName || newName.length > 100) {
+      setNameMessage("Enter a name between 1 and 100 characters.");
       return;
     }
 
-    if (!selectedPicture) {
-      setMessage(
-        "Please choose a new profile picture."
-      );
-      return;
-    }
+    setSavingName(true);
+    setNameMessage("Saving your creator name...");
 
     try {
-      setSaving(true);
-      setMessage(
-        "Uploading your profile picture..."
-      );
-
-      const safeEmail = profile.email
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "-");
-
-      const pictureBlob = await upload(
-        `profiles/${safeEmail}/${Date.now()}-${selectedPicture.name}`,
-        selectedPicture,
-        {
-          access: "public",
-          handleUploadUrl: "/api/upload",
-        }
-      );
-
-      setMessage("Saving your profile...");
-
-      const response = await fetch(
-        "/api/creator-profile",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            profilePictureUrl:
-              pictureBlob.url,
-            profilePicturePathname:
-              pictureBlob.pathname,
-          }),
-        }
-      );
-
+      const response = await fetch("/api/creator-profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      });
       const data = await response.json();
 
       if (response.status === 401) {
@@ -202,85 +117,167 @@ export default function CreatorProfilePage() {
       }
 
       if (!response.ok) {
-        setMessage(
-          data.error ||
-            "Could not save your profile."
-        );
+        throw new Error(data.error || "Could not save your name.");
+      }
+
+      const savedName = String(data.name || newName);
+
+      setName(savedName);
+      setProfile((current) =>
+        current ? { ...current, name: savedName } : current
+      );
+
+      // Refresh the name cached by the creator dashboard.
+      try {
+        const stored = localStorage.getItem("raysstreamCreator");
+        if (stored) {
+          const creator = JSON.parse(stored);
+          if (
+            creator &&
+            typeof creator === "object" &&
+            !Array.isArray(creator)
+          ) {
+            localStorage.setItem(
+              "raysstreamCreator",
+              JSON.stringify({ ...creator, name: savedName })
+            );
+          }
+        }
+      } catch {
+        // The database name has already been saved.
+      }
+
+      setNameMessage(
+        "Creator name updated! Your prerelease announcements use it too."
+      );
+      router.refresh();
+    } catch (error) {
+      setNameMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not save your name."
+      );
+    } finally {
+      setSavingName(false);
+    }
+  }
+
+  function choosePicture(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] || null;
+    setPictureMessage("");
+
+    if (!file) {
+      setSelectedPicture(null);
+      setPreviewUrl("");
+      return;
+    }
+
+    if (
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+      file.size === 0 ||
+      file.size > 5 * 1024 * 1024
+    ) {
+      event.target.value = "";
+      setSelectedPicture(null);
+      setPreviewUrl("");
+      setPictureMessage("Choose a JPG, PNG, or WebP image under 5 MB.");
+      return;
+    }
+
+    setSelectedPicture(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
+
+  async function savePicture(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!profile || !selectedPicture || busy) return;
+
+    const form = event.currentTarget;
+    setSavingPicture(true);
+    setPictureMessage("Uploading your profile picture...");
+
+    try {
+      const safeEmail = profile.email
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "-");
+
+      const blob = await upload(
+        `profiles/${safeEmail}/${Date.now()}-${selectedPicture.name}`,
+        selectedPicture,
+        {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+        }
+      );
+
+      setPictureMessage("Saving your profile picture...");
+
+      const response = await fetch("/api/creator-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profilePictureUrl: blob.url,
+          profilePicturePathname: blob.pathname,
+        }),
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        router.replace("/creator/login");
         return;
       }
 
-      setProfile((currentProfile) =>
-        currentProfile
+      if (!response.ok) {
+        throw new Error(data.error || "Could not save your picture.");
+      }
+
+      setProfile((current) =>
+        current
           ? {
-              ...currentProfile,
-              profilePictureUrl:
-                data.profilePictureUrl,
-              profilePicturePathname:
-                data.profilePicturePathname,
+              ...current,
+              profilePictureUrl: data.profilePictureUrl,
+              profilePicturePathname: data.profilePicturePathname,
             }
-          : currentProfile
+          : current
       );
 
+      form.reset();
       setSelectedPicture(null);
       setPreviewUrl("");
-      setMessage(
-        "Profile picture updated successfully!"
-      );
+      setPictureMessage("Profile picture updated successfully!");
     } catch (error) {
-      console.error(
-        "Save profile error:",
-        error
-      );
-
-      setMessage(
-        "Could not save your profile picture."
+      setPictureMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not save your profile picture."
       );
     } finally {
-      setSaving(false);
+      setSavingPicture(false);
     }
-  } 
-  const displayedPicture =
-    previewUrl ||
-    profile?.profilePictureUrl ||
-    "";
+  }
 
-  const creatorInitial =
-    profile?.name?.trim().charAt(0)
-      .toUpperCase() || "C";
+  const displayedPicture = previewUrl || profile?.profilePictureUrl || "";
+  const initial = profile?.name.trim().charAt(0).toUpperCase() || "C";
 
   return (
     <main
       style={{
         minHeight: "100vh",
-        background:
-          "linear-gradient(135deg, #050816, #111827)",
-        color: "#ffffff",
+        background: "linear-gradient(135deg, #050816, #111827)",
         padding: "30px 20px",
         fontFamily: "Arial, sans-serif",
       }}
     >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "700px",
-          margin: "0 auto",
-        }}
-      >
+      <div style={{ maxWidth: "700px", margin: "0 auto" }}>
         <button
           type="button"
-          onClick={() =>
-            router.push("/creator/dashboard")
-          }
+          onClick={() => router.push("/creator/dashboard")}
           style={{
-            padding: "12px 18px",
+            ...buttonStyle,
+            background: "white",
+            color: "black",
             marginBottom: "25px",
-            borderRadius: "8px",
-            border: "2px solid #000000",
-            backgroundColor: "#ffffff",
-            color: "#000000",
-            fontSize: "16px",
-            fontWeight: "bold",
-            cursor: "pointer",
           }}
         >
           ← Back to Creator Dashboard
@@ -288,48 +285,30 @@ export default function CreatorProfilePage() {
 
         <section
           style={{
-            padding: "30px",
+            padding: "28px",
             borderRadius: "18px",
-            border: "2px solid #000000",
-            backgroundColor: "#ffffff",
+            border: "2px solid black",
+            background: "white",
             color: "#111827",
-            boxShadow:
-              "0 18px 45px rgba(0, 0, 0, 0.35)",
+            boxShadow: "0 18px 45px rgba(0,0,0,0.35)",
           }}
         >
-          <h1
-            style={{
-              marginTop: 0,
-              marginBottom: "10px",
-              fontSize: "38px",
-            }}
-          >
+          <h1 style={{ marginTop: 0, fontSize: "36px" }}>
             Creator Profile
           </h1>
-
-          <p
-            style={{
-              marginTop: 0,
-              marginBottom: "28px",
-              color: "#4b5563",
-              fontSize: "17px",
-            }}
-          >
-            View your account and update your
-            creator profile picture.
-          </p>
+          <p>Update your creator name and profile picture.</p>
 
           {loading ? (
             <p>Loading your profile...</p>
           ) : profile ? (
-            <form onSubmit={saveProfile}>
+            <>
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "22px",
                   flexWrap: "wrap",
-                  marginBottom: "28px",
+                  gap: "22px",
+                  margin: "28px 0",
                 }}
               >
                 {displayedPicture ? (
@@ -340,168 +319,117 @@ export default function CreatorProfilePage() {
                       width: "150px",
                       height: "150px",
                       borderRadius: "50%",
-                      border:
-                        "4px solid #111827",
+                      border: "4px solid #111827",
                       objectFit: "cover",
-                      backgroundColor: "#e5e7eb",
                     }}
                   />
                 ) : (
                   <div
-                    aria-label="Creator profile placeholder"
                     style={{
                       width: "150px",
                       height: "150px",
                       borderRadius: "50%",
-                      border:
-                        "4px solid #111827",
+                      background: "#2563eb",
+                      color: "white",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      background:
-                        "linear-gradient(135deg, #4f46e5, #06b6d4)",
-                      color: "#ffffff",
                       fontSize: "64px",
-                      fontWeight: "bold",
                     }}
                   >
-                    {creatorInitial}
+                    {initial}
                   </div>
                 )}
 
-                <div
-                  style={{
-                    flex: "1 1 260px",
-                  }}
-                >
-                  <h2
-                    style={{
-                      margin: "0 0 8px",
-                      fontSize: "28px",
-                      overflowWrap: "anywhere",
-                    }}
+                <div style={{ flex: "1 1 240px", overflowWrap: "anywhere" }}>
+                  <h2>{profile.name}</h2>
+                  <p>{profile.email}</p>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => router.push("/creator/email")}
+                    style={buttonStyle}
                   >
-                    {profile.name}
-                  </h2>
-
-                  <p
-                    style={{
-                      margin: 0,
-                      color: "#4b5563",
-                      fontSize: "17px",
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {profile.email}
-                  </p>
-<button
-  type="button"
-  onClick={() =>
-    router.push("/creator/email")
-  }
-  style={{
-    marginTop: "14px",
-    padding: "11px 17px",
-    borderRadius: "8px",
-    border: "2px solid #000000",
-    backgroundColor: "#2563eb",
-    color: "#ffffff",
-    fontSize: "16px",
-    fontWeight: "bold",
-    cursor: "pointer",
-  }}
->
-  Edit Email
-</button> 
+                    Edit Email
+                  </button>
                 </div>
               </div>
 
-              <label
-                htmlFor="profile-picture"
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                }}
-              >
-                Choose New Profile Picture
-              </label>
+              <form onSubmit={saveName}>
+                <label
+                  htmlFor="creator-name"
+                  style={{ display: "block", fontWeight: "bold" }}
+                >
+                  Creator Name
+                </label>
+                <input
+                  id="creator-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                  maxLength={100}
+                  disabled={busy}
+                  style={{
+                    boxSizing: "border-box",
+                    width: "100%",
+                    padding: "12px",
+                    margin: "10px 0 14px",
+                    border: "1px solid #666",
+                    borderRadius: "8px",
+                    background: "white",
+                    color: "#111827",
+                    fontSize: "18px",
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !name.trim()}
+                  style={{
+                    ...buttonStyle,
+                    background: busy ? "#9ca3af" : "#16a34a",
+                  }}
+                >
+                  {savingName ? "Saving..." : "Save Creator Name"}
+                </button>
+                {nameMessage && <p role="status">{nameMessage}</p>}
+              </form>
 
-              <p
-                style={{
-                  margin: "0 0 12px",
-                  color: "#4b5563",
-                  lineHeight: 1.5,
-                }}
-              >
-                Choose a JPG, PNG, or WebP image
-                smaller than 5 MB.
-              </p>
+              <hr style={{ margin: "30px 0" }} />
 
-              <input
-                id="profile-picture"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={choosePicture}
-                disabled={saving}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  marginBottom: "22px",
-                  fontSize: "16px",
-                }}
-              />
-
-              <button
-                type="submit"
-                disabled={
-                  saving || !selectedPicture
-                }
-                style={{
-                  width: "100%",
-                  padding: "14px 20px",
-                  borderRadius: "9px",
-                  border: "2px solid #000000",
-                  backgroundColor:
-                    saving || !selectedPicture
-                      ? "#9ca3af"
-                      : "#16a34a",
-                  color: "#ffffff",
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                  cursor:
-                    saving || !selectedPicture
-                      ? "not-allowed"
-                      : "pointer",
-                }}
-              >
-                {saving
-                  ? "Saving..."
-                  : "Save Profile Picture"}
-              </button>
-            </form>
+              <form onSubmit={savePicture}>
+                <label
+                  htmlFor="profile-picture"
+                  style={{ display: "block", fontWeight: "bold" }}
+                >
+                  Choose New Profile Picture
+                </label>
+                <p>Choose a JPG, PNG, or WebP image under 5 MB.</p>
+                <input
+                  id="profile-picture"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={choosePicture}
+                  disabled={busy}
+                  style={{ width: "100%", marginBottom: "20px" }}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !selectedPicture}
+                  style={{
+                    ...buttonStyle,
+                    width: "100%",
+                    background:
+                      busy || !selectedPicture ? "#9ca3af" : "#16a34a",
+                  }}
+                >
+                  {savingPicture ? "Saving..." : "Save Profile Picture"}
+                </button>
+                {pictureMessage && <p role="status">{pictureMessage}</p>}
+              </form>
+            </>
           ) : (
-            <p>
-              Your creator profile could not be
-              loaded.
-            </p>
-          )}
-
-          {message && (
-            <p
-              style={{
-                marginTop: "20px",
-                marginBottom: 0,
-                padding: "12px",
-                borderRadius: "8px",
-                backgroundColor: "#f3f4f6",
-                color: "#111827",
-                fontWeight: "bold",
-                overflowWrap: "anywhere",
-              }}
-            >
-              {message}
+            <p role="alert">
+              {loadError || "Your creator profile could not be loaded."}
             </p>
           )}
         </section>

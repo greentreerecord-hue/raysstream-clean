@@ -10,38 +10,36 @@ const connectionString =
   process.env.RAYSSTREAM_DB_DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error(
-    "RAYSSTREAM_DB_DATABASE_URL is missing"
-  );
+  throw new Error("RAYSSTREAM_DB_DATABASE_URL is missing");
 }
 
 const sql = postgres(connectionString, {
   ssl: "require",
 });
 
+function json(body: object, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
 async function ensureProfileColumns() {
   await sql`
     ALTER TABLE creators
-    ADD COLUMN IF NOT EXISTS
-      profile_picture_url TEXT
+    ADD COLUMN IF NOT EXISTS profile_picture_url TEXT
   `;
 
   await sql`
     ALTER TABLE creators
-    ADD COLUMN IF NOT EXISTS
-      profile_picture_pathname TEXT
+    ADD COLUMN IF NOT EXISTS profile_picture_pathname TEXT
   `;
 }
 
 function unauthorizedResponse() {
-  return NextResponse.json(
-    {
-      error:
-        "Please log in to your creator account.",
-    },
-    {
-      status: 401,
-    }
+  return json(
+    { error: "Please log in to your creator account." },
+    401
   );
 }
 
@@ -52,10 +50,9 @@ function validBlobUrl(
   try {
     const parsedUrl = new URL(blobUrl);
 
-    const validHost =
-      parsedUrl.hostname.endsWith(
-        ".public.blob.vercel-storage.com"
-      );
+    const validHost = parsedUrl.hostname.endsWith(
+      ".public.blob.vercel-storage.com"
+    );
 
     const urlPathname = decodeURIComponent(
       parsedUrl.pathname.replace(/^\/+/, "")
@@ -64,6 +61,8 @@ function validBlobUrl(
     return (
       parsedUrl.protocol === "https:" &&
       validHost &&
+      !parsedUrl.username &&
+      !parsedUrl.password &&
       urlPathname === expectedPathname
     );
   } catch {
@@ -71,10 +70,27 @@ function validBlobUrl(
   }
 }
 
+async function readBody(request: Request) {
+  try {
+    const body = await request.json();
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return null;
+    }
+
+    return body as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   try {
-    const creator =
-      await getCreatorFromSession(request);
+    const creator = await getCreatorFromSession(request);
 
     if (!creator) {
       return unauthorizedResponse();
@@ -82,7 +98,7 @@ export async function GET(request: Request) {
 
     await ensureProfileColumns();
 
-    const creators = await sql`
+    const rows = await sql`
       SELECT
         name,
         email,
@@ -93,56 +109,42 @@ export async function GET(request: Request) {
       LIMIT 1
     `;
 
-    if (creators.length === 0) {
-      return NextResponse.json(
-        {
-          error: "Creator was not found.",
-        },
-        {
-          status: 404,
-        }
-      );
+    if (rows.length === 0) {
+      return json({ error: "Creator was not found." }, 404);
     }
 
-    const creatorProfile = creators[0];
+    const profile = rows[0];
 
-    return NextResponse.json({
-      name: creatorProfile.name,
-      email: creatorProfile.email,
-      profilePictureUrl:
-        creatorProfile.profile_picture_url || "",
+    return json({
+      name: profile.name,
+      email: profile.email,
+      profilePictureUrl: profile.profile_picture_url || "",
       profilePicturePathname:
-        creatorProfile.profile_picture_pathname ||
-        "",
+        profile.profile_picture_pathname || "",
     });
   } catch (error) {
-    console.error(
-      "Load creator profile error:",
-      error
-    );
+    console.error("Load creator profile error:", error);
 
-    return NextResponse.json(
-      {
-        error:
-          "Could not load the creator profile.",
-      },
-      {
-        status: 500,
-      }
+    return json(
+      { error: "Could not load the creator profile." },
+      500
     );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const creator =
-      await getCreatorFromSession(request);
+    const creator = await getCreatorFromSession(request);
 
     if (!creator) {
       return unauthorizedResponse();
     }
 
-    const body = await request.json();
+    const body = await readBody(request);
+
+    if (!body) {
+      return json({ error: "Invalid profile information." }, 400);
+    }
 
     const profilePictureUrl =
       typeof body.profilePictureUrl === "string"
@@ -150,99 +152,62 @@ export async function POST(request: Request) {
         : "";
 
     const profilePicturePathname =
-      typeof body.profilePicturePathname ===
-      "string"
+      typeof body.profilePicturePathname === "string"
         ? body.profilePicturePathname.trim()
         : "";
 
-    if (
-      !profilePictureUrl ||
-      !profilePicturePathname
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing creator profile information.",
-        },
-        {
-          status: 400,
-        }
+    if (!profilePictureUrl || !profilePicturePathname) {
+      return json(
+        { error: "Missing creator profile information." },
+        400
       );
     }
 
-    const safeEmail = creator.email.replace(
-      /[^a-z0-9]/g,
-      "-"
-    );
-
-    const creatorFolder =
-      `profiles/${safeEmail}/`;
+    const safeEmail = creator.email.replace(/[^a-z0-9]/g, "-");
+    const creatorFolder = `profiles/${safeEmail}/`;
 
     if (
-      !profilePicturePathname.startsWith(
-        creatorFolder
-      ) ||
+      !profilePicturePathname.startsWith(creatorFolder) ||
       profilePicturePathname.includes("..") ||
       profilePicturePathname.includes("\\") ||
-      !validBlobUrl(
-        profilePictureUrl,
-        profilePicturePathname
-      )
+      !validBlobUrl(profilePictureUrl, profilePicturePathname)
     ) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid creator profile picture.",
-        },
-        {
-          status: 403,
-        }
+      return json(
+        { error: "Invalid creator profile picture." },
+        403
       );
     }
 
     await ensureProfileColumns();
 
-    const existingCreators = await sql`
+    const rows = await sql`
       SELECT profile_picture_url
       FROM creators
       WHERE id = ${creator.id}
       LIMIT 1
     `;
 
-    if (existingCreators.length === 0) {
-      return NextResponse.json(
-        {
-          error: "Creator was not found.",
-        },
-        {
-          status: 404,
-        }
-      );
+    if (rows.length === 0) {
+      return json({ error: "Creator was not found." }, 404);
     }
 
-    const oldProfilePictureUrl =
-      existingCreators[0].profile_picture_url;
+    const oldProfilePictureUrl = rows[0].profile_picture_url;
 
     await sql`
       UPDATE creators
       SET
-        profile_picture_url =
-          ${profilePictureUrl},
-        profile_picture_pathname =
-          ${profilePicturePathname}
+        profile_picture_url = ${profilePictureUrl},
+        profile_picture_pathname = ${profilePicturePathname}
       WHERE id = ${creator.id}
     `;
 
     if (
       oldProfilePictureUrl &&
-      oldProfilePictureUrl !==
-        profilePictureUrl
+      oldProfilePictureUrl !== profilePictureUrl
     ) {
       try {
         await del(oldProfilePictureUrl, {
-          token:
-            process.env
-              .RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
+          token: process.env.RAYSSTREAM_VIDEO_READ_WRITE_TOKEN,
         });
       } catch (error) {
         console.error(
@@ -252,58 +217,111 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({
+    return json({
       success: true,
       profilePictureUrl,
       profilePicturePathname,
-      message:
-        "Creator profile picture updated successfully.",
+      message: "Creator profile picture updated successfully.",
     });
   } catch (error) {
-    console.error(
-      "Save creator profile error:",
-      error
-    );
+    console.error("Save creator profile error:", error);
 
-    return NextResponse.json(
-      {
-        error:
-          "Could not save the creator profile.",
-      },
-      {
-        status: 500,
-      }
+    return json(
+      { error: "Could not save the creator profile." },
+      500
     );
   }
-} 
+}
+
 export async function PATCH(request: Request) {
   try {
-    const creator =
-      await getCreatorFromSession(request);
+    const creator = await getCreatorFromSession(request);
 
     if (!creator) {
       return unauthorizedResponse();
     }
 
-    const body = await request.json();
+    const body = await readBody(request);
 
+    if (!body) {
+      return json({ error: "Invalid profile update." }, 400);
+    }
+
+    // Update the creator's display name.
+    if (Object.prototype.hasOwnProperty.call(body, "name")) {
+      if (
+        request.headers.get("origin") !==
+        new URL(request.url).origin
+      ) {
+        return json({ error: "Invalid request origin." }, 403);
+      }
+
+      const newName =
+        typeof body.name === "string"
+          ? body.name.trim().replace(/\s+/g, " ")
+          : "";
+
+      if (!newName || newName.length > 100) {
+        return json(
+          {
+            error:
+              "Enter a creator name between 1 and 100 characters.",
+          },
+          400
+        );
+      }
+
+      const updated = await sql.begin(async (transaction) => {
+        const rows = await transaction`
+          UPDATE creators
+          SET name = ${newName}
+          WHERE id = ${creator.id}
+          RETURNING name, email
+        `;
+
+        if (rows.length === 0) {
+          return null;
+        }
+
+        const tables = await transaction`
+          SELECT to_regclass('public.prereleases') AS prereleases
+        `;
+
+        if (tables[0].prereleases) {
+          await transaction`
+            UPDATE prereleases
+            SET creator_name = ${newName}
+            WHERE creator_id = ${creator.id}
+          `;
+        }
+
+        return rows[0];
+      });
+
+      if (!updated) {
+        return json({ error: "Creator was not found." }, 404);
+      }
+
+      return json({
+        success: true,
+        name: updated.name,
+        email: updated.email,
+        message: "Your creator name was updated successfully.",
+      });
+    }
+
+    // Keep the existing email-editing feature.
     const newEmail =
       typeof body.email === "string"
         ? body.email.trim().toLowerCase()
         : "";
 
-    const emailPattern =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailPattern.test(newEmail)) {
-      return NextResponse.json(
-        {
-          error:
-            "Please enter a valid email address.",
-        },
-        {
-          status: 400,
-        }
+      return json(
+        { error: "Please enter a valid email address." },
+        400
       );
     }
 
@@ -316,14 +334,9 @@ export async function PATCH(request: Request) {
     `;
 
     if (existingCreators.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "That email address is already being used.",
-        },
-        {
-          status: 409,
-        }
+      return json(
+        { error: "That email address is already being used." },
+        409
       );
     }
 
@@ -335,28 +348,18 @@ export async function PATCH(request: Request) {
     `;
 
     if (currentCreators.length === 0) {
-      return NextResponse.json(
-        {
-          error: "Creator was not found.",
-        },
-        {
-          status: 404,
-        }
-      );
+      return json({ error: "Creator was not found." }, 404);
     }
 
-    const oldEmail = String(
-      currentCreators[0].email
-    )
+    const oldEmail = String(currentCreators[0].email)
       .trim()
       .toLowerCase();
 
     if (oldEmail === newEmail) {
-      return NextResponse.json({
+      return json({
         success: true,
         email: newEmail,
-        message:
-          "Your email address is already up to date.",
+        message: "Your email address is already up to date.",
       });
     }
 
@@ -373,8 +376,6 @@ export async function PATCH(request: Request) {
         WHERE LOWER(creator_email) = ${oldEmail}
       `;
 
-      
-
       await transaction`
         UPDATE creators
         SET email = ${newEmail}
@@ -382,27 +383,17 @@ export async function PATCH(request: Request) {
       `;
     });
 
-    return NextResponse.json({
+    return json({
       success: true,
       email: newEmail,
-      message:
-        "Your creator email was updated successfully.",
+      message: "Your creator email was updated successfully.",
     });
   } catch (error) {
-    console.error(
-      "Update creator email error:",
-      error
-    );
+    console.error("Update creator profile error:", error);
 
-    return NextResponse.json(
-      {
-        error:
-          "Could not update your creator email.",
-      },
-      {
-        status: 500,
-      }
+    return json(
+      { error: "Could not update your creator profile." },
+      500
     );
   }
 } 
-
